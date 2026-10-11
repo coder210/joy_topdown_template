@@ -1,14 +1,22 @@
 {
     "atlas": "joy_topdown_template/sprites/weapons/weapons.png",
-    "cell_px": 32,
+    "cell_px": 64,
     "weapons": {
-        "sniper":   { "name": "狙击枪", "row": 0, "col": 0, "hold_scale": 0.75, "hold_dx": 0.375,  "hold_dy": 0.0625 },
-        "pistol":   { "name": "小手枪", "row": 0, "col": 1, "hold_scale": 1, "hold_dx": 0.2, "hold_dy": 0.3, "hold_angle": 0 },
-        "revolver": { "name": "左轮",   "row": 0, "col": 2, "hold_scale": 1, "hold_dx": 0, "hold_dy": 0.3, "hold_angle": 0 },
-        "shotgun":  { "name": "散弹枪", "row": 0, "col": 3, "hold_scale": 1, "hold_dx": 0.2, "hold_dy": 0.3, "hold_angle": 0.8 },
-        "axe":      { "name": "斧头",   "row": 1, "col": 0, "hold_scale": 0.55, "hold_dx": 0.3125,  "hold_dy": 0.21875 },
-        "dp28":     { "name": "大盘鸡", "row": 1, "col": 1, "hold_scale": 0.70, "hold_dx": 0.375,  "hold_dy": 0.0625 },
-        "rocket":   { "name": "火箭筒", "row": 1, "col": 2, "hold_scale": 0.65, "hold_dx": 0.34375, "hold_dy": 0.03125 },
-        "dagger":   { "name": "匕首",   "row": 1, "col": 3, "hold_scale": 1, "hold_dx": 0,  "hold_dy": 0.3, "hold_angle": 0 }
+        "sword":           { "name": "长剑",   "row": 0, "col": 0, "hold_scale": 0.55, "hold_dx": 0.40, "hold_dy": 0.12, "hold_angle": -90, "kind": "melee" },
+        "longsword":       { "name": "巨剑",   "row": 0, "col": 1, "hold_scale": 0.70, "hold_dx": 0.45, "hold_dy": 0.05, "hold_angle": -90, "kind": "melee" },
+        "axe":             { "name": "手斧",   "row": 0, "col": 2, "hold_scale": 0.55, "hold_dx": 0.40, "hold_dy": 0.12, "hold_angle": -90, "kind": "melee" },
+        "axe_large":       { "name": "巨斧",   "row": 0, "col": 3, "hold_scale": 0.65, "hold_dx": 0.40, "hold_dy": 0.05, "hold_angle": -90, "kind": "melee" },
+        "axe_double":      { "name": "双刃斧", "row": 1, "col": 0, "hold_scale": 0.65, "hold_dx": 0.40, "hold_dy": 0.05, "hold_angle": -90, "kind": "melee" },
+        "axe_blades":      { "name": "双斧",   "row": 1, "col": 1, "hold_scale": 0.65, "hold_dx": 0.40, "hold_dy": 0.05, "hold_angle": -90, "kind": "melee" },
+        "dagger":          { "name": "匕首",   "row": 1, "col": 2, "hold_scale": 0.45, "hold_dx": 0.35, "hold_dy": 0.15, "hold_angle": -90, "kind": "melee" },
+        "hammer":          { "name": "战锤",   "row": 1, "col": 3, "hold_scale": 0.55, "hold_dx": 0.40, "hold_dy": 0.12, "hold_angle": -90, "kind": "melee" },
+        "spear":           { "name": "长矛",   "row": 2, "col": 0, "hold_scale": 0.70, "hold_dx": 0.45, "hold_dy": 0.05, "hold_angle": -90, "kind": "melee" },
+        "pole":            { "name": "长杆",   "row": 2, "col": 1, "hold_scale": 0.70, "hold_dx": 0.45, "hold_dy": 0.05, "hold_angle": -90, "kind": "melee" },
+        "staff":           { "name": "法杖",   "row": 2, "col": 2, "hold_scale": 0.70, "hold_dx": 0.45, "hold_dy": 0.05, "hold_angle": -90, "kind": "melee" },
+        "bow":             { "name": "弓",     "row": 2, "col": 3, "hold_scale": 0.60, "hold_dx": 0.30, "hold_dy": 0.10, "hold_angle": 0,  "kind": "ranged" },
+        "bow_arrow":       { "name": "搭箭弓", "row": 3, "col": 0, "hold_scale": 0.60, "hold_dx": 0.30, "hold_dy": 0.10, "hold_angle": 0,  "kind": "ranged" },
+        "arrow":           { "name": "箭矢",   "row": 3, "col": 1, "hold_scale": 0.40, "hold_dx": 0.30, "hold_dy": 0.10, "hold_angle": -90, "kind": "ranged" },
+        "shield_curved":   { "name": "圆盾",   "row": 3, "col": 2, "hold_scale": 0.50, "hold_dx": 0.30, "hold_dy": 0.20, "hold_angle": 0,  "kind": "melee" },
+        "shield_straight": { "name": "塔盾",   "row": 3, "col": 3, "hold_scale": 0.50, "hold_dx": 0.30, "hold_dy": 0.20, "hold_angle": 0,  "kind": "melee" }
     }
 }

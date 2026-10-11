@@ -3,6 +3,7 @@
 #include "game_scene_common.h"
 #include "game_scene.h"
 #include "../context.h"
+#include "../asset_manager.h"
 #include "../protocol.h"
 #include "../layers/gameplay_controls_layer.h"
 #include "../network/network_manager.h"
@@ -117,6 +118,52 @@ void GameSceneCommon::initAuthoritative(Context* ctx)
 }
 
 // ============================================================
+// 音频辅助：可选资源 + 按扩展名选择解码器
+// ============================================================
+// 大小写不敏感比较（自行实现，避免依赖 SDL_strcasecmp / POSIX strcasecmp）
+static bool audio_ext_eq(const char* ext, const char* want)
+{
+    if (!ext || !want) return false;
+    for (; *ext && *want; ++ext, ++want) {
+        char a = *ext, b = *want;
+        if (a >= 'A' && a <= 'Z') a = (char)(a + 32);
+        if (b >= 'A' && b <= 'Z') b = (char)(b + 32);
+        if (a != b) return false;
+    }
+    return *ext == '\0' && *want == '\0';
+}
+
+static const char* audio_file_ext(const char* path)
+{
+    if (!path) return "";
+    const char* dot = std::strrchr(path, '.');
+    return dot ? dot : "";
+}
+
+// audio_shot_create / audio_bgm_create 内部走 SDL_LoadWAV，仅支持 wav；
+// 这里按扩展名分派到 ogg/mp3/flac 变体（与 joy 的 luaclib/laudio.c 的 by_ext 同思路），
+// 使 Kenney 等以 ogg 为主的音效包直接放进 assets 即可用。
+static audio_shot_p shot_create_by_ext(const char* path, uint32_t dev)
+{
+    if (!path || !path[0]) return NULL;
+    const char* ext = audio_file_ext(path);
+    if (audio_ext_eq(ext, ".ogg"))  return audio_shot_create_ogg(path, dev);
+    if (audio_ext_eq(ext, ".mp3"))  return audio_shot_create_mp3(path, dev);
+    if (audio_ext_eq(ext, ".flac")) return audio_shot_create_flac(path, dev);
+    return audio_shot_create(path, dev);
+}
+
+static audio_bgm_p bgm_create_by_ext(const char* path, uint32_t dev)
+{
+    if (!path || !path[0]) return NULL;
+    const char* ext = audio_file_ext(path);
+    if (audio_ext_eq(ext, ".ogg"))  return audio_bgm_create_ogg(path, dev);
+    if (audio_ext_eq(ext, ".mp3"))  return audio_bgm_create_mp3(path, dev);
+    if (audio_ext_eq(ext, ".flac")) return audio_bgm_create_flac(path, dev);
+    return audio_bgm_create(path, dev);
+}
+
+// ============================================================
 // 本机操作层 + 音频（单机 / 客户端 / Host）
 // ============================================================
 void GameSceneCommon::initControlsAndAudio(GameScene* self)
@@ -125,9 +172,21 @@ void GameSceneCommon::initControlsAndAudio(GameScene* self)
     self->gcl = new GameplayControlsLayer(ctx);   // 纯 button 操作层，直接挂在 gs_ 上由 GameScene 桥接
 
     ctx->audio_dev = audio_open_device();
-    ctx->step_sound = audio_shot_create("joy_topdown_template/sounds/grass-step.wav", ctx->audio_dev);
+    // 音频为可选资源：路径走 AssetManager 的 audio 段（resources.json 为真源，缺失则回退内置默认）。
+    // 文件不存在或解码失败时 create 返回 NULL，而 joy 的 set_gain / play 对 NULL 安全 → 静音继续运行。
+    const char* footstep = AssetManager::GetInstance()
+        ? AssetManager::GetInstance()->GetResourcePath(AssetManager::kCatAudio, "footstep") : nullptr;
+    const char* bgm_path = AssetManager::GetInstance()
+        ? AssetManager::GetInstance()->GetResourcePath(AssetManager::kCatAudio, "bgm") : nullptr;
+
+    ctx->step_sound = shot_create_by_ext(footstep, ctx->audio_dev);
+    if (!ctx->step_sound)
+        log_info("[audio] footstep unavailable (path=%s), muted", footstep ? footstep : "(none)");
     audio_shot_set_gain(ctx->step_sound, ctx->settings.sfx_volume);
-    ctx->bgm = audio_bgm_create("joy_topdown_template/sounds/bgm.wav", ctx->audio_dev);
+
+    ctx->bgm = bgm_create_by_ext(bgm_path, ctx->audio_dev);
+    if (!ctx->bgm)
+        log_info("[audio] bgm unavailable (path=%s), muted", bgm_path ? bgm_path : "(none)");
     audio_bgm_set_gain(ctx->bgm, ctx->settings.bgm_volume);
 }
 

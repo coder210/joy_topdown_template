@@ -18,15 +18,23 @@ void WeaponCatalog::setBuiltinDefault()
         float hold_scale, hold_dx, hold_dy, hold_angle_deg;
         const char* kind;   // "melee" / "ranged"
     } kDefaults[] = {
-        //            name      row col  scale   dx        dy        angle    kind
-        { "sniper",   "狙击枪", 0, 0,  0.75f, 0.375f,  0.0625f,  0.0f, "ranged" },
-        { "pistol",   "小手枪", 0, 1,  0.50f, 0.28125f,0.1875f,  0.0f, "ranged" },
-        { "revolver", "左轮",   0, 2,  0.50f, 0.28125f,0.1875f,  0.0f, "ranged" },
-        { "shotgun",  "散弹枪", 0, 3,  0.65f, 0.34375f,0.125f,   0.0f, "ranged" },
-        { "axe",      "斧头",   1, 0,  0.55f, 0.3125f, 0.21875f, 0.0f, "melee"  },
-        { "dp28",     "大盘鸡", 1, 1,  0.70f, 0.375f,  0.0625f,  0.0f, "ranged" },
-        { "rocket",   "火箭筒", 1, 2,  0.65f, 0.34375f,0.03125f, 0.0f, "ranged" },
-        { "dagger",   "匕首",   1, 3,  0.45f, 0.3125f, 0.1875f,  0.0f, "melee"  },
+        //            name      row col  scale   dx      dy      angle    kind
+        { "sword",      "长剑",   0, 0,  0.55f, 0.40f, 0.12f, -90.0f, "melee"  },
+        { "longsword",  "巨剑",   0, 1,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
+        { "axe",        "手斧",   0, 2,  0.55f, 0.40f, 0.12f, -90.0f, "melee"  },
+        { "axe_large",  "巨斧",   0, 3,  0.65f, 0.40f, 0.05f, -90.0f, "melee"  },
+        { "axe_double", "双刃斧", 1, 0,  0.65f, 0.40f, 0.05f, -90.0f, "melee"  },
+        { "axe_blades", "双斧",   1, 1,  0.65f, 0.40f, 0.05f, -90.0f, "melee"  },
+        { "dagger",     "匕首",   1, 2,  0.45f, 0.35f, 0.15f, -90.0f, "melee"  },
+        { "hammer",     "战锤",   1, 3,  0.55f, 0.40f, 0.12f, -90.0f, "melee"  },
+        { "spear",      "长矛",   2, 0,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
+        { "pole",       "长杆",   2, 1,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
+        { "staff",      "法杖",   2, 2,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
+        { "bow",        "弓",     2, 3,  0.60f, 0.30f, 0.10f,   0.0f, "ranged" },
+        { "bow_arrow",  "搭箭弓", 3, 0,  0.60f, 0.30f, 0.10f,   0.0f, "ranged" },
+        { "arrow",      "箭矢",   3, 1,  0.40f, 0.30f, 0.10f, -90.0f, "ranged" },
+        { "shield_curved",   "圆盾", 3, 2, 0.50f, 0.30f, 0.20f,  0.0f, "melee" },
+        { "shield_straight", "塔盾", 3, 3, 0.50f, 0.30f, 0.20f,  0.0f, "melee" },
     };
     const int n = (int)(sizeof(kDefaults) / sizeof(kDefaults[0]));
     for (int i = 0; i < n; i++) {

@@ -8,20 +8,21 @@
 // 武器表：唯一真源是 data/weapons.json（经 resources.json 的 config.weapons 索引）。
 // 本文件只做"运行时 catalog"——解析、缓存、按整数 id / key 查询。
 //
-// 武器贴图为一张 2 行 × 6 列的 32×32 网格合图（sprites/weapons/weapons.png）：
-// 第 0~3 列是 8 把武器，第 4~5 列是准星（瞄准图标，非武器，不登记进本表）。
-// 因此"取武器贴图"= 加载一次合图 + 按 (row, col) 裁 32×32 的格子，
+// 武器贴图为一张 4 行 × 4 列的 64×64 网格合图（sprites/weapons/weapons.png，
+// 由 Scribble Dungeons 的 Items/ 16 张 64px 单图合成，无准星格）。
+// 因此"取武器贴图"= 加载一次合图 + 按 (row, col) 裁 64×64 的格子，
 // 与角色动画按 src_rect 切帧的套路一致，不产生额外的纹理加载。
+// 注意：Scribble 的近战武器在合图中为竖放（刀尖朝上），持握角需配 hold_angle: -90。
 //
 // 武器上限：防止 JSON 异常时武器表无限增长。
 static const int MAX_WEAPONS = 32;
 
 // 合图格子尺寸（像素）。JSON 未给 cell_px 时使用此默认值。
-static const float kWeaponCellPx = 32.0f;
+static const float kWeaponCellPx = 64.0f;
 
 struct WeaponDef {
     int         id = 0;         // 整数 id，按 JSON 中 weapons 出现顺序分配
-    std::string key;            // "sniper"
+    std::string key;            // "sword"
     std::string name;           // 展示名
     int         row = 0;        // 合图行号（从 0 起）
     int         col = 0;        // 合图列号（从 0 起）

@@ -13,26 +13,24 @@ static const float kSpeedMax = 15.0f;
 static const char* kAnimKeys[ANIM_COUNT] = { "idle", "walk", "attack", "hit", "death", "knocked" };
 
 // 内置默认表：characters.json 缺失/解析失败时的兜底。
-// 必须与 resources 中 survivor_a 的语义保持一致，且两端相同。
+// 必须与 resources 中 warrior（Scribble 绿色角色）的语义保持一致，且两端相同。
 void CharacterCatalog::setBuiltinDefault()
 {
     defs_.clear();
     byKey_.clear();
     CharacterDef d;
     d.id   = 0;
-    d.key  = "survivor_a";
-    d.name = "Survivor A";
-    d.max_hp = 100;
+    d.key  = "warrior";
+    d.name = "战士";
+    d.max_hp = 140;
     d.move_speed = fp_from_float(2.4f);
-    d.sprite_dir = "joy_topdown_template/sprites/characters/survivor_a/";
-    d.starting_weapon = "knife";
-    d.weapons.push_back("dagger");   // 兜底内置表仅授权匕首（与真实 weapons.json 的 key 一致）
-    d.anims[ANIM_IDLE].file   = "idle";
-    d.anims[ANIM_WALK].file   = "run";    // 素材实为 run.png
-    d.anims[ANIM_ATTACK].file = "";       // 素材缺失，渲染降级 idle
-    d.anims[ANIM_HIT].file    = "hit";
-    d.anims[ANIM_DEATH].file  = "death";
-    d.anims[ANIM_KNOCKED].file = "knocked";
+    d.sprite_dir = "joy_topdown_template/sprites/characters/green/";
+    d.starting_weapon = "sword";
+    d.weapons.push_back("sword");
+    d.weapons.push_back("axe");
+    d.weapons.push_back("hammer");
+    d.weapons.push_back("spear");
+    d.anims[ANIM_IDLE].file = "idle";   // Scribble 角色为单帧静态，其余动画渲染降级 idle
     defs_.push_back(d);
     byKey_[d.key] = d.id;
 }

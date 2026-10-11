@@ -17,6 +17,7 @@ public:
 	static constexpr const char* kCatFonts  = "fonts";
 	static constexpr const char* kCatMaps   = "maps";
 	static constexpr const char* kCatConfig = "config";   // 配置类资源（如角色表）
+	static constexpr const char* kCatAudio  = "audio";    // 可选音频（脚步 / BGM）；缺失即静音
 
 	// 品牌资源：不进索引（直接访问），但路径同样收敛到此处一处常量，
 	// 避免同一路径在多个场景里重复书写。

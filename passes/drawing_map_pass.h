@@ -6,11 +6,16 @@
 #include "../components/global_state_component.h"
 #include "../systems/map_def.h"
 #include "../protocol.h"
+#include "../asset_manager.h"
 
 struct Context;
 
-// 地图地形色块渲染：不再使用 Kenney tilesheet 图集，改为按 64×64 网格逐格画纯色块。
-// 墙（'#'）=墨色块，地面（'.'/'P'/'E' 等）=浅宣纸色块。视觉为黑白水墨风；
+// Scribble Dungeons 地形图集：14 列 × 11 行，每块 64×64
+//（源坐标映射见 map_def.h 的 tile_sprite_of / TILE_ATLAS_BLK）
+static constexpr const char* kTerrainAtlasPath = "joy_topdown_template/tilesheets/tilesheet.png";
+
+// 地图地形渲染：按 64×64 网格逐格贴图集瓦片（Scribble 手绘白底深线风格）。
+// 图集缺失时兜底为纯色块（墙=墨色、地面=浅宣纸色），保证仍可运行。
 // 格子尺寸每格 1 米（=50px），与实体/相机渲染的 1米=50px 精确一致，保证对齐。
 static void draw_map_pass(Context* ctx)
 {
@@ -35,21 +40,36 @@ static void draw_map_pass(Context* ctx)
         }
     }
 
-    // 墙色块：遍历 64×64 网格，'#' 画墨色方块；仅绘制落在可视画布内的格子
+    // 地形瓦片：遍历 64×64 网格逐格贴图集；仅绘制落在可视画布内的格子
+    //（屏幕 480×320、每格 50px ⇒ 约 70 次绘制，开销可忽略）
+    image_p atlas = AssetManager::GetInstance()
+        ? AssetManager::GetInstance()->GetImage(ctx->r2d, kTerrainAtlasPath) : NULL;
+    const float cell   = meters_to_pixels(1.0f);
+    const float kScale = cell / (float)TILE_ATLAS_BLK;   // 64px 图块 → 每格画布像素
+
     for (int y = 0; y < MAP_H; y++) {
         for (int x = 0; x < MAP_W; x++) {
-            if (!map_is_collidable(map_tile_at(x, y))) continue;
-            // 格心世界坐标 → 画布像素
-            float wx = meters_to_pixels((float)(x + 1)) - cx;      // 格左上/左界
-            float wy = meters_to_pixels((float)(y + 1)) - cy;
+            float wx = meters_to_pixels((float)x) - cx;   // 格左上角（画布像素）
+            float wy = meters_to_pixels((float)y) - cy;
             // 屏幕外快速剔除
-            if (wx + meters_to_pixels(1.0f) < 0.0f || wx - meters_to_pixels(1.0f) > 480.0f) continue;
-            if (wy + meters_to_pixels(1.0f) < 0.0f || wy - meters_to_pixels(1.0f) > 320.0f) continue;
+            if (wx + cell < 0.0f || wx > 480.0f) continue;
+            if (wy + cell < 0.0f || wy > 320.0f) continue;
 
-            // 墨色墙体块 + 稍淡描边（水墨风）
-            r2d_set_color(ctx->r2d, 40, 40, 45, 255);
-            jrect_t cell = { wx - meters_to_pixels(1.0f), wy - meters_to_pixels(1.0f), meters_to_pixels(1.0f), meters_to_pixels(1.0f) };
-            shape_draw_rectangle(ctx->r2d, "fill", cell);
+            int type = map_tile_at(x, y);
+            if (atlas) {
+                TileSprite ts = tile_sprite_of(type);
+                jrect_t  src    = { (float)ts.src_x, (float)ts.src_y,
+                                    (float)TILE_ATLAS_BLK, (float)TILE_ATLAS_BLK };
+                vec2_t   pos    = { wx, wy };
+                vec2_t   scale  = { kScale, kScale };
+                vec2_t   origin = { 0.0f, 0.0f };
+                image_draw_ex(atlas, &src, pos, 0.0f, scale, origin);
+            } else if (map_is_collidable(type)) {
+                // 图集缺失兜底：墨色墙体块（水墨风）
+                r2d_set_color(ctx->r2d, 40, 40, 45, 255);
+                jrect_t wall = { wx, wy, cell, cell };
+                shape_draw_rectangle(ctx->r2d, "fill", wall);
+            }
         }
     }
 }

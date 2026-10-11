@@ -32,13 +32,13 @@ struct CharacterAnim {
 
 struct CharacterDef {
     int         id = 0;              // 整数 id（协议 char_id），按 JSON 中出现顺序分配
-    std::string key;                 // "survivor_a"
+    std::string key;                 // "warrior"
     std::string name;                // 展示名
     int         max_hp = 100;        // stats.hp
     fp_t        move_speed = 0;      // stats.speed（米/秒，已定点化）
     std::string sprite_dir;          // 精灵目录（运行时相对路径）
     std::string starting_weapon;     // 初始武器（如 "knife"）
-    std::vector<std::string> weapons; // 持有的武器 key 列表（如 ["dagger","pistol"]）；空则回落 [starting_weapon]
+    std::vector<std::string> weapons; // 持有的武器 key 列表（如 ["sword","axe"]）；空则回落 [starting_weapon]
     CharacterAnim anims[ANIM_COUNT]; // 按 CharacterAnimId 索引
 };
 
@@ -55,7 +55,7 @@ public:
     const CharacterDef& get(int id);
 
     // 按 key 字符串（如 "survivor_a"）反查；找不到返回 nullptr。
-    const CharacterDef* findByName(const std::string& key);
+    const CharacterDef* findByName(const std::string& key);   // 如 "warrior"
 
     // 角色数量（至少 1）
     size_t size() const { return defs_.size(); }
@@ -65,7 +65,7 @@ public:
     std::string animPath(const CharacterDef& def, CharacterAnimId anim) const;
 
 private:
-    void setBuiltinDefault();                        // 兜底内置表（survivor_a）
+    void setBuiltinDefault();                        // 兜底内置表（warrior）
 
     std::vector<CharacterDef> defs_;                 // 稠密，按 char_id 索引
     std::unordered_map<std::string, int> byKey_;     // key → id 反查
