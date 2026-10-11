@@ -1,0 +1,16 @@
+{
+    "fonts": {
+        "simhei": "joy_topdown_template/fonts/simhei.ttf"
+    },
+    "maps": {
+        "level1": "joy_topdown_template/levels/level1.lua",
+        "level2": "joy_topdown_template/levels/level2.lua",
+        "level3": "joy_topdown_template/levels/level3.lua",
+        "level4": "joy_topdown_template/levels/level4.lua",
+        "level5": "joy_topdown_template/levels/level5.lua"
+    },
+    "config": {
+        "characters": "joy_topdown_template/data/characters.json",
+        "weapons": "joy_topdown_template/data/weapons.json"
+    }
+}
