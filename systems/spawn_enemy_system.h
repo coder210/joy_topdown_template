@@ -37,12 +37,7 @@ static void spawn_enemy_system(entt::registry& registry, Context* ctx, float /*d
             fp_from_float(s.x), fp_from_float(s.y),  // patrol_center
             fp_from_float(s.patrol_radius),
             fp_from_float(s.detect_radius),
-            fp_from_float(s.attack_radius),
-            s.ranged,                                   // 是否远程敌人
-            fp_from_float(s.bullet_speed),              // 子弹速度
-            fp_from_float(s.bullet_damage),             // 子弹伤害
-            (int)(s.bullet_interval * 20.0f + 0.5f),    // 射击间隔（tick）
-            0                                           // 射击冷却
+            fp_from_float(s.attack_radius)
         );
     }
 }

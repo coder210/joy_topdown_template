@@ -1,0 +1,22 @@
+{
+    "activeFile": "level1.tmx",
+    "fileStates": {
+        "level1.tmx": {
+            "scale": 0.46757812499999996,
+            "selectedLayer": 3,
+            "viewCenter": {
+                "x": 960.2673350041772,
+                "y": 639.465329991646
+            }
+        },
+        "level1.tmx#tilesheet": {
+            "scaleInDock": 1
+        }
+    },
+    "openFiles": [
+        "level1.tmx"
+    ],
+    "recentFiles": [
+        "level1.tmx"
+    ]
+}

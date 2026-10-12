@@ -21,8 +21,7 @@ float GameplayControlsLayer::localCoolRatio(int coolType)
                 auto& act = view.get<ActionStateComponent>(e);
                 int cd = 0, max = 1;
                 if (coolType == 1)      { cd = act.melee_cooldown;   max = ActionStateComponent::MELEE_COOLDOWN; }
-                else if (coolType == 2) { cd = act.ranged_cooldown;  max = ActionStateComponent::RANGED_COOLDOWN; }
-                else if (coolType == 3) { cd = act.ray_cooldown;     max = ActionStateComponent::RAY_COOLDOWN; }
+
                 else return 0.0f;
                 if (cd <= 0) return 0.0f;
                 return (float)cd / (float)max;
@@ -87,10 +86,8 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
         float out = R + 2.0f;
         shape_draw_circle(r2d, "line", { cx, cy }, out, 40);
 
-        // 圆心内容：切换钮画当前武器贴图，其余画文字
-        if (m->btn == btn_switch) {
-                drawWeaponIcon(cx, cy, R);
-        } else if (m->label && m->label[0]) {
+        // 圆心内容：画文字
+        if (m->label && m->label[0]) {
                 font_p f = AssetManager::GetInstance()->GetSimheiFont24();
                 jcolor_t tc = { 30, 30, 35, 255 };
                 jtext_printx(r2d, f, m->label, (int)strlen(m->label), tc,
@@ -112,36 +109,6 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
                 font_p f = AssetManager::GetInstance()->GetSimheiFont12();
                 drawKeyBadge(f, m->keyLabel, bx, by);
         }
-}
-
-// 切换武器钮：画当前武器的合图贴图（而非文字）。空手/无图时留白。
-void GameplayControlsLayer::drawWeaponIcon(float cx, float cy, float R)
-{
-        if (!ctx_) return;
-        int weapon_id = -1;
-        if (net_session(ctx_).local_conv != 0) {
-                auto view = ctx_->ecs.view<PlayerComponent>();
-                for (auto e : view) {
-                        auto& pc = view.get<PlayerComponent>(e);
-                        if (pc.conv == (int)net_session(ctx_).local_conv && pc.weapon_id >= 0)
-                                weapon_id = pc.weapon_id;
-                }
-        }
-        if (weapon_id < 0) return;
-        auto* am = AssetManager::GetInstance();
-        if (!am) return;
-        const std::string& atlas = g_weaponCatalog.atlasPath();
-        if (atlas.empty()) return;
-        image_p img = am->GetImage(ctx_->r2d, atlas.c_str());
-        if (!img) return;
-        const WeaponDef& wd = g_weaponCatalog.get(weapon_id);
-        jrect_t cell = g_weaponCatalog.cellRect(wd);
-        if (cell.w <= 0.0f || cell.h <= 0.0f) return;
-        vec2_t pos = { cx, cy };
-        float s = (R * 1.8f) / cell.w;   // 原图 32px 小于按钮直径(约54px)，故放大到约占直径 90%
-        vec2_t scl = { s, s };
-        vec2_t origin = { cell.w * 0.5f, cell.h * 0.5f };
-        image_draw_ex(img, &cell, pos, 0.0f, scl, origin);
 }
 
 void GameplayControlsLayer::sendGameplayControlEvent(int event_code)
@@ -178,9 +145,7 @@ void GameplayControlsLayer::load_dpad_panel()
         add_button(2, &btn_up,   0.18000f, 0.71000f, 0.09000f, 0.14000f, "上", "W", 0);
         add_button(3, &btn_down, 0.18000f, 0.90000f, 0.09000f, 0.14000f, "下", "S", 0);
         add_button(4, &btn_attack,0.92500f, 0.89375f, 0.13333f, 0.20000f, "攻", "J", 1);
-        add_button(5, &btn_ranged,0.76875f, 0.88438f, 0.12083f, 0.18125f, "射", "K", 2);
-        add_button(6, &btn_ray,   0.91042f, 0.64063f, 0.12083f, 0.18125f, "线", "L", 3);
-        add_button(7, &btn_switch, 0.64792f, 0.87813f, 0.11250f, 0.16875f, (const char*)switch_label_, "Q", 0);
+
 }
 
 void GameplayControlsLayer::HandleEvent(const void* ev)
@@ -205,12 +170,6 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                         GameplayControlsLayer::sendGameplayControlEvent(GAMEPLAY_CONTROL_DOWN);
                 } else if (self->btn_attack && hit(self->btn_attack) && self->localCoolRatio(1) <= 0.0f) {
                         self->pressed_btn = self->btn_attack; self->pressed_code = GAMEPLAY_CONTROL_ATTACK;
-                } else if (self->btn_ranged && hit(self->btn_ranged) && self->localCoolRatio(2) <= 0.0f) {
-                        self->pressed_btn = self->btn_ranged; self->pressed_code = GAMEPLAY_CONTROL_RANGED;
-                } else if (self->btn_ray && hit(self->btn_ray) && self->localCoolRatio(3) <= 0.0f) {
-                        self->pressed_btn = self->btn_ray; self->pressed_code = GAMEPLAY_CONTROL_RAY;
-                } else if (self->btn_switch && hit(self->btn_switch)) {
-                        self->pressed_btn = self->btn_switch; self->pressed_code = GAMEPLAY_CONTROL_SWITCH;
                 }
         };
         cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
@@ -222,16 +181,12 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                 self->pressed_btn = NULL;
                 self->pressed_code = 0;
                 button_set_pressed(b, false);
-                if (b == self->btn_attack || b == self->btn_ranged || b == self->btn_ray || b == self->btn_switch) {
+                if (b == self->btn_attack) {
                         // 技能：完整点击（松开仍在按钮内）才触发一次
                         if (!button_is_hovered(b, x, y)) return;
-                        if (b == self->btn_switch) {
-                                GameplayControlsLayer::sendGameplayControlEvent(code);
-                        } else {
-                                int coolType = (b == self->btn_attack) ? 1 : (b == self->btn_ranged) ? 2 : 3;
-                                if (self->localCoolRatio(coolType) > 0.0f) return;
-                                GameplayControlsLayer::sendGameplayControlEvent(code);
-                        }
+                        int coolType = 1;
+                        if (self->localCoolRatio(coolType) > 0.0f) return;
+                        GameplayControlsLayer::sendGameplayControlEvent(code);
                 } else {
                         // 方向键：松开即清除对应位移位
                         GameplayControlsLayer::sendGameplayControlEvent(code);
@@ -242,11 +197,11 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
 
 void GameplayControlsLayer::Destroy()
 {
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 5; i++) {
                 if (metas[i].btn) { button_destroy(metas[i].btn); metas[i].btn = NULL; }
         }
         btn_left = btn_right = btn_up = btn_down = NULL;
-        btn_attack = btn_ranged = btn_ray = btn_switch = NULL;
+        btn_attack = NULL;
         pressed_btn = NULL;
         pressed_code = 0;
 }
@@ -254,20 +209,5 @@ void GameplayControlsLayer::Destroy()
 void GameplayControlsLayer::Render()
 {
         if (!ctx_) return;
-        // 切换钮标签 = 本地玩家当前武器名（无本地玩家/空手显示"空手"）
-        {
-                const char* name = "空手";
-                if (net_session(ctx_).local_conv != 0) {
-                        auto view = ctx_->ecs.view<PlayerComponent>();
-                        for (auto e : view) {
-                                auto& pc = view.get<PlayerComponent>(e);
-                                if (pc.conv == (int)net_session(ctx_).local_conv && pc.weapon_id >= 0) {
-                                        name = g_weaponCatalog.get(pc.weapon_id).name.c_str();
-                                }
-                        }
-                }
-                strncpy(switch_label_, name, sizeof(switch_label_) - 1);
-                switch_label_[sizeof(switch_label_) - 1] = '\0';
-        }
-        for (int i = 0; i < 8; i++) drawButton(&metas[i]);
+        for (int i = 0; i < 5; i++) drawButton(&metas[i]);
 }

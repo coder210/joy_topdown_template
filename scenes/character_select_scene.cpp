@@ -7,6 +7,7 @@
 #include "../ui_style.h"
 #include "../asset_manager.h"
 #include "../systems/character_catalog.h"
+#include "../systems/weapon_catalog.h"
 
 // 角色卡片尺寸（与 Load 中创建一致）
 static const float CARD_W = 140.0f, CARD_H = 130.0f;
@@ -75,7 +76,8 @@ void CharacterSelectScene::draw_card(int i) {
     jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 44.0f);
     snprintf(buf, sizeof(buf), "移速 %.1f m/s", fp_to_float(cd.move_speed));
     jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 62.0f);
-    snprintf(buf, sizeof(buf), "武器 %s", cd.starting_weapon.c_str());
+    const WeaponDef* wd = cd.weapon.empty() ? nullptr : g_weaponCatalog.findByName(cd.weapon.c_str());
+    snprintf(buf, sizeof(buf), "武器 %s", wd ? wd->name.c_str() : "空手");
     jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 80.0f);
     snprintf(buf, sizeof(buf), "%s", cd.key.c_str());
     jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 98.0f);

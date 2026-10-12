@@ -70,7 +70,7 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
                             ctx_->ecs.ctx().get<GlobalState>().level, e_cnt);
                         if (si >= 0 && si < e_cnt) {
                             auto& sd = e_defs[si];
-                            // 血量组件：从快照恢复（玩家远程子弹伤害结算结果）
+                            // 血量组件：从快照恢复（近战伤害结算结果）
                             ctx_->ecs.emplace<HealthComponent>(e,
                                 (int)entity.hp, ENEMY_MAX_HP);
                             // 出生点：从 SpawnDef 恢复（死亡重生传送目标）
@@ -80,20 +80,14 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
                                 fp_from_float(sd.x), fp_from_float(sd.y),
                                 fp_from_float(sd.patrol_radius),
                                 fp_from_float(sd.detect_radius),
-                                fp_from_float(sd.attack_radius),
-                                sd.ranged,                                   // 是否远程敌人
-                                fp_from_float(sd.bullet_speed),              // 子弹速度
-                                fp_from_float(sd.bullet_damage),             // 子弹伤害
-                                (int)(sd.bullet_interval * 20.0f + 0.5f),    // 射击间隔（tick）
-                                0);                                          // 射击冷却
-                            // 恢复服务端下发的 AI 运行时状态（timer/state/target/shoot_cooldown），
+                                fp_from_float(sd.attack_radius));
+                            // 恢复服务端下发的 AI 运行时状态（timer/state/target），
                             // 否则这些持续累积的状态从 0/出生点开始，与服务端接入时值不同步
                             auto& ai = ctx_->ecs.get<AIComponent>(e);
                             ai.timer          = entity.ai_timer;
                             ai.state          = entity.ai_state;
                             ai.target_x       = (fp_t)entity.ai_target_x;
                             ai.target_y       = (fp_t)entity.ai_target_y;
-                            ai.shoot_cooldown = entity.ai_shoot_cooldown;
                         }
                 }
         }
@@ -111,7 +105,7 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
         // 告知服务器本地玩家加入（出生在当前关卡 'P' 格）
         fp_t sx_j, sy_j;
         map_player_spawn(ctx_->ecs.ctx().get<GlobalState>().level, &sx_j, &sy_j);
-        std::string data = pack_c2s(CMD_PLAYER_JOIN, sx_j, sy_j, 0, 0, 0, 0, ctx_->selected_char_id);
+        std::string data = pack_c2s(CMD_PLAYER_JOIN, sx_j, sy_j, 0, 0, ctx_->selected_char_id);
         netclient_send(ctx_->netclient, data.c_str(), (int)data.size());
 }
 
@@ -122,14 +116,8 @@ void NetworkManager::SendInput()
     int dir = game_runtime(ctx_).current_input_mask & INPUT_DIR_MASK;
     int attack = (game_runtime(ctx_).current_input_mask & INPUT_ATTACK) ? 1 : 0;
     if (game_runtime(ctx_).attack_triggered) { attack = 1; game_runtime(ctx_).attack_triggered = false; }
-    int ranged = (game_runtime(ctx_).current_input_mask & INPUT_RANGED) ? 1 : 0;
-    if (game_runtime(ctx_).bullet_triggered) { ranged = 1; game_runtime(ctx_).bullet_triggered = false; }
-    int ray = (game_runtime(ctx_).current_input_mask & INPUT_RAY) ? 1 : 0;
-    if (game_runtime(ctx_).ray_triggered) { ray = 1; game_runtime(ctx_).ray_triggered = false; }
-    int wswitch = 0;
-    if (game_runtime(ctx_).weapon_switch_triggered) { wswitch = 1; game_runtime(ctx_).weapon_switch_triggered = false; }
-    if (dir || attack || ranged || ray || wswitch) {
-        auto data = pack_c2s(CMD_PLAYER_INPUT, 0, 0, dir, attack, ranged, ray, wswitch);
+    if (dir || attack) {
+        auto data = pack_c2s(CMD_PLAYER_INPUT, 0, 0, dir, attack);
         netclient_send(ctx_->netclient, data.c_str(), (int)data.size());
     }
 }
@@ -221,9 +209,9 @@ void NetworkManager::HandleCmdPlayerLeave(int conv)
         net_session(ctx_).player_leaves.push_back(l);
 }
 
-void NetworkManager::HandleCmdPlayerInput(int conv, uint32_t seq, int dir, int attack, int ranged, int ray, int weapon_switch)
+void NetworkManager::HandleCmdPlayerInput(int conv, uint32_t seq, int dir, int attack)
 {
-        S2CPlayerInput i = { seq, conv, dir, (int8_t)attack, (int8_t)ranged, (int8_t)ray, (int8_t)weapon_switch };
+        S2CPlayerInput i = { seq, conv, dir, (int8_t)attack };
         net_session(ctx_).player_inputs.push_back(i);
 }
 
@@ -263,13 +251,13 @@ void NetworkManager::ServerReceive()
                         net_session(ctx_).player_leaves.push_back(l);
                 }
                 else if (msg.type == NET_TYPE_MESSAGE) {
-                        int cmd, input_dir = 0, input_attack = 0, input_ranged = 0, input_ray = 0, input_weapon_switch = 0, char_id = 0; int64_t join_x = 0, join_y = 0;
-                        if (unpack_c2s((const char*)msg.data, (int)msg.len, &cmd, &join_x, &join_y, &input_dir, &input_attack, &input_ranged, &input_ray, &char_id, &input_weapon_switch)) {
+                        int cmd, input_dir = 0, input_attack = 0, char_id = 0; int64_t join_x = 0, join_y = 0;
+                        if (unpack_c2s((const char*)msg.data, (int)msg.len, &cmd, &join_x, &join_y, &input_dir, &input_attack, &char_id)) {
                                 switch (cmd) {
                                 case CMD_LOADING:       HandleCmdLoading(msg.conv); break;
                                 case CMD_PLAYER_JOIN:   HandleCmdPlayerJoin(msg.conv, join_x, join_y, char_id); break;
                                 case CMD_PLAYER_LEAVE:  HandleCmdPlayerLeave(msg.conv); break;
-                                case CMD_PLAYER_INPUT:  HandleCmdPlayerInput(msg.conv, 0, input_dir, input_attack, input_ranged, input_ray, input_weapon_switch); break;
+                                case CMD_PLAYER_INPUT:  HandleCmdPlayerInput(msg.conv, 0, input_dir, input_attack); break;
                                 case CMD_PLAYER_HEART:  HandleCmdHeartbeat(msg.conv); break;
                                 }
                         }
@@ -327,10 +315,9 @@ void NetworkManager::CollectInput(int frame_id)
                 std::string input_finger;
                 for (int k = 0; k < num_inputs; k++) {
                         char b[64];
-                        snprintf(b, sizeof(b), "%d:%d:%d:%d:%d;",
+                        snprintf(b, sizeof(b), "%d:%d:%d;",
                                 inputs[k].conv, inputs[k].dir,
-                                (int)inputs[k].attack, (int)inputs[k].ranged,
-                                (int)inputs[k].ray);
+                                (int)inputs[k].attack);
                         input_finger += b;
                 }
                 ChecksumRecord rec;
@@ -438,14 +425,8 @@ void NetworkManager::CollectLocalInput()
         int dir = game_runtime(ctx_).current_input_mask & INPUT_DIR_MASK;
         int attack = (game_runtime(ctx_).current_input_mask & INPUT_ATTACK) ? 1 : 0;
         if (game_runtime(ctx_).attack_triggered) { attack = 1; game_runtime(ctx_).attack_triggered = false; }
-        int ranged = (game_runtime(ctx_).current_input_mask & INPUT_RANGED) ? 1 : 0;
-        if (game_runtime(ctx_).bullet_triggered) { ranged = 1; game_runtime(ctx_).bullet_triggered = false; }
-        int ray = (game_runtime(ctx_).current_input_mask & INPUT_RAY) ? 1 : 0;
-        if (game_runtime(ctx_).ray_triggered) { ray = 1; game_runtime(ctx_).ray_triggered = false; }
-        int wswitch = 0;
-        if (game_runtime(ctx_).weapon_switch_triggered) { wswitch = 1; game_runtime(ctx_).weapon_switch_triggered = false; }
-        if (dir || attack || ranged || ray || wswitch) {
-                S2CPlayerInput i = { 0, (int32_t)net_session(ctx_).local_conv, dir, (int8_t)attack, (int8_t)ranged, (int8_t)ray, (int8_t)wswitch };
+        if (dir || attack) {
+                S2CPlayerInput i = { 0, (int32_t)net_session(ctx_).local_conv, dir, (int8_t)attack };
                 net_session(ctx_).player_inputs.push_back(i);
         }
 }

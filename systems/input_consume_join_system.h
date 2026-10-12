@@ -31,18 +31,13 @@ static void input_consume_join_system(entt::registry& registry, Context* ctx, fl
 					sp.x = join.position_x;
 					sp.y = join.position_y;
 				}
-				// 快照重建的玩家若尚未授权武器（重连/晚加入），按角色授权补齐库存（幂等）。
+				// 快照重建的玩家若尚未持有武器（重连/晚加入），按角色类型授权（幂等）。
 				{
-					auto& pc = registry.get<PlayerComponent>(pe);
-					if (pc.weapon_count == 0) {
-						const auto& cd = g_characterCatalog.get(join.char_id);
-						if (!cd.weapons.empty()) {
-							for (const auto& wk : cd.weapons) pc_grant_weapon(pc, wk.c_str());
-						} else {
-							pc_grant_weapon(pc, cd.starting_weapon.c_str());
-						}
-						if (pc.weapon_id < 0) pc.weapon_id = pc.weapon_count > 0 ? pc.w_ids[0] : -1;
-					}
+				    auto& pc = registry.get<PlayerComponent>(pe);
+				    if (pc.weapon_id < 0) {
+				        const auto& cd = g_characterCatalog.get(join.char_id);
+				        pc_set_weapon(pc, cd.weapon.empty() ? nullptr : cd.weapon.c_str());
+				    }
 				}
 				exists = true;
 				break;
@@ -54,23 +49,13 @@ static void input_consume_join_system(entt::registry& registry, Context* ctx, fl
 		registry.emplace<IdComponent>(player, get_entity_id(ctx));
 		registry.emplace<PlayerComponent>(player, join.conv, join.char_id);
 
-		// 初始武器库存：由角色的 weapons 列表解析到武器 id（空则回落 starting_weapon）。
-		// 列表来自 characters.json，两端加载同一份文件 → 结果一致，帧同步安全。
-		// 查不到（键拼错 / 未登记进武器表）的条目静默跳过；全查不到则空手（weapon_id=-1）。
+		// 角色固定持有的武器：由 characters.json 的 weapon 字段决定（单一，无切换）。
+		// 角色类型两端加载同一份文件 → 结果一致，帧同步安全。
+		// 查不到（键拼错 / 未登记进武器表）则空手（weapon_id=-1）。
 		{
-			auto& pc = registry.get<PlayerComponent>(player);
-			const auto& def = g_characterCatalog.get(join.char_id);
-			std::vector<std::string> keys = def.weapons;
-			if (keys.empty()) keys.push_back(def.starting_weapon);
-			for (const auto& k : keys) {
-				const WeaponDef* wd = g_weaponCatalog.findByName(k);
-				if (wd && pc.weapon_count < 8)
-					pc.w_ids[pc.weapon_count++] = wd->id;
-			}
-			if (pc.weapon_count > 0) {
-				pc.weapon_index = 0;
-				pc.weapon_id = pc.w_ids[0];
-			}
+		    auto& pc = registry.get<PlayerComponent>(player);
+		    const auto& def = g_characterCatalog.get(join.char_id);
+		    pc_set_weapon(pc, def.weapon.empty() ? nullptr : def.weapon.c_str());
 		}
 		// join.position 是出生格中心；碰撞盒 0.8×0.8 以出生点居中，
 		// LogicPosition(左上角) = 中心 - 半宽(0.4)，Transform(渲染中心) = 出生点

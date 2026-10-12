@@ -9,11 +9,7 @@ struct SpawnDef {
     float x, y;           // 位置
     float patrol_radius;  // 巡逻半径
     float detect_radius;  // 检测范围
-    float attack_radius;  // 攻击范围
-    bool  ranged;         // 是否远程敌人
-    float bullet_speed;   // 子弹速度（m/s）
-    float bullet_interval;// 射击间隔（秒）
-    float bullet_damage;  // 子弹伤害
+    float attack_radius;  // 攻击范围（近战：接触距离）
 };
 
 // ============================================================
@@ -33,17 +29,12 @@ static inline const SpawnDef* level_enemy_defs(int level, int& count)
     for (int i = 0; i < count; ++i) {
         int cell = g_map_info.enemy_cells[i];
         int cx = cell % MAP_W, cy = cell / MAP_W;
-        bool ranged = (i % 2 == 0);   // 近战/远程交替混合
         SpawnDef d;
         d.x = (float)cx + 0.5f;
         d.y = (float)cy + 0.5f;
-        d.patrol_radius  = ranged ? 2.0f : 3.0f;
-        d.detect_radius  = ranged ? 10.0f : 6.0f;
-        d.attack_radius  = ranged ? 6.0f : 1.5f;
-        d.ranged         = ranged;
-        d.bullet_speed   = ranged ? 6.0f : 0.0f;
-        d.bullet_interval= ranged ? 1.5f : 0.0f;
-        d.bullet_damage  = ranged ? 10.0f : 0.0f;
+        d.patrol_radius  = 3.0f;
+        d.detect_radius  = 6.0f;
+        d.attack_radius  = 1.5f;
         defs[i] = d;
     }
     return defs;

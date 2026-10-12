@@ -4,7 +4,6 @@
 #include "../components/logic_position_component.h"
 #include "../components/logic_rect_component.h"
 #include "../components/player_component.h"
-#include "../components/bullet_component.h"
 #include "map_def.h"
 
 struct Context;

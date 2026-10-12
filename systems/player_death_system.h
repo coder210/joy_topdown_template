@@ -13,7 +13,7 @@
 struct Context;
 
 // 玩家死亡 / 重生（帧同步确定性：两端同一 tick 判定与传送，无需网络同步）
-// 注册在 bullet_system 之后：子弹扣血 → 死亡判定 → 重生计时
+// 注册在 melee_attack_system 之后：近战扣血 → 死亡判定 → 重生计时
 static void player_death_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
     auto view = registry.view<PlayerComponent, HealthComponent, LogicPositionComponent>();
@@ -21,7 +21,7 @@ static void player_death_system(entt::registry& registry, Context* ctx, float /*
         auto& h   = view.get<HealthComponent>(e);
         auto& pos = view.get<LogicPositionComponent>(e);
 
-        // 死亡判定：HP 归零（bullet_system 已把 HP 钳制在 0）
+        // 死亡判定：HP 归零（melee_attack_system 已把 HP 钳制在 0）
         if (!h.dead && h.hp <= 0) {
             h.dead = true;
             h.respawn_timer = PLAYER_RESPAWN_TICKS;
@@ -50,7 +50,6 @@ static void player_death_system(entt::registry& registry, Context* ctx, float /*
                     auto& act = registry.get<ActionStateComponent>(e);
                     act.state           = ActionStateComponent::IDLE;
                     act.attack_timer    = 0;
-                    act.ranged_cooldown = 0;   // 清射击冷却，防重生瞬间立刻开火
                     act.melee_cooldown  = 0;   // 清近战冷却，防重生瞬间立刻挥击
                 }
                 // 同步渲染坐标（碰撞盒中心 = 出生格中心），避免插值缓慢漂移

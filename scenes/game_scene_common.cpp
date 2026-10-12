@@ -30,9 +30,8 @@ void GameSceneCommon::playKeyPressed(const char* key, int scancode, bool repeat,
     else if (strcmp(key, "up") == 0) key_mask = INPUT_UP;
     else if (strcmp(key, "down") == 0) key_mask = INPUT_DOWN;
     else if (strcmp(key, "space") == 0) key_mask = INPUT_ATTACK;
-    else if (strcmp(key, "e") == 0 || strcmp(key, "E") == 0) { game_runtime(self->ctx()).bullet_triggered = true; return; }
-    else if (strcmp(key, "l") == 0 || strcmp(key, "L") == 0) { game_runtime(self->ctx()).ray_triggered = true; return; }
-    else if (strcmp(key, "q") == 0 || strcmp(key, "Q") == 0) { game_runtime(self->ctx()).weapon_switch_triggered = true; return; }
+
+
     if (key_mask) {
         game_runtime(self->ctx()).current_input_mask |= key_mask;
         if (key_mask & INPUT_DIR_MASK)
@@ -56,8 +55,8 @@ void GameSceneCommon::playKeyReleased(const char* key, int scancode, void* arg)
     else if (strcmp(key, "up") == 0) key_mask = INPUT_UP;
     else if (strcmp(key, "down") == 0) key_mask = INPUT_DOWN;
     else if (strcmp(key, "space") == 0) key_mask = INPUT_ATTACK;
-    else if (strcmp(key, "e") == 0 || strcmp(key, "E") == 0) { game_runtime(self->ctx()).bullet_triggered = true; return; }
-    else if (strcmp(key, "l") == 0 || strcmp(key, "L") == 0) { game_runtime(self->ctx()).ray_triggered = true; return; }
+
+
     if (key_mask) game_runtime(self->ctx()).current_input_mask &= ~key_mask;
 }
 
@@ -80,15 +79,6 @@ void GameSceneCommon::playableHandleEvent(GameScene* self, const void* ev)
         case GAMEPLAY_CONTROL_RELEASE_DOWN:  new_mask &= ~INPUT_DOWN; break;
         case GAMEPLAY_CONTROL_ATTACK:
             game_runtime(ctx).attack_triggered = true;
-            break;
-        case GAMEPLAY_CONTROL_RANGED:
-            game_runtime(ctx).bullet_triggered = true;
-            break;
-        case GAMEPLAY_CONTROL_RAY:
-            game_runtime(ctx).ray_triggered = true;
-            break;
-        case GAMEPLAY_CONTROL_SWITCH:
-            game_runtime(ctx).weapon_switch_triggered = true;
             break;
         default:
             new_mask &= ~(INPUT_UP | INPUT_DOWN | INPUT_LEFT | INPUT_RIGHT);
@@ -228,10 +218,9 @@ void GameSceneCommon::verifyFrameSyncImpl(GameScene* self, int frame_id,
     std::string input_finger;
     for (int k = 0; k < in; k++) {
         char b[64];
-        snprintf(b, sizeof(b), "%d:%d:%d:%d:%d:",
+        snprintf(b, sizeof(b), "%d:%d:%d:",
                 inputs[k].conv, inputs[k].dir,
-                (int)inputs[k].attack, (int)inputs[k].ranged,
-                (int)inputs[k].ray);
+                (int)inputs[k].attack);
         input_finger += b;
     }
 

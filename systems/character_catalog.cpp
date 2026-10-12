@@ -25,11 +25,7 @@ void CharacterCatalog::setBuiltinDefault()
     d.max_hp = 140;
     d.move_speed = fp_from_float(2.4f);
     d.sprite_dir = "joy_topdown_template/sprites/characters/green/";
-    d.starting_weapon = "sword";
-    d.weapons.push_back("sword");
-    d.weapons.push_back("axe");
-    d.weapons.push_back("hammer");
-    d.weapons.push_back("spear");
+    d.weapon = "sword";                  // 对应武器（单一固定，无切换）
     d.anims[ANIM_IDLE].file = "idle";   // Scribble 角色为单帧静态，其余动画渲染降级 idle
     defs_.push_back(d);
     byKey_[d.key] = d.id;
@@ -91,16 +87,8 @@ void CharacterCatalog::load()
         v = cJSON_GetObjectItem(ch, "sprite_dir");
         if (v && v->type == cJSON_String && v->valuestring) d.sprite_dir = v->valuestring;
 
-        v = cJSON_GetObjectItem(ch, "starting_weapon");
-        if (v && v->type == cJSON_String && v->valuestring) d.starting_weapon = v->valuestring;
-
-        cJSON* wl = cJSON_GetObjectItem(ch, "weapons");
-        if (wl && wl->type == cJSON_Array) {
-            for (cJSON* w = wl->child; w; w = w->next) {
-                if (w->type == cJSON_String && w->valuestring && w->valuestring[0])
-                    d.weapons.push_back(w->valuestring);
-            }
-        }
+        v = cJSON_GetObjectItem(ch, "weapon");
+        if (v && v->type == cJSON_String && v->valuestring) d.weapon = v->valuestring;
 
         cJSON* stats = cJSON_GetObjectItem(ch, "stats");
         if (stats) {

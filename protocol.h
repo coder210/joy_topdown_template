@@ -17,8 +17,6 @@ enum {
     INPUT_LEFT   = 1 << 2,
     INPUT_RIGHT  = 1 << 3,
     INPUT_ATTACK = 1 << 4,
-    INPUT_RANGED = 1 << 5,
-    INPUT_RAY    = 1 << 6,   // 射线大招（hitscan，玩家专属）
     INPUT_DIR_MASK = INPUT_UP | INPUT_DOWN | INPUT_LEFT | INPUT_RIGHT,
 };
 
@@ -49,7 +47,7 @@ enum S2CType {
 /* ============================ 协议结构体 ============================ */
 struct S2CPlayerJoin  { int32_t conv; int64_t position_x, position_y; int32_t char_id; };
 struct S2CPlayerLeave { int32_t conv; };
-struct S2CPlayerInput { uint32_t client_seq; int32_t conv, dir;  int8_t attack; int8_t ranged; int8_t ray; int8_t weapon_switch; };
+struct S2CPlayerInput { uint32_t client_seq; int32_t conv, dir;  int8_t attack; };
 struct S2CEntity {
     int32_t id, type;
     int64_t position_x, position_y, width, height, hp;
@@ -116,17 +114,14 @@ static inline void pack_leave(jmsgpack_packer_t* pk, const S2CPlayerLeave& l) {
     jmsgpack_pack_int(pk, l.conv);
 }
 static inline void pack_input(jmsgpack_packer_t* pk, const S2CPlayerInput& i) {
-    jmsgpack_pack_array(pk, 6);
+    jmsgpack_pack_array(pk, 3);
     jmsgpack_pack_int(pk, i.conv);
     jmsgpack_pack_int(pk, i.dir);
     jmsgpack_pack_int(pk, i.attack);
-    jmsgpack_pack_int(pk, i.ranged);
-    jmsgpack_pack_int(pk, i.ray);
-    jmsgpack_pack_int(pk, i.weapon_switch);
 }
 
 /* C2S 打包: [cmd, payload] */
-static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int input_dir, int input_attack, int input_ranged = 0, int input_ray = 0, int input_weapon_switch = 0, int char_id = 0) {
+static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int input_dir, int input_attack, int char_id = 0) {
     std::string out;
     jmsgpack_packer_t pk;
     jmsgpack_packer_init(&pk, &out, mp_write_cb);
@@ -138,12 +133,9 @@ static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int 
         jmsgpack_pack_int64(&pk, join_y);
         jmsgpack_pack_int(&pk, char_id);
     } else if (cmd == CMD_PLAYER_INPUT) {
-        jmsgpack_pack_array(&pk, 5);
+        jmsgpack_pack_array(&pk, 2);
         jmsgpack_pack_int(&pk, input_dir);
         jmsgpack_pack_int(&pk, input_attack);
-        jmsgpack_pack_int(&pk, input_ranged);
-        jmsgpack_pack_int(&pk, input_ray);
-        jmsgpack_pack_int(&pk, input_weapon_switch);
     } else {
         jmsgpack_pack_nil(&pk);
     }
@@ -307,13 +299,10 @@ static inline void unpack_command_read_one(S2CPlayerLeave& d, const jmsgpack_obj
     }
 }
 static inline void unpack_command_read_one(S2CPlayerInput& d, const jmsgpack_object_t* o) {
-    if (o->type == JMSGPACK_OBJECT_ARRAY && o->via.array.size >= 6) {
+    if (o->type == JMSGPACK_OBJECT_ARRAY && o->via.array.size >= 3) {
         d.conv = (int)jmp_int(&o->via.array.ptr[0]);
         d.dir = (int)jmp_int(&o->via.array.ptr[1]);
         d.attack = (int8_t)jmp_int(&o->via.array.ptr[2]);
-        d.ranged = (int8_t)jmp_int(&o->via.array.ptr[3]);
-        d.ray = (int8_t)jmp_int(&o->via.array.ptr[4]);
-        d.weapon_switch = (int8_t)jmp_int(&o->via.array.ptr[5]);
     }
 }
 
@@ -389,7 +378,7 @@ static inline int unpack_command(const char* data, int len,
  * 通过出参返回 cmd / join_x, join_y / input_dir, input_attack */
 static inline int unpack_c2s(const char* data, int len,
     int* cmd, int64_t* join_x, int64_t* join_y, int* input_dir, int* input_attack,
-    int* input_ranged = nullptr, int* input_ray = nullptr, int* char_id = nullptr, int* input_weapon_switch = nullptr)
+    int* char_id = nullptr)
 {
     jmsgpack_unpacked_t r;
     jmsgpack_unpacked_init(&r);
@@ -413,12 +402,6 @@ static inline int unpack_c2s(const char* data, int len,
                 *input_dir = (int)jmp_int(&payload->via.array.ptr[0]);
                 *input_attack = (int)jmp_int(&payload->via.array.ptr[1]);
             }
-            if (payload->via.array.size >= 3 && input_ranged)
-                *input_ranged = (int)jmp_int(&payload->via.array.ptr[2]);
-            if (payload->via.array.size >= 4 && input_ray)
-                *input_ray = (int)jmp_int(&payload->via.array.ptr[3]);
-            if (payload->via.array.size >= 5 && input_weapon_switch)
-                *input_weapon_switch = (int)jmp_int(&payload->via.array.ptr[4]);
             break;
         }
     }

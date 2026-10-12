@@ -15,7 +15,6 @@ struct WeaponAnimState {
     float duration = 0.0f;   // 总时长（秒）
     float aim_lock = 0.0f;   // 攻击起手锁定的瞄准角（近战扫弧以它为基准）
     int   prev_attack_timer = 0;  // 上一渲染帧的 attack_timer（检测跳变）
-    int   prev_ranged_cd = 0;     // 上一渲染帧的 ranged_cooldown（检测跳变）
 };
 
 struct AnimStateComponent {

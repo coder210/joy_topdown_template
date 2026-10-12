@@ -39,8 +39,7 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
         // 冷却自然流逝；近战事件来源（玩家点击 攻 / 敌人每 tick 推）由冷却节流
         if (act.melee_cooldown > 0) act.melee_cooldown -= 1;
 
-        // 只处理近战类型事件；射/线事件留给 player_shoot / player_ray 系统消费。
-        // 只移除近战事件，避免误清同一帧拍入的射/线事件导致技能丢失。
+        // 只处理近战类型事件；只移除近战事件，避免误清同一帧拍入的其它事件。
         auto erase_melee = [](std::vector<PlayerEventInput::Action>& v) {
             v.erase(std::remove_if(v.begin(), v.end(),
                 [](const PlayerEventInput::Action& a){ return a.type == PlayerEventInput::ATTACK_MELEE; }),
@@ -53,11 +52,13 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
 
         bool is_player = registry.all_of<PlayerComponent>(attacker);
 
-        // 远程敌人不产生近战命中（其攻击走子弹），近战事件直接丢弃
-        if (!is_player && registry.all_of<AIComponent>(attacker) &&
-            registry.get<AIComponent>(attacker).ranged) {
-            erase_melee(events.pending_actions);
-            continue;
+        // 玩家近战需持有近战武器（kind==1）；持有远程/空手武器则忽略近战输入
+        if (is_player) {
+            int wid = registry.get<PlayerComponent>(attacker).weapon_id;
+            if (wid >= 0 && g_weaponCatalog.get(wid).kind != 1) {
+                erase_melee(events.pending_actions);
+                continue;
+            }
         }
 
         // 冷却中：本次攻击被吞

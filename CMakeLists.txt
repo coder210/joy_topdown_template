@@ -33,8 +33,6 @@ set(PROJECT_FILES
     components/action_state_component.h
     components/ai_component.h
     components/anim_state_component.h
-    components/attack_ray_effect_component.h
-    components/bullet_component.h
     components/connection_component.h
     components/enemy_component.h
     components/game_runtime_component.h
@@ -67,11 +65,9 @@ set(PROJECT_FILES
     network/network_manager.h
     # ---- passes ----
     passes/camera_follow_pass.h
-    passes/drawing_attack_ray_effect_pass.h
     passes/drawing_collision_debug_pass.h
     passes/drawing_map_pass.h
     passes/drawing_minimap_pass.h
-    passes/draw_bullet_pass.h
     passes/draw_enemy_pass.h
     passes/draw_fps_pass.h
     passes/draw_player_pass.h
@@ -110,7 +106,6 @@ set(PROJECT_FILES
     systems/map_def.cpp
     systems/weapon_catalog.cpp
     systems/ai_system.h
-    systems/bullet_system.h
     systems/character_catalog.h
     systems/weapon_catalog.h
     systems/cleanup_system.h
@@ -125,8 +120,6 @@ set(PROJECT_FILES
     systems/movement_system.h
     systems/pathfinding_system.h
     systems/player_death_system.h
-    systems/player_ray_system.h
-    systems/player_shoot_system.h
     systems/snapshot_system.h
     systems/spawn_def.h
     systems/spawn_enemy_system.h

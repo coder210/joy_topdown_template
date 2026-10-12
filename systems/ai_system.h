@@ -8,13 +8,14 @@
 #include "../components/logic_rect_component.h"
 #include "../components/transform_component.h"
 #include "../components/id_component.h"
-#include "../components/bullet_component.h"
 #include "../components/action_state_component.h"
 #include "../components/player_event_input.h"
 #include "../components/pathfinding_component.h"
 #include "../components/health_component.h"
 #include "../components/global_state_component.h"
 #include <cmath>
+
+// 本模板为纯近战：敌人不再发射子弹，故无 spawn_enemy_bullet / BulletComponent 相关逻辑。
 
 struct Context;
 
@@ -24,41 +25,6 @@ static inline int fp_trunc_to_int(fp_t x)
     int64_t q = x >> FP_FRACTIONAL_PLACES;   // 负数时偏小（floor 方向）
     if (x < 0 && (x & (FP_ONE - 1)) != 0) q += 1;  // 向零修正
     return (int)q;
-}
-
-// 远程敌人发射子弹：帧同步下两端用 get_entity_id 分配相同 ID，无需网络同步。
-static void spawn_enemy_bullet(entt::registry& registry, Context* ctx,
-                               fp_t ex, fp_t ey, fp_t px, fp_t py,
-                               const AIComponent& ai)
-{
-    // 敌人/玩家碰撞盒 0.8x0.8，中心 = 左上角 + 0.4。全程纯定点数，帧同步确定性。
-    fp_t exf = fp_add(ex, fp_from_float(0.4f));
-    fp_t eyf = fp_add(ey, fp_from_float(0.4f));
-    fp_t pxf = fp_add(px, fp_from_float(0.4f));
-    fp_t pyf = fp_add(py, fp_from_float(0.4f));
-    // 从敌人中心指向玩家中心的方向向量
-    fp_t dx = fp_sub(pxf, exf);
-    fp_t dy = fp_sub(pyf, eyf);
-    // 归一化方向并乘以速度（fp_sqrt/fp_div 均为纯整数实现，两端结果一致）
-    fp_t len_sq = fp_add(fp_mul(dx, dx), fp_mul(dy, dy));
-    fp_t len = fp_sqrt(len_sq);
-    if (len < fp_from_float(0.001f)) len = fp_one();
-    fp_t vx = fp_div(fp_mul(dx, ai.bullet_speed), len);
-    fp_t vy = fp_div(fp_mul(dy, ai.bullet_speed), len);
-
-    // 出生点：敌人中心（子弹碰撞盒左上角 = 中心 - 半尺寸）
-    fp_t cxf = fp_sub(exf, fp_from_float(BULLET_HALF));
-    fp_t cyf = fp_sub(eyf, fp_from_float(BULLET_HALF));
-
-    entt::entity b = registry.create();
-    registry.emplace<IdComponent>(b, get_entity_id(ctx));
-    registry.emplace<BulletComponent>(b,
-        vx, vy, ai.bullet_damage, 0, BULLET_LIFE_TICKS);
-    registry.emplace<LogicPositionComponent>(b, cxf, cyf);
-    registry.emplace<LogicRectComponent>(b, fp_from_float(BULLET_SIZE), fp_from_float(BULLET_SIZE));
-    vec2_t tpos  = { fp_to_float(cxf), fp_to_float(cyf) };
-    vec2_t tscale = { BULLET_SIZE, BULLET_SIZE };
-    registry.emplace<TransformComponent>(b, tpos, 0.0f, tscale);
 }
 
 static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
@@ -116,16 +82,6 @@ static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
                     act.attack_timer = ActionStateComponent::ATTACK_DURATION;
             }
             act.state = ActionStateComponent::ATTACK;
-
-            // 远程敌人：射击冷却与子弹生成（近战敌人跳过）
-            if (ai.ranged) {
-                if (ai.shoot_cooldown > 0) {
-                    ai.shoot_cooldown--;
-                } else {
-                    ai.shoot_cooldown = ai.shoot_interval;
-                    //spawn_enemy_bullet(registry, ctx, pos.x, pos.y, nearest_px, nearest_py, ai);
-                }
-            }
 
             if (!registry.all_of<PlayerEventInput>(e)) {
                 registry.emplace<PlayerEventInput>(e);
