@@ -21,8 +21,7 @@ struct gc_button_meta {
         button_p btn;
         Context* ctx;
         float w, h, x, y;
-        const char* label;      // 圆心文字（上/下/左/右/攻/射/线）
-        const char* keyLabel;   // 键盘角标字符（W/S/A/D/J/K/L）
+        const char* label;      // 圆心文字（上/下/左/右/攻/射/线）；同时用于选择按钮纹理
         int coolType;
 };
 
@@ -45,14 +44,13 @@ private:
     gc_button_meta metas[5] = {};
     void add_button(int idx, button_p* slot,
                     float cx, float cy, float wf, float hf,
-                    const char* label, const char* keyLabel, int coolType);
+                    const char* label, int coolType);
     void load_dpad_panel();
 
     // ---- 实现辅助（原文件内 static 自由函数，改为成员以直接访问 ctx_）----
     static void sendGameplayControlEvent(int event_code);
     float localCoolRatio(int coolType);
     void drawCoolRing(float cx, float cy, float R, float thick, float frac);
-    void drawKeyBadge(font_p font, const char* key, float bx, float by, bool on_dark);
     void drawButton(const gc_button_meta* m);
 };
 

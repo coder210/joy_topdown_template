@@ -54,26 +54,9 @@ void GameplayControlsLayer::drawCoolRing(float cx, float cy,
         }
 }
 
-// 圆按钮右下角叠加键盘键角标（方案 A，对齐 3D）：右下 1/4 处小字母。
-// on_dark：底为黑色纹理（Style D）时用浅色字，否则用墨色字。
-void GameplayControlsLayer::drawKeyBadge(font_p font, const char* key,
-                float bx, float by, bool on_dark)
-{
-        if (!ctx_) return;
-        jr2d_p r2d = ctx_->r2d;
-        if (!r2d || !font || !key || !key[0]) return;
-        float size = 14.0f;                          // 角标像素高度（与 font 实际字号一致）
-        float tw = size * 0.5f;                      // 单字符宽≈fontSize/2
-        jcolor_t c = on_dark ? jcolor_t{ 230, 230, 235, 255 }
-                             : jcolor_t{ 60, 60, 70, 255 };
-        float px = floorf(bx - tw * 0.5f + 0.5f);    // 对齐到最近整数像素
-        float py = floorf(by - size * 0.5f + 0.5f);
-        jtext_printx(r2d, font, key, (int)strlen(key), c, px, py);
-}
-
 // 单个按钮绘制（去掉 node 依赖后由 Render 直接调用）
-// 纯纹理呈现：底图自带方向箭头 / 圆钮造型，按下切 Highlights A 金色辉光图，
-// 不再叠加程序绘制的圆与文字（原白底圆 + 墨色描边 + 圆心汉字已移除）。
+// 纯纹理呈现：底图自带造型（方向键自带箭头 / 圆钮为黑色描边、中心镂空），
+// 按下切 Highlights A 金色辉光图；不再叠加程序绘制的圆与键盘角标。
 void GameplayControlsLayer::drawButton(const gc_button_meta* m)
 {
         if (!ctx_ || !m || !m->btn) return;
@@ -85,14 +68,15 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
         // 最外轮廓半径（冷却环画在其外侧）
         float out = R + 2.0f;
 
-        // 纹理路径：label 决定用方向键还是圆钮底（label 仅作素材选择键，不再绘制）
+        // 纹理路径：label 决定用方向键素材还是通用圆钮素材
         const char* basePath = "joy_topdown_template/sprites/ui/button_circle.png";
         const char* hlPath   = "joy_topdown_template/sprites/ui/button_circle_highlight.png";
+        bool isDpad = false;
         if (m->label) {
-                if      (strcmp(m->label, "上") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_north.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_north_highlight.png"; }
-                else if (strcmp(m->label, "下") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_south.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_south_highlight.png"; }
-                else if (strcmp(m->label, "左") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_west.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_west_highlight.png"; }
-                else if (strcmp(m->label, "右") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_east.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_east_highlight.png"; }
+                if      (strcmp(m->label, "上") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_north.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_north_highlight.png"; isDpad = true; }
+                else if (strcmp(m->label, "下") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_south.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_south_highlight.png"; isDpad = true; }
+                else if (strcmp(m->label, "左") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_west.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_west_highlight.png";  isDpad = true; }
+                else if (strcmp(m->label, "右") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_east.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_east_highlight.png";  isDpad = true; }
         }
         bool pressed = (m->btn == pressed_btn);
         auto* am = AssetManager::GetInstance();
@@ -103,20 +87,21 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
                 image_draw1(tex, &src, &dst);
         }
 
+        // 圆心汉字：仅通用圆钮（攻/射/线）保留，用墨黑色。
+        // Style D 圆钮为黑色描边、中心镂空，黑字落在镂空处透出的浅色地板上，清晰可读；
+        // 方向键由素材自带箭头表达，不再叠字。
+        if (!isDpad && m->label && m->label[0]) {
+                font_p f = AssetManager::GetInstance()->GetSimheiFont24();
+                jcolor_t tc = { 20, 20, 25, 255 };
+                jtext_printx(r2d, f, m->label, (int)strlen(m->label), tc,
+                        cx - 12.0f, cy - 12.0f);
+        }
+
         // 冷却环：比最外轮廓略大一圈（深墨）
         if (m->coolType != 0) {
                 float ratio = localCoolRatio(m->coolType);
                 if (ratio > 0.0f)
                         drawCoolRing(cx, cy, out + 1.0f, 4.0f, 1.0f - ratio);
-        }
-
-        // 键盘角标：右下 1/4 处（黑底纹理用浅色字）
-        if (m->keyLabel && m->keyLabel[0]) {
-                float off = R * 0.68f;
-                float bx = cx + off * 0.7071f;
-                float by = cy + off * 0.7071f;
-                font_p f = AssetManager::GetInstance()->GetSimheiFont12();
-                drawKeyBadge(f, m->keyLabel, bx, by, tex != NULL);
         }
 }
 
@@ -134,7 +119,7 @@ GameplayControlsLayer::~GameplayControlsLayer() = default;
 
 void GameplayControlsLayer::add_button(int idx, button_p* slot,
                 float cx, float cy, float wf, float hf,
-                const char* label, const char* keyLabel, int coolType)
+                const char* label, int coolType)
 {
         button_p b = button_create(ctx_->r2d, cx, cy, wf, hf);
         UIStyle::applyInkButton(b);
@@ -143,17 +128,18 @@ void GameplayControlsLayer::add_button(int idx, button_p* slot,
         r2d_get_logical_presentation(ctx_->r2d, &lw, &lh, NULL);
         float w = wf * (float)lw, h = hf * (float)lh;
         float x = (cx - wf * 0.5f) * (float)lw, y = (cy - hf * 0.5f) * (float)lh;
-        metas[idx] = { b, ctx_, w, h, x, y, label, keyLabel, coolType };
+        metas[idx] = { b, ctx_, w, h, x, y, label, coolType };
 }
 
 void GameplayControlsLayer::load_dpad_panel()
 {
-        // 俯视十字方向键（左/右/上/下），其余为技能键
-        add_button(0, &btn_left,   0.09000f, 0.82000f, 0.09000f, 0.14000f, "左", "A", 0);
-        add_button(1, &btn_right,0.27000f, 0.82000f, 0.09000f, 0.14000f, "右", "D", 0);
-        add_button(2, &btn_up,   0.18000f, 0.71000f, 0.09000f, 0.14000f, "上", "W", 0);
-        add_button(3, &btn_down, 0.18000f, 0.90000f, 0.09000f, 0.14000f, "下", "S", 0);
-        add_button(4, &btn_attack,0.92500f, 0.89375f, 0.13333f, 0.20000f, "攻", "J", 1);
+        // 俯视十字方向键（左/右/上/下）：用 dpad_element_* 素材，自带箭头，不叠文字。
+        // 攻击键为通用圆钮：用 button_circle 素材 + 圆心墨黑「攻」字，带冷却环。
+        add_button(0, &btn_left,   0.09000f, 0.82000f, 0.09000f, 0.14000f, "左", 0);
+        add_button(1, &btn_right,0.27000f, 0.82000f, 0.09000f, 0.14000f, "右", 0);
+        add_button(2, &btn_up,   0.18000f, 0.71000f, 0.09000f, 0.14000f, "上", 0);
+        add_button(3, &btn_down, 0.18000f, 0.90000f, 0.09000f, 0.14000f, "下", 0);
+        add_button(4, &btn_attack,0.92500f, 0.89375f, 0.13333f, 0.20000f, "攻", 1);
 
 }
 
