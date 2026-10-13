@@ -226,13 +226,13 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                         const float e = 1.0f - (1.0f - p) * (1.0f - p);
                         aim   = base - kSwingDeg + 2.0f * kSwingDeg * e;
                         reach = 1.0f + 0.30f * sinf(p * 3.1415926f);
-                } else {                                     // 远程(弓)：拉弓蓄力 → 松放
-                        // 0~0.6 拉满、0.6~1 松放；拉满时握点回收(弓靠近身体)、松放瞬间前送
+                } else {                                     // 远程(弓)：拉弓后撤 → 复位
+                        // 全程只沿瞄准方向前后移动（不做侧移、不做松放前冲）：
+                        // 0~0.6 向身体后撤，0.6~1 回到原位。基准取与待机一致的 1.15，
+                        // 避免按下攻击的瞬间前后跳一下。
                         const float drawAmt = (p < 0.6f) ? (p / 0.6f)
                                                         : (1.0f - (p - 0.6f) / 0.40f);
-                        reach = 1.0f - 0.32f * drawAmt;                       // 拉弓后撤
-                        if (p >= 0.6f)
-                                reach += 0.10f * sinf((p - 0.6f) / 0.40f * 3.1415926f); // 松放回弹前刺
+                        reach = 1.15f - 0.47f * drawAmt;     // 后撤：1.15 → 0.68 → 1.15
                         aim = base;                                        // 弓始终指向瞄准方向，不挥扫
                         useArrow = (p < 0.6f);                           // 拉弓至松放前搭箭在弦
                 }
@@ -270,8 +270,11 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                 pos.x = cx + cosf(rad0) * rr * 1.15f;
                 pos.y = cy + sinf(rad0) * rr * 1.15f;
         } else {
-                pos.x = cx + cosf(rad) * rr - sinf(rad) * ry;
-                pos.y = cy + sinf(rad) * rr + cosf(rad) * ry;
+                // 攻击：近战挥扫时带手高侧移(ry)；远程(弓)只沿瞄准方向前后移动，
+                // 不加侧移——否则拉弓时弓会向一侧偏（瞄准朝上时表现为向右）。
+                const float perp = (wd.kind == 0) ? 0.0f : ry;
+                pos.x = cx + cosf(rad) * rr - sinf(rad) * perp;
+                pos.y = cy + sinf(rad) * rr + cosf(rad) * perp;
         }
         vec2_t scl    = { scale, scale };                  // 不随角色翻转，武器独立旋转
         // 旋转轴 = 握点（素材上"手握的位置"，如弓上的蓝点标记）：武器绕握点旋转，
@@ -285,7 +288,17 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
 
         // 手：把角色的"手"贴图（sprite_dir/hand.png，绿色拳头）画在握点上，盖在武器上
         // → 手握住武器的握点（如弓上的蓝点）。手不随武器旋转（拳头是圆的），
-        //   大小与角色同比例（role_scale）。素材缺失时静默跳过，只显示武器。
+        //   大小与角色同比例（role_scale）。
+        // 手的位置可用 hand_dx/hand_dy（格内像素，随武器朝向一起旋转）单独微调——
+        // 只动手、不动武器（武器位置由上面的 origin/grip 决定）。素材缺失时静默跳过。
+        vec2_t handPos = pos;
+        if (wd.hand_dx != 0.0f || wd.hand_dy != 0.0f) {
+                const float hc = cosf(ang), hs = sinf(ang);
+                const float lx = wd.hand_dx * scale;
+                const float ly = wd.hand_dy * scale;
+                handPos.x = pos.x + lx * hc - ly * hs;
+                handPos.y = pos.y + lx * hs + ly * hc;
+        }
         const CharacterDef& cd = g_characterCatalog.get(char_id);
         std::string handPath = cd.sprite_dir;
         if (!handPath.empty() && handPath[handPath.size() - 1] != '/') handPath += "/";
@@ -297,7 +310,7 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                         jrect_t handCell = { 0.0f, 0.0f, hw, hh };
                         vec2_t hscl    = { role_scale, role_scale };
                         vec2_t horigin = { hw * 0.5f, hh * 0.5f };
-                        image_draw_ex(handImg, &handCell, pos, 0.0f, hscl, horigin);
+                        image_draw_ex(handImg, &handCell, handPos, 0.0f, hscl, horigin);
                 }
         }
 }

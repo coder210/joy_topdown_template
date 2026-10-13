@@ -13,8 +13,8 @@
         "spear":           { "name": "长矛",   "row": 2, "col": 0, "hold_scale": 0.70, "hold_dx": 0.45, "hold_dy": 0.05, "hold_angle": -90, "grip_x": 32, "grip_y": 52, "kind": "melee" },
         "pole":            { "name": "长杆",   "row": 2, "col": 1, "hold_scale": 0.70, "hold_dx": 0.45, "hold_dy": 0.05, "hold_angle": -90, "grip_x": 32, "grip_y": 52, "kind": "melee" },
         "staff":           { "name": "法杖",   "row": 2, "col": 2, "hold_scale": 0.70, "hold_dx": 0.45, "hold_dy": 0.05, "hold_angle": -90, "grip_x": 32, "grip_y": 52, "kind": "melee" },
-        "bow":             { "name": "弓",     "row": 3, "col": 0, "hold_scale": 0.85, "hold_dx": 0.40, "hold_dy": 0.10, "hold_angle": -90, "grip_x": 32, "grip_y": 30, "kind": "ranged" },
-        "bow_arrow":       { "name": "搭箭弓", "row": 3, "col": 0, "hold_scale": 0.85, "hold_dx": 0.40, "hold_dy": 0.10, "hold_angle": -90, "grip_x": 32, "grip_y": 30, "kind": "ranged" },
+        "bow":             { "name": "弓",     "row": 3, "col": 0, "hold_scale": 0.85, "hold_dx": 0.40, "hold_dy": 0.10, "hold_angle": -90, "hand_dx": -14, "kind": "ranged" },
+        "bow_arrow":       { "name": "搭箭弓", "row": 3, "col": 0, "hold_scale": 0.85, "hold_dx": 0.40, "hold_dy": 0.10, "hold_angle": -90, "hand_dx": -14, "kind": "ranged" },
         "arrow":           { "name": "箭矢",   "row": 3, "col": 1, "hold_scale": 0.40, "hold_dx": 0.30, "hold_dy": 0.10, "hold_angle": -90, "kind": "ranged" },
         "shield_curved":   { "name": "圆盾",   "row": 3, "col": 2, "hold_scale": 0.50, "hold_dx": 0.30, "hold_dy": 0.20, "hold_angle": 0,  "kind": "melee" },
         "shield_straight": { "name": "塔盾",   "row": 3, "col": 3, "hold_scale": 0.50, "hold_dx": 0.30, "hold_dy": 0.20, "hold_angle": 0,  "kind": "melee" }
