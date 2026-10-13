@@ -188,7 +188,7 @@ static float dir_to_angle_deg(int dir)
 // 服务端/无鼠标时为 false，弓竖直朝上（无瞄准数据）。纯渲染，不参与帧同步。
 static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                              float role_scale, const ActionStateComponent& ac, bool flip_h,
-                             bool has_mouse_aim, float mouse_aim_deg)
+                             bool has_mouse_aim, float mouse_aim_deg, int char_id)
 {
         if (weapon_id < 0) return;
         auto* am = AssetManager::GetInstance();
@@ -274,11 +274,32 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                 pos.y = cy + sinf(rad) * rr + cosf(rad) * ry;
         }
         vec2_t scl    = { scale, scale };                  // 不随角色翻转，武器独立旋转
-        vec2_t origin = { cell.w * 0.5f, cell.h * 0.5f };  // 绕贴图中心旋转
+        // 旋转轴 = 握点（素材上"手握的位置"，如弓上的蓝点标记）：武器绕握点旋转，
+        // 握点落在 pos（角色手部）。未配置握点（<0）的素材退回格中心。
+        vec2_t origin = { (wd.grip_x >= 0.0f ? wd.grip_x : cell.w * 0.5f),
+                          (wd.grip_y >= 0.0f ? wd.grip_y : cell.h * 0.5f) };
 
         // 旋转角 = 瞄准角 - 图集姿态修正（竖放武器 hold_angle=-90 → +90 修正为刀尖指向 aim）
         const float ang = (aim - wd.hold_angle_deg) * 3.1415926f / 180.0f;
         image_draw_ex(wimg, &cell, pos, ang, scl, origin);
+
+        // 手：把角色的"手"贴图（sprite_dir/hand.png，绿色拳头）画在握点上，盖在武器上
+        // → 手握住武器的握点（如弓上的蓝点）。手不随武器旋转（拳头是圆的），
+        //   大小与角色同比例（role_scale）。素材缺失时静默跳过，只显示武器。
+        const CharacterDef& cd = g_characterCatalog.get(char_id);
+        std::string handPath = cd.sprite_dir;
+        if (!handPath.empty() && handPath[handPath.size() - 1] != '/') handPath += "/";
+        handPath += "hand.png";
+        image_p handImg = am->GetImage(ctx->r2d, handPath.c_str());
+        if (handImg) {
+                float hw = 0.0f, hh = 0.0f;
+                if (image_get_size(handImg, &hw, &hh) && hw > 0.0f && hh > 0.0f) {
+                        jrect_t handCell = { 0.0f, 0.0f, hw, hh };
+                        vec2_t hscl    = { role_scale, role_scale };
+                        vec2_t horigin = { hw * 0.5f, hh * 0.5f };
+                        image_draw_ex(handImg, &handCell, pos, 0.0f, hscl, horigin);
+                }
+        }
 }
 
 static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
@@ -366,13 +387,13 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                         weapon_front = (g_weaponCatalog.get(pc.weapon_id).kind == 0);
                 if (!weapon_front)
                         draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,
-                                has_mouse_aim, mouse_aim_deg);
+                                has_mouse_aim, mouse_aim_deg, pc.char_id);
 
                 image_draw_ex(img, &clip.src_rect, pos, 0.0f, scl, origin);
 
                 if (weapon_front)
                         draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,
-                                has_mouse_aim, mouse_aim_deg);
+                                has_mouse_aim, mouse_aim_deg, pc.char_id);
         }
 }
 

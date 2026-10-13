@@ -16,25 +16,26 @@ void WeaponCatalog::setBuiltinDefault()
     static const struct {
         const char* key; const char* name; int row; int col;
         float hold_scale, hold_dx, hold_dy, hold_angle_deg;
+        float grip_x, grip_y;   // 握点（格内像素；-1=格中心）
         const char* kind;   // "melee" / "ranged"
     } kDefaults[] = {
-        //            name      row col  scale   dx      dy      angle    kind
-        { "sword",      "长剑",   0, 0,  0.55f, 0.40f, 0.12f, -90.0f, "melee"  },
-        { "longsword",  "巨剑",   0, 1,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
-        { "axe",        "手斧",   0, 2,  0.55f, 0.40f, 0.12f, -90.0f, "melee"  },
-        { "axe_large",  "巨斧",   0, 3,  0.65f, 0.40f, 0.05f, -90.0f, "melee"  },
-        { "axe_double", "双刃斧", 1, 0,  0.65f, 0.40f, 0.05f, -90.0f, "melee"  },
-        { "axe_blades", "双斧",   1, 1,  0.65f, 0.40f, 0.05f, -90.0f, "melee"  },
-        { "dagger",     "匕首",   1, 2,  0.45f, 0.35f, 0.15f, -90.0f, "melee"  },
-        { "hammer",     "战锤",   1, 3,  0.55f, 0.40f, 0.12f, -90.0f, "melee"  },
-        { "spear",      "长矛",   2, 0,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
-        { "pole",       "长杆",   2, 1,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
-        { "staff",      "法杖",   2, 2,  0.70f, 0.45f, 0.05f, -90.0f, "melee"  },
-        { "bow",        "弓",     3, 0,  0.85f, 0.40f, 0.10f, -90.0f, "ranged" },
-        { "bow_arrow",  "搭箭弓", 3, 0,  0.85f, 0.40f, 0.10f, -90.0f, "ranged" },
-        { "arrow",      "箭矢",   3, 1,  0.40f, 0.30f, 0.10f, -90.0f, "ranged" },
-        { "shield_curved",   "圆盾", 3, 2, 0.50f, 0.30f, 0.20f,  0.0f, "melee" },
-        { "shield_straight", "塔盾", 3, 3, 0.50f, 0.30f, 0.20f,  0.0f, "melee" },
+        //            name      row col  scale   dx      dy      angle    grip       kind
+        { "sword",      "长剑",   0, 0,  0.55f, 0.40f, 0.12f, -90.0f,  32.0f, 47.0f, "melee"  },
+        { "longsword",  "巨剑",   0, 1,  0.70f, 0.45f, 0.05f, -90.0f,  32.0f, 51.0f, "melee"  },
+        { "axe",        "手斧",   0, 2,  0.55f, 0.40f, 0.12f, -90.0f,  32.0f, 48.0f, "melee"  },
+        { "axe_large",  "巨斧",   0, 3,  0.65f, 0.40f, 0.05f, -90.0f,  32.0f, 50.0f, "melee"  },
+        { "axe_double", "双刃斧", 1, 0,  0.65f, 0.40f, 0.05f, -90.0f,  32.0f, 52.0f, "melee"  },
+        { "axe_blades", "双斧",   1, 1,  0.65f, 0.40f, 0.05f, -90.0f,  32.0f, 52.0f, "melee"  },
+        { "dagger",     "匕首",   1, 2,  0.45f, 0.35f, 0.15f, -90.0f,  32.0f, 45.0f, "melee"  },
+        { "hammer",     "战锤",   1, 3,  0.55f, 0.40f, 0.12f, -90.0f,  32.0f, 52.0f, "melee"  },
+        { "spear",      "长矛",   2, 0,  0.70f, 0.45f, 0.05f, -90.0f,  32.0f, 52.0f, "melee"  },
+        { "pole",       "长杆",   2, 1,  0.70f, 0.45f, 0.05f, -90.0f,  32.0f, 52.0f, "melee"  },
+        { "staff",      "法杖",   2, 2,  0.70f, 0.45f, 0.05f, -90.0f,  32.0f, 52.0f, "melee"  },
+        { "bow",        "弓",     3, 0,  0.85f, 0.40f, 0.10f, -90.0f,  -1.0f, -1.0f, "ranged" },
+        { "bow_arrow",  "搭箭弓", 3, 0,  0.85f, 0.40f, 0.10f, -90.0f,  -1.0f, -1.0f, "ranged" },
+        { "arrow",      "箭矢",   3, 1,  0.40f, 0.30f, 0.10f, -90.0f,  -1.0f, -1.0f, "ranged" },
+        { "shield_curved",   "圆盾", 3, 2, 0.50f, 0.30f, 0.20f,  0.0f,  -1.0f, -1.0f, "melee" },
+        { "shield_straight", "塔盾", 3, 3, 0.50f, 0.30f, 0.20f,  0.0f,  -1.0f, -1.0f, "melee" },
     };
     const int n = (int)(sizeof(kDefaults) / sizeof(kDefaults[0]));
     for (int i = 0; i < n; i++) {
@@ -48,6 +49,8 @@ void WeaponCatalog::setBuiltinDefault()
         d.hold_dx        = kDefaults[i].hold_dx;
         d.hold_dy        = kDefaults[i].hold_dy;
         d.hold_angle_deg = kDefaults[i].hold_angle_deg;
+        d.grip_x         = kDefaults[i].grip_x;
+        d.grip_y         = kDefaults[i].grip_y;
         d.kind           = (strcmp(kDefaults[i].kind, "melee") == 0) ? 1 : 0;
         defs_.push_back(d);
         byKey_[d.key] = d.id;
@@ -133,6 +136,12 @@ void WeaponCatalog::load()
             if (v && v->type == cJSON_Number) d.hold_dy = (float)v->valuedouble;
             v = cJSON_GetObjectItem(ch, "hold_angle");
             if (v && v->type == cJSON_Number) d.hold_angle_deg = (float)v->valuedouble;
+
+            // 握点（可选）：素材上"手握位置"的格内像素；未配置时用格中心
+            v = cJSON_GetObjectItem(ch, "grip_x");
+            if (v && v->type == cJSON_Number) d.grip_x = (float)v->valuedouble;
+            v = cJSON_GetObjectItem(ch, "grip_y");
+            if (v && v->type == cJSON_Number) d.grip_y = (float)v->valuedouble;
 
             // 武器类别（可选）：melee / ranged；缺省按 ranged 处理
             v = cJSON_GetObjectItem(ch, "kind");
