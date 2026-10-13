@@ -23,19 +23,6 @@ static constexpr int   BULLET_LIFE_TICKS   = 120;    // 6s @20Hz
 static constexpr float BULLET_SIZE         = 0.15f;  // 碰撞盒边长（米）
 static constexpr float BULLET_SPAWN_OFFSET = 0.5f;   // 出生点沿瞄准方向偏移（避免重叠自身）
 
-// dir（0=下 1=左 2=右 3=上）-> 世界角（度）。
-// 必须与 passes/draw_player_pass.h 的 dir_to_angle_deg 保持一致：0=右、90=下、180=左、270=上，
-// 屏幕 y 向下、顺时针为正。无鼠标瞄准时回退使用。
-static float shoot_dir_to_angle_deg(int dir) {
-    switch (dir) {
-        case 0: return 90.0f;
-        case 1: return 180.0f;
-        case 2: return 0.0f;
-        case 3: return 270.0f;
-        default: return 0.0f;
-    }
-}
-
 // 从事件队列里移除近战攻击事件（只清 ATTACK_MELEE，不影响同帧其它事件）。
 // 用普通循环原地压缩，避免引入 <algorithm> 的 remove_if。
 static void remove_melee_events(std::vector<PlayerEventInput::Action>& v) {
@@ -49,7 +36,7 @@ static void remove_melee_events(std::vector<PlayerEventInput::Action>& v) {
 
 // 远程射击系统：消费 PlayerEventInput.pending_actions 中的 ATTACK_MELEE 事件。
 // 仅处理"玩家 + 远程武器（kind==0）"的情形；近战武器与敌人攻击交给 melee_attack_system。
-// 方向取自 ActionStateComponent.aim_yaw（鼠标量化角，0..254 映射 0..360°），无效时回退 dir。
+// 方向只取自 ActionStateComponent.aim_yaw（鼠标量化角，0..254 映射 0..360°）；上下左右键不参与。
 // 帧同步确定性：aim_yaw 由同步输入推导，两端一致；发射用定点三角函数 fp_cos/fp_sin。
 static void player_shoot_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
@@ -85,10 +72,13 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
         // 只处理远程武器；近战武器交由 melee_attack_system（它已对此分支放行/跳过）
         if (pc.weapon_id < 0 || g_weaponCatalog.get(pc.weapon_id).kind != 0) continue;
 
-        // 方向：鼠标优先，无瞄准数据回退键盘朝向
-        float a_deg = (act.aim_yaw != kAimYawInvalid)
-                          ? aim_yaw_degrees(act.aim_yaw)
-                          : shoot_dir_to_angle_deg(act.dir);
+        // 方向只来自鼠标瞄准角 aim_yaw（帧同步输入推导，两端一致）；上下左右键不参与方向。
+        // 无瞄准数据时本 tick 不发射，并吞掉该攻击事件，避免在队列里堆积。
+        if (act.aim_yaw == kAimYawInvalid) {
+            remove_melee_events(events.pending_actions);
+            continue;
+        }
+        float a_deg = aim_yaw_degrees(act.aim_yaw);
         fp_t rad = fp_mul(fp_from_float(a_deg), fp_div(fp_pi(), fp_from_float(180.0f)));
         fp_t dx = fp_cos(rad);
         fp_t dy = fp_sin(rad);
