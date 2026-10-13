@@ -38,4 +38,15 @@ struct ActionStateComponent {
     // 防止按住攻击键导致高频发射。与 melee_cooldown 同理，但与攻击动画计时 attack_timer 解耦。
     int bullet_cooldown = 0;
     static constexpr int BULLET_COOLDOWN = 12;  // 0.6s @ 20Hz
+
+    // 待发射（拉弓离弦前）：按下射击时锁存瞄准角并置计时，由 player_shoot_system 每 tick 递减；
+    // 减到 0 的那一 tick 才用玩家"当时"的位置生成箭并飞出——这样边移动边射时箭的出生点
+    // 会跟着玩家走，不会停在按下瞬间的旧位置。0 = 无待发射。
+    int pending_shoot_timer = 0;
+    int pending_shoot_yaw   = kAimYawInvalid;   // 按下时锁存的量化瞄准角（0..254）
+
+    // 拉弓时长（tick）：从按下射击到"箭离弦"的 tick 数。逻辑层（player_shoot_system 的
+    // pending 计时）与渲染层（draw_player_pass 的搭箭/松放分界）**共用此常量**，
+    // 保证"箭飞出"与"弓切到无箭纹理"严格同 tick，不会两边各写一个值而漂移。
+    static constexpr int SHOOT_DRAW_TICKS = 5;
 };

@@ -23,6 +23,10 @@ static constexpr int   BULLET_LIFE_TICKS   = 120;    // 6s @20Hz
 static constexpr float BULLET_SIZE         = 0.15f;  // 碰撞盒边长（米）
 static constexpr float BULLET_SPAWN_OFFSET = 0.5f;   // 出生点沿瞄准方向偏移（避免重叠自身）
 
+// 拉弓时长（tick）：按下射击后拉弓多久才离弦（期间弓显示"有箭的弓"纹理、箭还搭在弦上）。
+// 取自 ActionStateComponent::SHOOT_DRAW_TICKS——渲染层（搭箭/松放分界）用同一常量，
+// 所以"箭离弦"与"弓切到无箭纹理"必然同 tick。
+
 // 从事件队列里移除近战攻击事件（只清 ATTACK_MELEE，不影响同帧其它事件）。
 // 用普通循环原地压缩，避免引入 <algorithm> 的 remove_if。
 static void remove_melee_events(std::vector<PlayerEventInput::Action>& v) {
@@ -54,10 +58,51 @@ static AimDirFp aim_yaw_dir(int q) {
     return table[q];
 }
 
+// 在"当前"枪口位置生成一支箭（方向取自 aim_yaw 的定点查表，逻辑路径无浮点）。
+// 抽成独立函数是为了让离弦发生在确定的 tick，并用玩家"那一刻"的位置——
+// 边移动边射时出生点会跟随玩家，不会停在按下瞬间的旧位置。
+static void spawn_player_bullet(entt::registry& registry, Context* ctx,
+                                const LogicPositionComponent& lpos,
+                                const LogicRectComponent& lrec, int aim_yaw)
+{
+    AimDirFp dir = aim_yaw_dir(aim_yaw);   // 定点查表，逻辑路径无浮点
+    fp_t dx = dir.dx;
+    fp_t dy = dir.dy;
+
+    // 出生点：玩家中心沿瞄准方向偏移
+    fp_t cx = fp_add(lpos.x, fp_div(lrec.width,  fp_from_float(2.0f)));
+    fp_t cy = fp_add(lpos.y, fp_div(lrec.height, fp_from_float(2.0f)));
+    fp_t sx = fp_add(cx, fp_mul(dx, fp_from_float(BULLET_SPAWN_OFFSET)));
+    fp_t sy = fp_add(cy, fp_mul(dy, fp_from_float(BULLET_SPAWN_OFFSET)));
+    fp_t bw = fp_from_float(BULLET_SIZE), bh = fp_from_float(BULLET_SIZE);
+
+    entt::entity bullet = registry.create();
+
+    registry.emplace<IdComponent>(bullet, get_entity_id(ctx));
+    registry.emplace<LogicPositionComponent>(bullet,
+        fp_sub(sx, fp_div(bw, fp_from_float(2.0f))),
+        fp_sub(sy, fp_div(bh, fp_from_float(2.0f))));
+    registry.emplace<LogicRectComponent>(bullet, bw, bh);
+    registry.emplace<TransformComponent>(bullet, fp_to_float(sx), fp_to_float(sy), 0.0f, 1.0f, 1.0f);
+
+    BulletComponent b;
+    b.vx          = fp_mul(fp_from_float(BULLET_SPEED), dx);
+    b.vy          = fp_mul(fp_from_float(BULLET_SPEED), dy);
+    b.damage      = BULLET_DAMAGE;
+    b.source_conv = 0;
+    b.life_ticks  = BULLET_LIFE_TICKS;
+    b.from_player = 1;
+    registry.emplace<BulletComponent>(bullet, b);
+}
+
 // 远程射击系统：消费 PlayerEventInput.pending_actions 中的 ATTACK_MELEE 事件。
 // 仅处理"玩家 + 远程武器（kind==0）"的情形；近战武器与敌人攻击交给 melee_attack_system。
 // 方向只取自 ActionStateComponent.aim_yaw（鼠标量化角，0..254 映射 0..360°）；上下左右键不参与。
 // 帧同步确定性：aim_yaw 由同步输入推导，两端一致；方向用定点查表（见 aim_yaw_dir），逻辑路径无浮点。
+//
+// 拉弓 → 离弦分两阶段：按下射击只锁存瞄准角并置 pending_shoot_timer（不立即生成箭）；
+// 计时减到 0 的当 tick 才用玩家"当时"的位置生成箭并飞出——与渲染层"有箭的弓→无箭的弓"
+// 纹理切换同 tick，且边移动边射时出生点跟随玩家，不会滞后于按下瞬间。
 static void player_shoot_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
     auto view = registry.view<PlayerEventInput, ActionStateComponent,
@@ -76,6 +121,15 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
             if (events.pending_actions[i].type == PlayerEventInput::ATTACK_MELEE) {
                 has_attack = true;
                 break;
+            }
+        }
+
+        // ---- 1) 离弦：拉弓计时归零的当 tick，用"当前"枪口位置生成箭 ----
+        if (act.pending_shoot_timer > 0) {
+            act.pending_shoot_timer--;
+            if (act.pending_shoot_timer == 0 &&
+                act.pending_shoot_yaw != kAimYawInvalid) {
+                spawn_player_bullet(registry, ctx, lpos, lrec, act.pending_shoot_yaw);
             }
         }
 
@@ -98,39 +152,14 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
             remove_melee_events(events.pending_actions);
             continue;
         }
-        AimDirFp dir = aim_yaw_dir(act.aim_yaw);   // 定点查表，逻辑路径无浮点
-        fp_t dx = dir.dx;
-        fp_t dy = dir.dy;
 
-        // 出生点：玩家中心沿瞄准方向偏移
-        fp_t cx = fp_add(lpos.x, fp_div(lrec.width,  fp_from_float(2.0f)));
-        fp_t cy = fp_add(lpos.y, fp_div(lrec.height, fp_from_float(2.0f)));
-        fp_t sx = fp_add(cx, fp_mul(dx, fp_from_float(BULLET_SPAWN_OFFSET)));
-        fp_t sy = fp_add(cy, fp_mul(dy, fp_from_float(BULLET_SPAWN_OFFSET)));
-        fp_t bw = fp_from_float(BULLET_SIZE), bh = fp_from_float(BULLET_SIZE);
-
-        entt::entity bullet = registry.create();
-
-        registry.emplace<IdComponent>(bullet, get_entity_id(ctx));
-        registry.emplace<LogicPositionComponent>(bullet,
-            fp_sub(sx, fp_div(bw, fp_from_float(2.0f))),
-            fp_sub(sy, fp_div(bh, fp_from_float(2.0f))));
-        registry.emplace<LogicRectComponent>(bullet, bw, bh);
-        registry.emplace<TransformComponent>(bullet, fp_to_float(sx), fp_to_float(sy), 0.0f, 1.0f, 1.0f);
-
-        BulletComponent b;
-        b.vx          = fp_mul(fp_from_float(BULLET_SPEED), dx);
-        b.vy          = fp_mul(fp_from_float(BULLET_SPEED), dy);
-        b.damage      = BULLET_DAMAGE;
-        b.source_conv = 0;
-        b.life_ticks  = BULLET_LIFE_TICKS;
-        b.from_player = 1;
-        registry.emplace<BulletComponent>(bullet, b);
-
+        // ---- 2) 拉弓：锁存瞄准角，等 SHOOT_DRAW_TICKS 后才离弦（见函数头注释）----
         // 触发拉弓动画（复用 ATTACK 状态与 attack_timer，与近战同源）+ 设置射击冷却
-        act.state           = ActionStateComponent::ATTACK;
-        act.attack_timer    = ActionStateComponent::ATTACK_DURATION;
-        act.bullet_cooldown = ActionStateComponent::BULLET_COOLDOWN;
+        act.state               = ActionStateComponent::ATTACK;
+        act.attack_timer        = ActionStateComponent::ATTACK_DURATION;
+        act.bullet_cooldown     = ActionStateComponent::BULLET_COOLDOWN;
+        act.pending_shoot_timer = ActionStateComponent::SHOOT_DRAW_TICKS;
+        act.pending_shoot_yaw   = act.aim_yaw;
 
         remove_melee_events(events.pending_actions);
     }

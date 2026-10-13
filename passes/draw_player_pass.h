@@ -227,21 +227,33 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                         aim   = base - kSwingDeg + 2.0f * kSwingDeg * e;
                         reach = 1.0f + 0.30f * sinf(p * 3.1415926f);
                 } else {                                     // 远程(弓)：拉弓后撤 → 复位
-                        // 全程只沿瞄准方向前后移动（不做侧移、不做松放前冲）：
-                        // 0~0.6 向身体后撤，0.6~1 回到原位。基准取与待机一致的 1.15，
-                        // 避免按下攻击的瞬间前后跳一下。
-                        const float drawAmt = (p < 0.6f) ? (p / 0.6f)
-                                                        : (1.0f - (p - 0.6f) / 0.40f);
+                        // 渲染只"读"逻辑状态，不自己算离弦时机（渲染与逻辑解耦）：
+                        //   pending_shoot_timer > 0 ——> 箭还搭在弦上（逻辑的待发射计时未归零）
+                        //   == 0                   ——> 已离弦（该 tick 逻辑层已生成箭实体）
+                        // 贴图切换因此完全跟随逻辑，二者不可能各走各的。
+                        useArrow = (ac.pending_shoot_timer > 0);
+
+                        // 拉弓进度 0→1：拉弓阶段由 pending_shoot_timer 递减映射；
+                        // 离弦后用 attack_timer 的剩余量做复位。纯视觉，不参与逻辑。
+                        float drawAmt;
+                        if (ac.pending_shoot_timer > 0) {
+                                drawAmt = 1.0f - (float)ac.pending_shoot_timer
+                                        / (float)ActionStateComponent::SHOOT_DRAW_TICKS;
+                        } else {
+                                const int rec = ActionStateComponent::ATTACK_DURATION
+                                              - ActionStateComponent::SHOOT_DRAW_TICKS;
+                                drawAmt = (rec > 0) ? (float)ac.attack_timer / (float)rec : 0.0f;
+                        }
                         reach = 1.15f - 0.47f * drawAmt;     // 后撤：1.15 → 0.68 → 1.15
-                        aim = base;                                        // 弓始终指向瞄准方向，不挥扫
-                        useArrow = (p < 0.6f);                           // 拉弓至松放前搭箭在弦
+                        aim = base;                          // 弓始终指向瞄准方向，不挥扫
                 }
         }
 
         // 取武器格子：
         //  - 近战：weapons.png 合图中该武器所在格（不变）；
-        //  - 远程(弓)：两帧贴图在 tilesheet.png（row9）——拉弓搭箭(p<0.6)用 col5"有箭的弓"，
-        //    待机与松放后(p>=0.6，箭已射出)用 col6"无箭的弓"。tilesheet 加载失败时回退 weapons.png。
+        //  - 远程(弓)：两帧贴图在 tilesheet.png（row9）——箭搭在弦上(useArrow：逻辑的
+        //    pending_shoot_timer>0)用 col5"有箭的弓"；待机与已离弦用 col6"无箭的弓"。
+        //    tilesheet 加载失败时回退 weapons.png。
         jrect_t cell = g_weaponCatalog.cellRect(wd);
         image_p wimg = img;
         if (wd.kind == 0) {
