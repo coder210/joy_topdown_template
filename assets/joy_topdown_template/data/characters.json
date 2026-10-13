@@ -16,7 +16,7 @@
   "ranger": {
     "name": "弓手",
     "sprite_dir": "joy_topdown_template/sprites/characters/red/",
-    "weapon": "spear",
+    "weapon": "bow",
     "stats": { "hp": 100, "speed": 2.8 },
     "anims": { "idle": "idle" }
   },

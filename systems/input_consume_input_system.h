@@ -54,9 +54,19 @@ static void input_consume_input_system(entt::registry& registry, Context* ctx, f
 
 		// log_info("Raw dir: %d\n", input.dir);
 
+		// 鼠标瞄准角：来自随输入同步的量化值（两端同一整数，渲染层据此指向武器）。
+		// 存到 ActionStateComponent.aim_yaw（持久）；**不能存 PlayerStateInput**——
+		// 那是"每帧用完即清"的瞬时输入组件（cleanup_system 每帧 remove），渲染层读不到。
+		// 无效值(255)表示这一帧没带瞄准数据，保留上一次的角度。
+		if (registry.all_of<ActionStateComponent>(player)) {
+			auto& act0 = registry.get<ActionStateComponent>(player);
+			if (input.yaw_q != kAimYawInvalid) act0.aim_yaw = input.yaw_q;
+		}
+		state_input.yaw_quantized = (int16_t)input.yaw_q;
 		if (registry.all_of<PlayerStateInput>(player)) {
 			auto& state = registry.get<PlayerStateInput>(player);
 			state.move_bits = state_input.move_bits;
+			if (input.yaw_q != kAimYawInvalid) state.yaw_quantized = state_input.yaw_quantized;
 		}
 		else {
 			registry.emplace<PlayerStateInput>(player, state_input);

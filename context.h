@@ -57,6 +57,12 @@ struct Context {
         int  selected_char_id  = 0;                    // 选中角色（CHAR_WARRIOR 默认）
         int  selected_level    = 1;                    // 选中关卡（默认第 1 关）
         char selected_nickname[32] = "玩家";            // 玩家昵称
+
+        // ========== 鼠标（仅渲染层瞄准用，不参与帧同步）==========
+        // 鼠标事件给的是窗口像素，统一经 r2d_coordinates_from_window 换算到逻辑坐标(480x320)。
+        // 由 GameplayControlsLayer 的 on_mousemoved 写入；无鼠标(服务端/未移动过)时 mouse_valid=false。
+        vec2_t mouse_logical = { -1.0f, -1.0f };
+        bool   mouse_valid   = false;
 };
 
 // ========== System 调度基础设施 ==========

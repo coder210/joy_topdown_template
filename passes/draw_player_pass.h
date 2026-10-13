@@ -5,10 +5,13 @@
 #include <string>
 #include <unordered_map>
 #include <cstring>
+#include <cmath>
 #include "../components/global_state_component.h"
+#include "../components/net_session_component.h"
 #include "../components/id_component.h"
 #include "../components/player_component.h"
 #include "../components/action_state_component.h"
+#include "../components/player_state_input.h"
 #include "../components/health_component.h"
 #include "../components/transform_component.h"
 #include "../systems/character_catalog.h"
@@ -140,16 +143,42 @@ static const anim_def_t& sprite_anim_def(Context* ctx, int char_id)
 // 玩家序列帧：推进动画状态机 + 绘制（合并原 player_anim_pass 与 draw_player_pass，
 // 单次遍历玩家实体，省去两次 view 迭代与两次动画定义查表；纯渲染、不参与帧同步、不进快照）。
 // dt 为渲染帧真实步长（由 GameScene 在 Update 阶段存下，Render 阶段传入）。
-// 绘制玩家所持武器（叠加画在角色 sprite 之上）。
-// 武器取合图中该武器所在的格子；大小与手持偏移由每把武器在 weapons.json 里
-// 单独配置（hold_scale / hold_dx / hold_dy），短刀小而靠外、长枪大而平端。
-// 位置相对角色中心，偏移以米计（最终用 meters_to_pixels 转像素，与角色世界坐标同单位）。
-// 注意：武器图集原生朝右、角色图集原生朝左，两者朝向相反，故武器的镜像与前后偏移
-// 都取与角色相反的方向 —— 角色朝左（flip_h=false）时武器被镜像并画在前方（左侧）。
-// hold_angle 是额外姿态角（度，顺时针为正）：0 = 横向朝前（枪/刀默认），-90 = 竖放刀尖朝上；
-// 武器被镜像的一侧（flip_h=false）角度自动取反，保证左右两个朝向下姿态一致。
+// 绘制玩家所持武器（叠加画在角色 sprite 之上，参考 rougelite 类游戏的
+// "武器独立于角色、绕握点随朝向旋转"的表现）：
+//  - 收势（待机/行走）：均取世界角 270°（竖直），不随移动朝向乱指。
+//    近战竖举在肩后（垫在角色身后绘制）；远程(弓)正前方持握（沿朝向推出）
+//    画在身前（对齐参考 rougelite：弓手把弓持在身前一侧，始终可见）；
+//  - 近战：攻击时锁定 attack_dir，沿基角 ±75° 挥扫一道弧线（ease-out），并伴随
+//    握点半径脉冲（前刺感），画在角色身前；
+//  - 远程(弓)：攻击时原地拉弓蓄力（握点后撤、弦上搭箭）后松放回弹，不挥扫；
+//    上述进度取自 attack_timer 递减，帧同步两端一致，纯渲染推导、不进快照、不改协议。
+// 武器取合图中该武器所在的格子；大小/握距/手高由 weapons.json 每把武器单独配置
+// （hold_scale / hold_dx / hold_dy），hold_dx 兼作握点绕角色旋转的半径（米），
+// hold_dy 为垂直手高（米）。武器不再随角色水平镜像，独立做 360° 旋转。
+// 图集原生朝向修正：近战武器竖放（刀尖朝上，hold_angle=-90），旋转角 = aim - hold_angle
+// 即可让其刀尖指向 aim；横放的弓/盾（hold_angle=0）直接指向 aim。
 // weapon_id < 0 表示空手。纯渲染，不参与帧同步、不进快照。
-static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy, bool flip_h, float role_scale)
+
+// dir（0=下 1=左 2=右 3=上，见 input_to_dir）→ 世界角（度，屏幕坐标 y 向下、
+// 顺时针为正，0=朝右、90=朝下；屏幕 y 向下，故"下"为 +90 而非 -90）。
+static float dir_to_angle_deg(int dir)
+{
+        switch (dir) {
+        case 0: return 90.0f;    // 下
+        case 1: return 180.0f;   // 左
+        case 2: return 0.0f;     // 右
+        case 3: return 270.0f;   // 上
+        default: return 0.0f;
+        }
+}
+
+// has_mouse_aim / mouse_aim_deg：本机玩家的鼠标瞄准（度，世界坐标，0=右、顺时针为正）。
+// 仅用于远程(弓)的朝向表现：收势指向光标、攻击沿光标方向拉弓；近战完全不受影响。
+// 关键点：弓的朝向**只认鼠标**，键盘上下左右不参与（否则移动朝向会跟鼠标朝向打架）。
+// 服务端/无鼠标时为 false，弓竖直朝上（无瞄准数据）。纯渲染，不参与帧同步。
+static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
+                             float role_scale, const ActionStateComponent& ac, bool flip_h,
+                             bool has_mouse_aim, float mouse_aim_deg)
 {
         if (weapon_id < 0) return;
         auto* am = AssetManager::GetInstance();
@@ -161,22 +190,79 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy, bo
         if (!img) return;
 
         const WeaponDef& wd = g_weaponCatalog.get(weapon_id);
-        jrect_t cell = g_weaponCatalog.cellRect(wd);
-        if (cell.h <= 0.0f) return;
+        // 武器格子与越界保护延迟到攻击分支之后再取（弓拉弓时要换成"搭箭弓"格）
 
         const float scale = role_scale * wd.hold_scale;
-        // 手持偏移以"米"计（与角色世界坐标同单位），用 meters_to_pixels 转屏幕像素，与 cx/cy 一致；
-        // 翻转时 dx 自动取反（武器随角色镜像）。
-        const float dx = meters_to_pixels(wd.hold_dx);
-        const float dy = meters_to_pixels(wd.hold_dy);
-        vec2_t pos = { cx + (flip_h ? dx : -dx), cy + dy };
-        vec2_t scl = { flip_h ? scale : -scale, scale };   // 武器与角色原生朝向相反：镜像/偏移取反，保证在前方且朝前
-        vec2_t origin = { cell.w * 0.5f, cell.h * 0.5f };
 
-        // 旋转（度→弧度；image_draw_ex 的角度按弧度处理，见 jtilemap.c:1035 用法）。
-        // SDL 语义为先水平翻转再顺时针旋转，故武器被镜像的一侧（flip_h=false）角度取反，
-        const float ang = (flip_h ? wd.hold_angle_deg : -wd.hold_angle_deg)
-                * 3.1415926f / 180.0f;
+        // 瞄准角 / 攻击表现：
+        //  - 远程(弓)：朝向只由鼠标瞄准驱动（量化角随输入同步，**键盘上下左右完全不参与**），
+        //    无瞄准数据时竖直朝上。避免"移动朝向"与"鼠标朝向"两套朝向打架。
+        //  - 近战：收势竖直朝上（肩后），攻击沿 attack_dir 挥扫（键盘朝向驱动）。
+        float aim   = 270.0f;    // 收势：竖直朝上（刀尖/弓背朝上，背在肩后）
+        float reach = 1.0f;      // 握点半径脉冲（攻击时前刺 / 拉弓后退）
+        bool  useArrow = false;  // 弓拉弓阶段在弦上搭一支箭
+        const WeaponDef* arrowDef = nullptr;
+        if (wd.kind == 0 && has_mouse_aim)
+                aim = mouse_aim_deg;   // 弓：只认鼠标
+
+        const bool attacking = (ac.state == ActionStateComponent::ATTACK
+                && ac.attack_timer > 0);
+        if (attacking) {
+                // 远程(弓)沿鼠标瞄准方向拉弓；近战沿用 attack_dir 挥扫
+                const float base = (wd.kind == 0) ? aim : dir_to_angle_deg(ac.attack_dir);
+                // 进度 0→1（attack_timer 从 ATTACK_DURATION 逐 tick 递减）
+                const float p = 1.0f - (float)ac.attack_timer
+                        / (float)ActionStateComponent::ATTACK_DURATION;
+
+                if (wd.kind == 1) {                          // 近战：沿基角 ±75° 挥扫（ease-out 起手快收势慢）
+                        const float kSwingDeg = 75.0f;
+                        const float e = 1.0f - (1.0f - p) * (1.0f - p);
+                        aim   = base - kSwingDeg + 2.0f * kSwingDeg * e;
+                        reach = 1.0f + 0.30f * sinf(p * 3.1415926f);
+                } else {                                     // 远程(弓)：拉弓蓄力 → 松放
+                        // 0~0.6 拉满、0.6~1 松放；拉满时握点回收(弓靠近身体)、松放瞬间前送
+                        const float drawAmt = (p < 0.6f) ? (p / 0.6f)
+                                                        : (1.0f - (p - 0.6f) / 0.40f);
+                        reach = 1.0f - 0.32f * drawAmt;                       // 拉弓后撤
+                        if (p >= 0.6f)
+                                reach += 0.10f * sinf((p - 0.6f) / 0.40f * 3.1415926f); // 松放回弹前刺
+                        aim = base;                                        // 弓始终指向瞄准方向，不挥扫
+                        useArrow = (p < 0.6f);                           // 拉弓至松放前搭箭在弦
+                        arrowDef = g_weaponCatalog.findByName("bow_arrow");
+                }
+        }
+
+        // 取武器格子：弓在拉弓阶段换成"搭箭弓"贴图（同合图、同 hold 参数）
+        jrect_t cell = g_weaponCatalog.cellRect(wd);
+        if (arrowDef && useArrow && arrowDef->id != wd.id)
+                cell = g_weaponCatalog.cellRect(*arrowDef);
+        if (cell.h <= 0.0f) return;
+
+        // 握点：攻击时以角色中心为原点，把"握距(前)/手高(下)"偏移随瞄准角一起旋转。
+        // 收势分两态（对齐参考 rougelite）：
+        //  - 近战：竖举在肩后（随角色朝向镜像，配合"垫在身后"的绘制顺序）；
+        //  - 远程(弓)：竖持于面朝方向的身体一侧，画在身前（弓始终可见）。
+        const float rad = aim * 3.1415926f / 180.0f;
+        const float rr  = meters_to_pixels(wd.hold_dx) * reach;
+        const float ry  = meters_to_pixels(wd.hold_dy);
+        vec2_t pos;
+        if (!attacking && wd.kind == 1) {
+                pos.x = cx + (flip_h ? -ry : ry) * 1.8f;
+                pos.y = cy - rr * 0.9f;
+        } else if (!attacking) {
+                // 远程(弓)：沿瞄准方向(鼠标)正前方持握，与键盘朝向无关
+                const float rad0 = aim * 3.1415926f / 180.0f;
+                pos.x = cx + cosf(rad0) * rr * 1.15f;
+                pos.y = cy + sinf(rad0) * rr * 1.15f;
+        } else {
+                pos.x = cx + cosf(rad) * rr - sinf(rad) * ry;
+                pos.y = cy + sinf(rad) * rr + cosf(rad) * ry;
+        }
+        vec2_t scl    = { scale, scale };                  // 不随角色翻转，武器独立旋转
+        vec2_t origin = { cell.w * 0.5f, cell.h * 0.5f };  // 绕贴图中心旋转
+
+        // 旋转角 = 瞄准角 - 图集姿态修正（竖放武器 hold_angle=-90 → +90 修正为刀尖指向 aim）
+        const float ang = (aim - wd.hold_angle_deg) * 3.1415926f / 180.0f;
         image_draw_ex(img, &cell, pos, ang, scl, origin);
 }
 
@@ -237,7 +323,7 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                 float sx = meters_to_pixels(t.position.x - cam.x);
                 float sy = meters_to_pixels(t.position.y - cam.y);
 
-                // 素材帧高 32px；按 50 PPM 缩放到约 1 格，避免角色过小
+                // Scribble 素材为 64x64 单帧；统一按"绘制高度 50px"缩放（武器同用此基准）
                 const float scale = (clip.src_rect.h > 0.0f)
                         ? (50.0f / clip.src_rect.h) : 1.0f;
                 vec2_t pos = { sx, sy };
@@ -246,10 +332,32 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                 vec2_t scl = { a.flip_h ? -scale : scale, scale };
                 vec2_t origin = { clip.src_rect.w * 0.5f, clip.src_rect.h * 0.5f };
 
+                // 瞄准角取自 ActionStateComponent.aim_yaw：由本机鼠标量化后随 C2S 输入上传，
+                // 两端消费同一个整数，故所有客户端画出的"武器指向"一致（不直接用本机鼠标，
+                // 否则只有自己看得到）。255=无瞄准数据 → 回退到"朝向"表现。
+                bool  has_mouse_aim = false;
+                float mouse_aim_deg = 0.0f;
+                if (ac.aim_yaw != kAimYawInvalid) {
+                        mouse_aim_deg = aim_yaw_degrees(ac.aim_yaw);
+                        has_mouse_aim = true;
+                }
+
+                // 武器绘制顺序：攻击必在身前（挥扫/拉弓）；非攻击时近战垫在身后
+                // （肩后竖举）、远程(弓)持于身前画在身前（对齐参考 rougelite，弓始终可见）
+                const bool attacking = (!dead && ac.state == ActionStateComponent::ATTACK
+                        && ac.attack_timer > 0);
+                bool weapon_front = attacking;
+                if (!attacking && pc.weapon_id >= 0)
+                        weapon_front = (g_weaponCatalog.get(pc.weapon_id).kind == 0);
+                if (!weapon_front)
+                        draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,
+                                has_mouse_aim, mouse_aim_deg);
+
                 image_draw_ex(img, &clip.src_rect, pos, 0.0f, scl, origin);
 
-                // 所持武器：叠加在角色之上示意握持；空手（weapon_id < 0）时不绘制
-                draw_held_weapon(ctx, pc.weapon_id, sx, sy, a.flip_h, scale);
+                if (weapon_front)
+                        draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,
+                                has_mouse_aim, mouse_aim_deg);
         }
 }
 

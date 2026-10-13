@@ -109,6 +109,32 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
         netclient_send(ctx_->netclient, data.c_str(), (int)data.size());
 }
 
+// ===== 本地鼠标瞄准角（量化后随输入上传，供所有端同步"武器指向鼠标"的表现）=====
+// 只在本机计算并量化成整数，两端按同一个整数还原角度，故帧同步一致（浮点不跨端）。
+// 返回 0..254（有效角度）或 kAimYawInvalid（无鼠标 / 本地玩家不存在）。
+static int collect_aim_yaw_q(Context* ctx)
+{
+    if (!ctx || !ctx->mouse_valid) return kAimYawInvalid;
+
+    const auto& gs   = ctx->ecs.ctx().get<GlobalState>();
+    const int   conv = (int)net_session(ctx).local_conv;
+
+    auto view = ctx->ecs.view<PlayerComponent, LogicPositionComponent>();
+    for (auto e : view) {
+        if (view.get<PlayerComponent>(e).conv != conv) continue;
+        const auto& lp = view.get<LogicPositionComponent>(e);
+        // 逻辑像素 → 世界(米)：px = PPM * (world - cam)
+        const float wx = gs.camera_position.x + ctx->mouse_logical.x / (float)PIXELS_PER_METER;
+        const float wy = gs.camera_position.y + ctx->mouse_logical.y / (float)PIXELS_PER_METER;
+        const float dx = wx - fp_to_float(lp.x);
+        const float dy = wy - fp_to_float(lp.y);
+        if (dx * dx + dy * dy < 1e-6f) return kAimYawInvalid;
+        float deg = atan2f(dy, dx) * 180.0f / 3.1415926f;   // 屏幕 y 向下，顺时针为正
+        return aim_yaw_quantize(deg);
+    }
+    return kAimYawInvalid;
+}
+
 // ========== 发送输入（客户端）==========
 void NetworkManager::SendInput()
 {
@@ -116,9 +142,12 @@ void NetworkManager::SendInput()
     int dir = game_runtime(ctx_).current_input_mask & INPUT_DIR_MASK;
     int attack = (game_runtime(ctx_).current_input_mask & INPUT_ATTACK) ? 1 : 0;
     if (game_runtime(ctx_).attack_triggered) { attack = 1; game_runtime(ctx_).attack_triggered = false; }
-    if (dir || attack) {
-        auto data = pack_c2s(CMD_PLAYER_INPUT, 0, 0, dir, attack);
+    // 瞄准角：只在变化时补发一帧（静止不动也要能更新朝向给别人看）
+    const int yaw = collect_aim_yaw_q(ctx_);
+    if (dir || attack || yaw != game_runtime(ctx_).last_aim_yaw_sent) {
+        auto data = pack_c2s(CMD_PLAYER_INPUT, 0, 0, dir, attack, 0, yaw);
         netclient_send(ctx_->netclient, data.c_str(), (int)data.size());
+        game_runtime(ctx_).last_aim_yaw_sent = yaw;
     }
 }
 
@@ -209,9 +238,9 @@ void NetworkManager::HandleCmdPlayerLeave(int conv)
         net_session(ctx_).player_leaves.push_back(l);
 }
 
-void NetworkManager::HandleCmdPlayerInput(int conv, uint32_t seq, int dir, int attack)
+void NetworkManager::HandleCmdPlayerInput(int conv, uint32_t seq, int dir, int attack, int yaw)
 {
-        S2CPlayerInput i = { seq, conv, dir, (int8_t)attack };
+        S2CPlayerInput i = { seq, conv, dir, (int8_t)attack, yaw };
         net_session(ctx_).player_inputs.push_back(i);
 }
 
@@ -251,13 +280,13 @@ void NetworkManager::ServerReceive()
                         net_session(ctx_).player_leaves.push_back(l);
                 }
                 else if (msg.type == NET_TYPE_MESSAGE) {
-                        int cmd, input_dir = 0, input_attack = 0, char_id = 0; int64_t join_x = 0, join_y = 0;
-                        if (unpack_c2s((const char*)msg.data, (int)msg.len, &cmd, &join_x, &join_y, &input_dir, &input_attack, &char_id)) {
+                        int cmd, input_dir = 0, input_attack = 0, char_id = 0, input_yaw = kAimYawInvalid; int64_t join_x = 0, join_y = 0;
+                        if (unpack_c2s((const char*)msg.data, (int)msg.len, &cmd, &join_x, &join_y, &input_dir, &input_attack, &char_id, &input_yaw)) {
                                 switch (cmd) {
                                 case CMD_LOADING:       HandleCmdLoading(msg.conv); break;
                                 case CMD_PLAYER_JOIN:   HandleCmdPlayerJoin(msg.conv, join_x, join_y, char_id); break;
                                 case CMD_PLAYER_LEAVE:  HandleCmdPlayerLeave(msg.conv); break;
-                                case CMD_PLAYER_INPUT:  HandleCmdPlayerInput(msg.conv, 0, input_dir, input_attack); break;
+                                case CMD_PLAYER_INPUT:  HandleCmdPlayerInput(msg.conv, 0, input_dir, input_attack, input_yaw); break;
                                 case CMD_PLAYER_HEART:  HandleCmdHeartbeat(msg.conv); break;
                                 }
                         }
@@ -425,8 +454,11 @@ void NetworkManager::CollectLocalInput()
         int dir = game_runtime(ctx_).current_input_mask & INPUT_DIR_MASK;
         int attack = (game_runtime(ctx_).current_input_mask & INPUT_ATTACK) ? 1 : 0;
         if (game_runtime(ctx_).attack_triggered) { attack = 1; game_runtime(ctx_).attack_triggered = false; }
-        if (dir || attack) {
-                S2CPlayerInput i = { 0, (int32_t)net_session(ctx_).local_conv, dir, (int8_t)attack };
+        // 瞄准角同 SendInput：有变化就补发一帧，静止时也能更新朝向
+        const int yaw = collect_aim_yaw_q(ctx_);
+        if (dir || attack || yaw != game_runtime(ctx_).last_aim_yaw_sent) {
+                S2CPlayerInput i = { 0, (int32_t)net_session(ctx_).local_conv, dir, (int8_t)attack, yaw };
                 net_session(ctx_).player_inputs.push_back(i);
+                game_runtime(ctx_).last_aim_yaw_sent = yaw;
         }
 }

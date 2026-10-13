@@ -192,6 +192,13 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                         GameplayControlsLayer::sendGameplayControlEvent(code);
                 }
         };
+        cbs.on_mousemoved = [](float x, float y, float dx, float dy, void* arg) {
+                (void)dx; (void)dy;
+                auto* self = (GameplayControlsLayer*)arg;
+                // 事件给的是窗口像素；换算到逻辑坐标(480x320)供渲染层做鼠标瞄准（letterbox 自动处理）
+                self->ctx_->mouse_logical = r2d_coordinates_from_window(self->ctx_->r2d, x, y);
+                self->ctx_->mouse_valid   = true;
+        };
         dispatch_event(cbs, ev, this);
 }
 

@@ -47,7 +47,9 @@ enum S2CType {
 /* ============================ 协议结构体 ============================ */
 struct S2CPlayerJoin  { int32_t conv; int64_t position_x, position_y; int32_t char_id; };
 struct S2CPlayerLeave { int32_t conv; };
-struct S2CPlayerInput { uint32_t client_seq; int32_t conv, dir;  int8_t attack; };
+// yaw_q：鼠标瞄准角（量化 0..254，255=无瞄准数据）。随输入一起同步，
+// 使所有端都能画出同一个"武器指向鼠标"的表现。见上方 aim_yaw_* 说明。
+struct S2CPlayerInput { uint32_t client_seq; int32_t conv, dir;  int8_t attack;  int32_t yaw_q; };
 struct S2CEntity {
     int32_t id, type;
     int64_t position_x, position_y, width, height, hp;
@@ -80,6 +82,22 @@ static inline int64_t jmp_int(const jmsgpack_object_t* o) {
     if (o->type == JMSGPACK_OBJECT_NEGATIVE_INTEGER) return o->via.i64;
     return 0;
 }
+
+/* ======================== 鼠标瞄准角量化（随输入同步） ======================== */
+// 渲染层要"武器指向鼠标"，但鼠标是本机输入、不能进帧同步逻辑。
+// 解法：客户端把瞄准角量化成一个小整数，随 C2S 输入上传；两端都从同一个整数推导
+// 角度，因此所有客户端看到的一致（浮点不参与跨端运算，不存在精度差）。
+// 0..254 → 0°..360°（约 1.41°/档）；255 = 无瞄准数据（渲染回退到"朝向"逻辑）。
+static const int kAimYawMax     = 254;
+static const int kAimYawInvalid = 255;
+static inline int aim_yaw_quantize(float deg)
+{
+        if (deg < 0.0f) deg += 360.0f;
+        int q = (int)(deg * 255.0f / 360.0f);
+        if (q < 0) q = 0; else if (q > kAimYawMax) q = kAimYawMax;
+        return q;
+}
+static inline float aim_yaw_degrees(int q) { return (float)q * 360.0f / 255.0f; }
 
 /* ======================== msgpack 打包 ======================== */
 
@@ -114,14 +132,15 @@ static inline void pack_leave(jmsgpack_packer_t* pk, const S2CPlayerLeave& l) {
     jmsgpack_pack_int(pk, l.conv);
 }
 static inline void pack_input(jmsgpack_packer_t* pk, const S2CPlayerInput& i) {
-    jmsgpack_pack_array(pk, 3);
+    jmsgpack_pack_array(pk, 4);
     jmsgpack_pack_int(pk, i.conv);
     jmsgpack_pack_int(pk, i.dir);
     jmsgpack_pack_int(pk, i.attack);
+    jmsgpack_pack_int(pk, i.yaw_q);
 }
 
 /* C2S 打包: [cmd, payload] */
-static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int input_dir, int input_attack, int char_id = 0) {
+static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int input_dir, int input_attack, int char_id = 0, int input_yaw = kAimYawInvalid) {
     std::string out;
     jmsgpack_packer_t pk;
     jmsgpack_packer_init(&pk, &out, mp_write_cb);
@@ -133,9 +152,10 @@ static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int 
         jmsgpack_pack_int64(&pk, join_y);
         jmsgpack_pack_int(&pk, char_id);
     } else if (cmd == CMD_PLAYER_INPUT) {
-        jmsgpack_pack_array(&pk, 2);
+        jmsgpack_pack_array(&pk, 3);
         jmsgpack_pack_int(&pk, input_dir);
         jmsgpack_pack_int(&pk, input_attack);
+        jmsgpack_pack_int(&pk, input_yaw);
     } else {
         jmsgpack_pack_nil(&pk);
     }
@@ -303,6 +323,9 @@ static inline void unpack_command_read_one(S2CPlayerInput& d, const jmsgpack_obj
         d.conv = (int)jmp_int(&o->via.array.ptr[0]);
         d.dir = (int)jmp_int(&o->via.array.ptr[1]);
         d.attack = (int8_t)jmp_int(&o->via.array.ptr[2]);
+        // 第 4 位是瞄准角；旧包/缺失时为"无瞄准数据"（渲染回退到朝向）
+        d.yaw_q = (o->via.array.size >= 4) ? (int)jmp_int(&o->via.array.ptr[3])
+                                           : kAimYawInvalid;
     }
 }
 
@@ -378,7 +401,7 @@ static inline int unpack_command(const char* data, int len,
  * 通过出参返回 cmd / join_x, join_y / input_dir, input_attack */
 static inline int unpack_c2s(const char* data, int len,
     int* cmd, int64_t* join_x, int64_t* join_y, int* input_dir, int* input_attack,
-    int* char_id = nullptr)
+    int* char_id = nullptr, int* input_yaw = nullptr)
 {
     jmsgpack_unpacked_t r;
     jmsgpack_unpacked_init(&r);
@@ -402,6 +425,9 @@ static inline int unpack_c2s(const char* data, int len,
                 *input_dir = (int)jmp_int(&payload->via.array.ptr[0]);
                 *input_attack = (int)jmp_int(&payload->via.array.ptr[1]);
             }
+            if (input_yaw)
+                *input_yaw = (payload->via.array.size >= 3)
+                        ? (int)jmp_int(&payload->via.array.ptr[2]) : kAimYawInvalid;
             break;
         }
     }

@@ -17,6 +17,7 @@ struct GameRuntime {
     int   local_dir = 0;                   // 本地玩家方向
     int   current_input_mask = 0;
     bool  attack_triggered = false;        // 近战 tap
+    int   last_aim_yaw_sent = -1;          // 上次随输入上传的瞄准角（-1=从未发过；变化时补发一帧）
 
     bool  ready = false;
     int   server_frameid = 0;

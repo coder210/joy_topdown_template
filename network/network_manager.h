@@ -52,7 +52,7 @@ private:
     void HandleCmdLoading(int conv);
     void HandleCmdPlayerJoin(int conv, int64_t x, int64_t y, int char_id);
     void HandleCmdPlayerLeave(int conv);
-    void HandleCmdPlayerInput(int conv, uint32_t seq, int dir, int attack);
+    void HandleCmdPlayerInput(int conv, uint32_t seq, int dir, int attack, int yaw = kAimYawInvalid);
     void HandleCmdHeartbeat(int conv);
     static int GetTargetFrameId(int curr_frameid, int context_frameid);
 };
