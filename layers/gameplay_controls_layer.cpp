@@ -78,13 +78,41 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
         float cy = m->y + m->h * 0.5f;
         float R  = (m->w < m->h ? m->w : m->h) * 0.5f;
 
-        // 白底圆 + 墨色描边（显式设色，避免继承上层残留颜色导致红/杂色边框）
-        r2d_set_color(r2d, 255, 255, 255, 255);
-        shape_draw_circle(r2d, "fill", { cx, cy }, R, 40);
-        r2d_set_color(r2d, 0, 0, 0, 255);
-        shape_draw_circle(r2d, "line", { cx, cy }, R, 40);
+        // 最外描边半径（冷却环画在其外侧，两种底都通用）
         float out = R + 2.0f;
-        shape_draw_circle(r2d, "line", { cx, cy }, out, 40);
+
+        // 纹理底（Style B 浅色圆钮 / 方向键）：按下用 *_highlight 图。
+        // 方案1：保留墨色文字、键盘角标、冷却环，仅把程序白圆替换为素材纹理，
+        // 贴合游戏浅色水墨 UI；纹理缺失时回退到原程序白底圆，避免回归。
+        const char* basePath = "joy_topdown_template/sprites/ui/button_circle.png";
+        const char* hlPath   = "joy_topdown_template/sprites/ui/button_circle_highlight.png";
+        bool circleBase = true;   // 圆钮底；方向键为盾形底（墨色描边只画外圈）
+        if (m->label) {
+                if      (strcmp(m->label, "上") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_north.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_north_highlight.png"; circleBase = false; }
+                else if (strcmp(m->label, "下") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_south.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_south_highlight.png"; circleBase = false; }
+                else if (strcmp(m->label, "左") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_west.png";   hlPath = "joy_topdown_template/sprites/ui/dpad_element_west_highlight.png"; circleBase = false; }
+                else if (strcmp(m->label, "右") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_east.png";   hlPath = "joy_topdown_template/sprites/ui/dpad_element_east_highlight.png"; circleBase = false; }
+        }
+        bool pressed = (m->btn == pressed_btn);
+        auto* am = AssetManager::GetInstance();
+        image_p tex = (am && ctx_) ? am->GetImage(r2d, pressed ? hlPath : basePath) : NULL;
+        if (tex) {
+                jrect_t src = { 0.0f, 0.0f, 64.0f, 64.0f };
+                jrect_t dst = { m->x, m->y, m->w, m->h };
+                image_draw1(tex, &src, &dst);
+                // 墨色描边（水墨风识别度）：纹理填充偏浅，浅色地板上需墨线勾边。
+                // 圆钮画内外双圈（恢复原白底墨边观感）；盾形方向键只画外圈避免割裂形状。
+                r2d_set_color(r2d, 0, 0, 0, 255);
+                shape_draw_circle(r2d, "line", { cx, cy }, out, 40);
+                if (circleBase)
+                        shape_draw_circle(r2d, "line", { cx, cy }, R, 40);
+        } else {  // 纹理缺失：回退原程序白底圆 + 墨色描边
+                r2d_set_color(r2d, 255, 255, 255, 255);
+                shape_draw_circle(r2d, "fill", { cx, cy }, R, 40);
+                r2d_set_color(r2d, 0, 0, 0, 255);
+                shape_draw_circle(r2d, "line", { cx, cy }, R, 40);
+                shape_draw_circle(r2d, "line", { cx, cy }, out, 40);
+        }
 
         // 圆心内容：画文字
         if (m->label && m->label[0]) {
