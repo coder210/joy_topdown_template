@@ -3,10 +3,21 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "",
+    "activeFile": "level1.tmx",
     "expandedProjectPaths": [
     ],
     "fileStates": {
+        "level1.tmx": {
+            "scale": 0.46757812499999996,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 960.2673350041772,
+                "y": 639.465329991646
+            }
+        },
+        "level1.tmx#tilesheet": {
+            "scaleInDock": 1
+        }
     },
     "last.exportedFilePath": "E:/c++/joy/joy_topdown_template/assets/joy_topdown_template/levels",
     "last.imagePath": "E:/c++/joy/joy_topdown_template/assets/joy_topdown_template/tilesheets",
@@ -15,9 +26,11 @@
     "map.tileHeight": 64,
     "map.tileWidth": 64,
     "openFiles": [
+        "level1.tmx"
     ],
     "project": "level.tiled-project",
     "recentFiles": [
+        "level1.tmx"
     ],
     "tileset.embedInMap": true,
     "tileset.tileSize": {

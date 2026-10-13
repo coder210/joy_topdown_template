@@ -19,8 +19,9 @@ static constexpr int   PLAYER_MELEE_DAMAGE = 25;    // ENEMY_MAX_HP=50，两刀�
 static constexpr int   ENEMY_MELEE_DAMAGE  = 20;    // PLAYER_MAX_HP=100，五刀击杀
 
 // 近战攻击结算：消费 PlayerEventInput.pending_actions（玩家由 input_consume_input_system
-// 生产、敌人由 ai_system 生产），按朝向生成攻击盒（自身碰撞盒沿 dir 向前延伸 range）
-// 做 AABB 命中判定并扣血，跳过死亡目标。帧同步确定性要求两端注册顺序一致：
+// 生产、敌人由 ai_system 生产）。攻击盒延伸方向优先用鼠标瞄准角 aim_yaw（与渲染视觉挥砍
+// 一致），无瞄准数据时回退键盘朝向 act.dir；自身碰撞盒沿该方向向前延伸 range 做 AABB
+// 命中判定并扣血，跳过死亡目标。帧同步确定性要求两端注册顺序一致：
 // ai_system 之后、player_death 之前。
 static void melee_attack_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
@@ -73,13 +74,27 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
         auto& apos  = view.get<LogicPositionComponent>(attacker);
         auto& arect = view.get<LogicRectComponent>(attacker);
 
-        // 攻击盒 = 自身碰撞盒沿朝向 dir 向前延伸 range（纯定点数，帧同步确定性）
+        // 攻击盒延伸方向：优先用鼠标瞄准角 aim_yaw（与渲染层视觉挥砍一致），
+        // 无瞄准数据（服务端/本机从未动过鼠标）时回退键盘朝向 act.dir。
+        // 瞄准角按就近吸附成 4 向（与本项目 4 向判定、帧同步确定性保持一致）：
+        // 角度约定 0=右 90=下 180=左 270=上（屏幕 y 向下，与 dir_to_angle_deg 同约定）。
+        int atk_dir = act.dir;
+        if (act.aim_yaw != kAimYawInvalid) {
+            int m = (int)aim_yaw_degrees(act.aim_yaw);
+            m %= 360; if (m < 0) m += 360;
+            if (m <= 45 || m > 315)      atk_dir = 2;   // 右
+            else if (m <= 135)           atk_dir = 0;   // 下
+            else if (m <= 225)           atk_dir = 1;   // 左
+            else                         atk_dir = 3;   // 上
+        }
+
+        // 攻击盒 = 自身碰撞盒沿 atk_dir 向前延伸 range（纯定点数，帧同步确定性）
         const fp_t ax = apos.x, ay = apos.y;
         const fp_t aw = arect.width, ah = arect.height;
         const fp_t range = is_player ? fp_from_float(PLAYER_MELEE_RANGE)
                                      : registry.get<AIComponent>(attacker).attack_radius;
         fp_t hx = ax, hy = ay, hw = aw, hh = ah;
-        switch (act.dir) {
+        switch (atk_dir) {
             case 0: hy = fp_add(ay, ah); hh = range; break;              // 下
             case 1: hx = fp_sub(ax, range); hw = range; break;           // 左
             case 2: hx = fp_add(ax, aw);   hw = range; break;            // 右

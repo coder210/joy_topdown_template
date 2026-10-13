@@ -157,7 +157,7 @@ static const anim_def_t& sprite_anim_def(Context* ctx, int char_id)
 // "武器独立于角色、绕握点随朝向旋转"的表现）：
 //  - 收势（待机/行走）：均取世界角 270°（竖直），不随移动朝向乱指。
 //    近战竖举在肩后（垫在角色身后绘制）；远程(弓)正前方持握（沿朝向推出）
-//    画在身前（对齐参考 rougelite：弓手把弓持在身前一侧，始终可见）；
+//    画在身前正前方（对齐参考 rougelite，弓始终可见）；
 //  - 近战：攻击时锁定 attack_dir，沿基角 ±75° 挥扫一道弧线（ease-out），并伴随
 //    握点半径脉冲（前刺感），画在角色身前；
 //  - 远程(弓)：攻击时原地拉弓蓄力（握点后撤、弦上搭箭）后松放回弹，不挥扫；
@@ -182,10 +182,10 @@ static float dir_to_angle_deg(int dir)
         }
 }
 
-// has_mouse_aim / mouse_aim_deg：本机玩家的鼠标瞄准（度，世界坐标，0=右、顺时针为正）。
-// 仅用于远程(弓)的朝向表现：收势指向光标、攻击沿光标方向拉弓；近战完全不受影响。
-// 关键点：弓的朝向**只认鼠标**，键盘上下左右不参与（否则移动朝向会跟鼠标朝向打架）。
-// 服务端/无鼠标时为 false，弓竖直朝上（无瞄准数据）。纯渲染，不参与帧同步。
+// has_mouse_aim / mouse_aim_deg：武器朝向的瞄准角（度，世界坐标，0=右、顺时针为正），
+// 由 ActionStateComponent.aim_yaw 还原（鼠标量化角随输入同步到所有客户端，两端一致）。
+// 所有武器（近战 + 远程）一律由此驱动朝向：收势指向光标、攻击沿光标方向；
+// 键盘上下左右不参与方向（否则移动朝向会和鼠标朝向打架）；无瞄准数据时竖直朝上。
 static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                              float role_scale, const ActionStateComponent& ac, bool flip_h,
                              bool has_mouse_aim, float mouse_aim_deg, int char_id)

@@ -23,7 +23,7 @@ static void input_consume_input_system(entt::registry& registry, Context* ctx, f
 		if (pact.knockback_timer > 0) pact.knockback_timer -= 1;
 
 		// 兜底：本帧没有该玩家的输入即视为静止（松开方向键 / 未攻击）。
-		// 输入收集端在 dir/attack/ranged/ray 全为 0 时不发送输入（见
+		// 输入收集端在 dir/attack 全为 0 时不发送输入（攻击键近战/远程通用，由武器 kind 分流；
 		// NetworkManager::CollectLocalInput / SendInput），若此处不兜底，
 		// act.state 会滞留上一次的 WALK（或 ATTACK），动画永远停在 run。
 		// 下方“本帧有输入”的分支会覆盖这里的值。
