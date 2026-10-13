@@ -204,21 +204,19 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
 
         const float scale = role_scale * wd.hold_scale;
 
-        // 瞄准角 / 攻击表现：
-        //  - 远程(弓)：朝向只由鼠标瞄准驱动（量化角随输入同步，**键盘上下左右完全不参与**），
-        //    无瞄准数据时竖直朝上。避免"移动朝向"与"鼠标朝向"两套朝向打架。
-        //  - 近战：收势竖直朝上（肩后），攻击沿 attack_dir 挥扫（键盘朝向驱动）。
-        float aim   = 270.0f;    // 收势：竖直朝上（刀尖/弓背朝上，背在肩后）
+        // 瞄准角 / 攻击表现：所有武器（近战 + 远程）一律由鼠标瞄准驱动朝向，
+        // 与弓一致——量化角随输入同步，键盘上下左右完全不参与。无瞄准数据时竖直朝上。
+        float aim   = 270.0f;    // 收势：竖直朝上（刀尖/弓背朝上）
         float reach = 1.0f;      // 握点半径脉冲（攻击时前刺 / 拉弓后退）
         bool  useArrow = false;  // 弓拉弓阶段在弦上搭一支箭
-        if (wd.kind == 0 && has_mouse_aim)
-                aim = mouse_aim_deg;   // 弓：只认鼠标
+        if (has_mouse_aim)
+                aim = mouse_aim_deg;   // 所有武器：只认鼠标
 
         const bool attacking = (ac.state == ActionStateComponent::ATTACK
                 && ac.attack_timer > 0);
         if (attacking) {
-                // 远程(弓)沿鼠标瞄准方向拉弓；近战沿用 attack_dir 挥扫
-                const float base = (wd.kind == 0) ? aim : dir_to_angle_deg(ac.attack_dir);
+                // 远程(弓)与近战都沿鼠标瞄准方向；无鼠标时近战沿用键盘 attack_dir 挥扫
+                const float base = (wd.kind == 0 || has_mouse_aim) ? aim : dir_to_angle_deg(ac.attack_dir);
                 // 进度 0→1（attack_timer 从 ATTACK_DURATION 逐 tick 递减）
                 const float p = 1.0f - (float)ac.attack_timer
                         / (float)ActionStateComponent::ATTACK_DURATION;
@@ -256,14 +254,14 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         if (cell.h <= 0.0f) return;
 
         // 握点：攻击时以角色中心为原点，把"握距(前)/手高(下)"偏移随瞄准角一起旋转。
-        // 收势分两态（对齐参考 rougelite）：
-        //  - 近战：竖举在肩后（随角色朝向镜像，配合"垫在身后"的绘制顺序）；
-        //  - 远程(弓)：竖持于面朝方向的身体一侧，画在身前（弓始终可见）。
+        // 收势分两态：
+        //  - 有鼠标瞄准：所有武器沿瞄准方向正前方持握（与弓一致，武器随鼠标旋转可见）；
+        //  - 无鼠标(服务端/键盘)：近战竖举肩后（原行为），远程(弓)仍画身前。
         const float rad = aim * 3.1415926f / 180.0f;
         const float rr  = meters_to_pixels(wd.hold_dx) * reach;
         const float ry  = meters_to_pixels(wd.hold_dy);
         vec2_t pos;
-        if (!attacking && wd.kind == 1) {
+        if (!attacking && wd.kind == 1 && !has_mouse_aim) {
                 pos.x = cx + (flip_h ? -ry : ry) * 1.8f;
                 pos.y = cy - rr * 0.9f;
         } else if (!attacking) {
