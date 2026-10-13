@@ -13,6 +13,7 @@
 #include "../passes/interpolate_pass.h"
 #include "../passes/draw_player_pass.h"
 #include "../passes/draw_enemy_pass.h"
+#include "../passes/draw_bullet_pass.h"
 
 #include "../systems/input_consume_join_system.h"
 #include "../passes/player_status_hud_pass.h"
@@ -248,6 +249,8 @@ void GameScene::Render()
     draw_enemy_pass(ctx);              // 敌人：墨色方块占位
 
     player_render_pass(ctx->ecs, ctx, this->render_dt_);   // 玩家：动画推进 + 绘制（characters.json 序列帧）
+
+    draw_bullet_pass(ctx);              // 飞行中的箭/子弹（tilesheet.png col7，按速度旋转）
 
     // 2D 战争迷雾：覆盖地图与实体，仅暴露视野附近，墙后与远端被墨雾遮蔽
     //fog_pass_2d(ctx);

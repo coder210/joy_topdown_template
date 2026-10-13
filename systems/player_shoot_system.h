@@ -34,10 +34,30 @@ static void remove_melee_events(std::vector<PlayerEventInput::Action>& v) {
     v.resize(w);
 }
 
+// 鼠标瞄准角 -> 单位方向向量（定点）查表。
+// 表在首次调用时用定点三角函数（fp_cos/fp_sin）一次性生成，之后每次发射只做整数查表，
+// 逻辑路径不含浮点。角度 = q * 2π / 255（与 aim_yaw_degrees 同角度），全程定点，两端表逐位一致。
+struct AimDirFp { fp_t dx; fp_t dy; };
+
+static AimDirFp aim_yaw_dir(int q) {
+    static AimDirFp table[kAimYawMax + 1];
+    static bool built = false;
+    if (!built) {
+        for (int i = 0; i <= kAimYawMax; ++i) {
+            fp_t rad = fp_div(fp_mul(fp_from_int(i), FP_PI_TIMES_2), fp_from_int(255));
+            table[i].dx = fp_cos(rad);
+            table[i].dy = fp_sin(rad);
+        }
+        built = true;
+    }
+    if (q < 0 || q > kAimYawMax) q = 0;   // 网络来的异常值兜底，避免越界
+    return table[q];
+}
+
 // 远程射击系统：消费 PlayerEventInput.pending_actions 中的 ATTACK_MELEE 事件。
 // 仅处理"玩家 + 远程武器（kind==0）"的情形；近战武器与敌人攻击交给 melee_attack_system。
 // 方向只取自 ActionStateComponent.aim_yaw（鼠标量化角，0..254 映射 0..360°）；上下左右键不参与。
-// 帧同步确定性：aim_yaw 由同步输入推导，两端一致；发射用定点三角函数 fp_cos/fp_sin。
+// 帧同步确定性：aim_yaw 由同步输入推导，两端一致；方向用定点查表（见 aim_yaw_dir），逻辑路径无浮点。
 static void player_shoot_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
     auto view = registry.view<PlayerEventInput, ActionStateComponent,
@@ -78,10 +98,9 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
             remove_melee_events(events.pending_actions);
             continue;
         }
-        float a_deg = aim_yaw_degrees(act.aim_yaw);
-        fp_t rad = fp_mul(fp_from_float(a_deg), fp_div(fp_pi(), fp_from_float(180.0f)));
-        fp_t dx = fp_cos(rad);
-        fp_t dy = fp_sin(rad);
+        AimDirFp dir = aim_yaw_dir(act.aim_yaw);   // 定点查表，逻辑路径无浮点
+        fp_t dx = dir.dx;
+        fp_t dy = dir.dy;
 
         // 出生点：玩家中心沿瞄准方向偏移
         fp_t cx = fp_add(lpos.x, fp_div(lrec.width,  fp_from_float(2.0f)));

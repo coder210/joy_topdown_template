@@ -33,6 +33,16 @@ struct Context;
  // 播放帧率（帧/秒）。素材未携带帧率，统一取 12 FPS。
 static const float kSpriteFPS = 12.0f;
 
+// 弓的两帧贴图（tilesheet.png，64×64 网格第 9 行，纯渲染用）：
+//   col5 = (320,576) 拉满搭箭的弓（拉弓阶段）
+//   col6 = (384,576) 无箭的弓（待机 / 松放后）
+//   col7 = (448,576) 箭弹体（飞行中的箭，供子弹渲染用）
+// 两帧原生箭尖朝上，与 weapons.png 的弓同为竖放（hold_angle=-90），旋转公式不变。
+static const char* kBowTilesheetPath = "joy_topdown_template/tilesheet.png";
+static const float kBowCellPx = 64.0f;
+static jrect_t bow_cell_with_arrow() { jrect_t r = { 320.0f, 576.0f, kBowCellPx, kBowCellPx }; return r; }
+static jrect_t bow_cell_no_arrow()   { jrect_t r = { 384.0f, 576.0f, kBowCellPx, kBowCellPx }; return r; }
+
 // 渲染层缓存（不属于帧同步状态）：
 //  - 纹理缓存统一收归 AssetManager::tex_cache_（见 sprite_get_image），本文件不再持有；
 //  - 每实体的动画播放状态改为 AnimStateComponent 挂在实体上（实体销毁由 ECS 自动回收，
@@ -201,7 +211,6 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         float aim   = 270.0f;    // 收势：竖直朝上（刀尖/弓背朝上，背在肩后）
         float reach = 1.0f;      // 握点半径脉冲（攻击时前刺 / 拉弓后退）
         bool  useArrow = false;  // 弓拉弓阶段在弦上搭一支箭
-        const WeaponDef* arrowDef = nullptr;
         if (wd.kind == 0 && has_mouse_aim)
                 aim = mouse_aim_deg;   // 弓：只认鼠标
 
@@ -228,14 +237,22 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                                 reach += 0.10f * sinf((p - 0.6f) / 0.40f * 3.1415926f); // 松放回弹前刺
                         aim = base;                                        // 弓始终指向瞄准方向，不挥扫
                         useArrow = (p < 0.6f);                           // 拉弓至松放前搭箭在弦
-                        arrowDef = g_weaponCatalog.findByName("bow_arrow");
                 }
         }
 
-        // 取武器格子：弓在拉弓阶段换成"搭箭弓"贴图（同合图、同 hold 参数）
+        // 取武器格子：
+        //  - 近战：weapons.png 合图中该武器所在格（不变）；
+        //  - 远程(弓)：两帧贴图在 tilesheet.png（row9）——拉弓搭箭(p<0.6)用 col5"有箭的弓"，
+        //    待机与松放后(p>=0.6，箭已射出)用 col6"无箭的弓"。tilesheet 加载失败时回退 weapons.png。
         jrect_t cell = g_weaponCatalog.cellRect(wd);
-        if (arrowDef && useArrow && arrowDef->id != wd.id)
-                cell = g_weaponCatalog.cellRect(*arrowDef);
+        image_p wimg = img;
+        if (wd.kind == 0) {
+                image_p tsimg = am->GetImage(ctx->r2d, kBowTilesheetPath);
+                if (tsimg) {
+                        wimg = tsimg;
+                        cell = useArrow ? bow_cell_with_arrow() : bow_cell_no_arrow();
+                }
+        }
         if (cell.h <= 0.0f) return;
 
         // 握点：攻击时以角色中心为原点，把"握距(前)/手高(下)"偏移随瞄准角一起旋转。
@@ -263,7 +280,7 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
 
         // 旋转角 = 瞄准角 - 图集姿态修正（竖放武器 hold_angle=-90 → +90 修正为刀尖指向 aim）
         const float ang = (aim - wd.hold_angle_deg) * 3.1415926f / 180.0f;
-        image_draw_ex(img, &cell, pos, ang, scl, origin);
+        image_draw_ex(wimg, &cell, pos, ang, scl, origin);
 }
 
 static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
