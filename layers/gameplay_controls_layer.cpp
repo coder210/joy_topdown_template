@@ -54,22 +54,26 @@ void GameplayControlsLayer::drawCoolRing(float cx, float cy,
         }
 }
 
-// 圆按钮右下角叠加键盘键角标（方案 A，对齐 3D）：右下 1/4 处深墨小字母。
+// 圆按钮右下角叠加键盘键角标（方案 A，对齐 3D）：右下 1/4 处小字母。
+// on_dark：底为黑色纹理（Style D）时用浅色字，否则用墨色字。
 void GameplayControlsLayer::drawKeyBadge(font_p font, const char* key,
-                float bx, float by)
+                float bx, float by, bool on_dark)
 {
         if (!ctx_) return;
         jr2d_p r2d = ctx_->r2d;
         if (!r2d || !font || !key || !key[0]) return;
         float size = 14.0f;                          // 角标像素高度（与 font 实际字号一致）
         float tw = size * 0.5f;                      // 单字符宽≈fontSize/2
-        jcolor_t c = { 60, 60, 70, 255 };
+        jcolor_t c = on_dark ? jcolor_t{ 230, 230, 235, 255 }
+                             : jcolor_t{ 60, 60, 70, 255 };
         float px = floorf(bx - tw * 0.5f + 0.5f);    // 对齐到最近整数像素
         float py = floorf(by - size * 0.5f + 0.5f);
         jtext_printx(r2d, font, key, (int)strlen(key), c, px, py);
 }
 
-// 单个圆形按钮绘制（去掉 node 依赖后由 Render 直接调用）
+// 单个按钮绘制（去掉 node 依赖后由 Render 直接调用）
+// 纯纹理呈现：底图自带方向箭头 / 圆钮造型，按下切 Highlights A 金色辉光图，
+// 不再叠加程序绘制的圆与文字（原白底圆 + 墨色描边 + 圆心汉字已移除）。
 void GameplayControlsLayer::drawButton(const gc_button_meta* m)
 {
         if (!ctx_ || !m || !m->btn) return;
@@ -78,20 +82,17 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
         float cy = m->y + m->h * 0.5f;
         float R  = (m->w < m->h ? m->w : m->h) * 0.5f;
 
-        // 最外描边半径（冷却环画在其外侧，两种底都通用）
+        // 最外轮廓半径（冷却环画在其外侧）
         float out = R + 2.0f;
 
-        // 纹理底（Style B 浅色圆钮 / 方向键）：按下用 *_highlight 图。
-        // 方案1：保留墨色文字、键盘角标、冷却环，仅把程序白圆替换为素材纹理，
-        // 贴合游戏浅色水墨 UI；纹理缺失时回退到原程序白底圆，避免回归。
+        // 纹理路径：label 决定用方向键还是圆钮底（label 仅作素材选择键，不再绘制）
         const char* basePath = "joy_topdown_template/sprites/ui/button_circle.png";
         const char* hlPath   = "joy_topdown_template/sprites/ui/button_circle_highlight.png";
-        bool circleBase = true;   // 圆钮底；方向键为盾形底（墨色描边只画外圈）
         if (m->label) {
-                if      (strcmp(m->label, "上") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_north.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_north_highlight.png"; circleBase = false; }
-                else if (strcmp(m->label, "下") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_south.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_south_highlight.png"; circleBase = false; }
-                else if (strcmp(m->label, "左") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_west.png";   hlPath = "joy_topdown_template/sprites/ui/dpad_element_west_highlight.png"; circleBase = false; }
-                else if (strcmp(m->label, "右") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_east.png";   hlPath = "joy_topdown_template/sprites/ui/dpad_element_east_highlight.png"; circleBase = false; }
+                if      (strcmp(m->label, "上") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_north.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_north_highlight.png"; }
+                else if (strcmp(m->label, "下") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_south.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_south_highlight.png"; }
+                else if (strcmp(m->label, "左") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_west.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_west_highlight.png"; }
+                else if (strcmp(m->label, "右") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_east.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_east_highlight.png"; }
         }
         bool pressed = (m->btn == pressed_btn);
         auto* am = AssetManager::GetInstance();
@@ -100,42 +101,22 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
                 jrect_t src = { 0.0f, 0.0f, 64.0f, 64.0f };
                 jrect_t dst = { m->x, m->y, m->w, m->h };
                 image_draw1(tex, &src, &dst);
-                // 墨色描边（水墨风识别度）：纹理填充偏浅，浅色地板上需墨线勾边。
-                // 圆钮画内外双圈（恢复原白底墨边观感）；盾形方向键只画外圈避免割裂形状。
-                r2d_set_color(r2d, 0, 0, 0, 255);
-                shape_draw_circle(r2d, "line", { cx, cy }, out, 40);
-                if (circleBase)
-                        shape_draw_circle(r2d, "line", { cx, cy }, R, 40);
-        } else {  // 纹理缺失：回退原程序白底圆 + 墨色描边
-                r2d_set_color(r2d, 255, 255, 255, 255);
-                shape_draw_circle(r2d, "fill", { cx, cy }, R, 40);
-                r2d_set_color(r2d, 0, 0, 0, 255);
-                shape_draw_circle(r2d, "line", { cx, cy }, R, 40);
-                shape_draw_circle(r2d, "line", { cx, cy }, out, 40);
         }
 
-        // 圆心内容：画文字
-        if (m->label && m->label[0]) {
-                font_p f = AssetManager::GetInstance()->GetSimheiFont24();
-                jcolor_t tc = { 30, 30, 35, 255 };
-                jtext_printx(r2d, f, m->label, (int)strlen(m->label), tc,
-                        cx - 12.0f, cy - 12.0f);
-        }
-
-        // 冷却环：比最外描边略大一圈（深墨）
+        // 冷却环：比最外轮廓略大一圈（深墨）
         if (m->coolType != 0) {
                 float ratio = localCoolRatio(m->coolType);
                 if (ratio > 0.0f)
                         drawCoolRing(cx, cy, out + 1.0f, 4.0f, 1.0f - ratio);
         }
 
-        // 键盘角标：右下 1/4 处
+        // 键盘角标：右下 1/4 处（黑底纹理用浅色字）
         if (m->keyLabel && m->keyLabel[0]) {
                 float off = R * 0.68f;
                 float bx = cx + off * 0.7071f;
                 float by = cy + off * 0.7071f;
                 font_p f = AssetManager::GetInstance()->GetSimheiFont12();
-                drawKeyBadge(f, m->keyLabel, bx, by);
+                drawKeyBadge(f, m->keyLabel, bx, by, tex != NULL);
         }
 }
 

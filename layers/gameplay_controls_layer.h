@@ -52,7 +52,7 @@ private:
     static void sendGameplayControlEvent(int event_code);
     float localCoolRatio(int coolType);
     void drawCoolRing(float cx, float cy, float R, float thick, float frac);
-    void drawKeyBadge(font_p font, const char* key, float bx, float by);
+    void drawKeyBadge(font_p font, const char* key, float bx, float by, bool on_dark);
     void drawButton(const gc_button_meta* m);
 };
 
