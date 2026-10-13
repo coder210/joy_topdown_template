@@ -28,6 +28,8 @@
 #include "../passes/camera_follow_pass.h"
 #include "../systems/ai_system.h"
 #include "../systems/melee_attack_system.h"
+#include "../systems/player_shoot_system.h"
+#include "../systems/bullet_system.h"
 
 
 #include "../systems/player_death_system.h"
@@ -77,12 +79,14 @@ void GameScene::Load()
     add_system(ctx, PreUpdate, "input_consume_input", input_consume_input_system);
     add_system(ctx, OnUpdate, "ai_system", ai_system);
     add_system(ctx, OnUpdate, "melee_attack", melee_attack_system);
+    add_system(ctx, OnUpdate, "player_shoot", player_shoot_system);
 
 
     add_system(ctx, OnUpdate, "player_death", player_death_system);
     add_system(ctx, OnUpdate, "pathfinding", pathfinding_system);
     add_system(ctx, OnUpdate, "movement", movement_system);
     add_system(ctx, OnUpdate, "collision", collision_system);
+    add_system(ctx, OnUpdate, "bullet", bullet_system);
     add_system(ctx, OnUpdate, "cleanup", cleanup_system);
 
     // 执行 OnStart phase（生成地图）

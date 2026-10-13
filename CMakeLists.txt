@@ -52,6 +52,7 @@ set(PROJECT_FILES
     components/spawn_point_component.h
     components/system_registry_component.h
     components/transform_component.h
+    components/bullet_component.h
     # ---- layers ----
     layers/debug_layer.cpp
     layers/gameplay_controls_layer.cpp
@@ -117,6 +118,8 @@ set(PROJECT_FILES
     systems/map_def.h
     systems/map_spawn_system.h
     systems/melee_attack_system.h
+    systems/player_shoot_system.h
+    systems/bullet_system.h
     systems/movement_system.h
     systems/pathfinding_system.h
     systems/player_death_system.h

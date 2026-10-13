@@ -52,11 +52,14 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
 
         bool is_player = registry.all_of<PlayerComponent>(attacker);
 
-        // 玩家近战需持有近战武器（kind==1）；持有远程/空手武器则忽略近战输入
+        // 玩家近战需持有近战武器（kind==1）。
+        // 持有远程武器（kind==0）时不消费事件，放行交给 player_shoot_system 处理射击；
+        // 空手（weapon_id<0 或 kind 既非 0 也非 1）则丢弃事件。
         if (is_player) {
             int wid = registry.get<PlayerComponent>(attacker).weapon_id;
             if (wid >= 0 && g_weaponCatalog.get(wid).kind != 1) {
-                erase_melee(events.pending_actions);
+                if (g_weaponCatalog.get(wid).kind == 0) continue;  // 远程：留待 player_shoot 消费
+                erase_melee(events.pending_actions);                // 空手：丢弃
                 continue;
             }
         }

@@ -33,4 +33,9 @@ struct ActionStateComponent {
     // 防止按住攻击键 / 敌人每 tick 产生攻击事件导致高频结算。
     int melee_cooldown = 0;
     static constexpr int MELEE_COOLDOWN = 18;   // 0.9s @ 20Hz（与 ATTACK_DURATION 一致）
+
+    // 远程射击冷却（tick 数）：发射后置满，由 player_shoot_system 每 tick 递减，
+    // 防止按住攻击键导致高频发射。与 melee_cooldown 同理，但与攻击动画计时 attack_timer 解耦。
+    int bullet_cooldown = 0;
+    static constexpr int BULLET_COOLDOWN = 12;  // 0.6s @ 20Hz
 };
