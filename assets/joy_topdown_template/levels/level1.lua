@@ -1,7 +1,7 @@
 return {
   version = "1.10",
   luaversion = "5.1",
-  tiledversion = "1.11.2",
+  tiledversion = "1.12.2",
   class = "",
   orientation = "orthogonal",
   renderorder = "right-down",
@@ -9,8 +9,8 @@ return {
   height = 20,
   tilewidth = 64,
   tileheight = 64,
-  nextlayerid = 5,
-  nextobjectid = 6,
+  nextlayerid = 6,
+  nextobjectid = 11,
   properties = {},
   tilesets = {
     {
@@ -108,6 +108,7 @@ return {
           width = 1920,
           height = 64,
           rotation = 0,
+          opacity = 1,
           visible = true,
           properties = {}
         },
@@ -121,6 +122,7 @@ return {
           width = 64,
           height = 1280,
           rotation = 0,
+          opacity = 1,
           visible = true,
           properties = {}
         },
@@ -134,6 +136,7 @@ return {
           width = 1920,
           height = 64,
           rotation = 0,
+          opacity = 1,
           visible = true,
           properties = {}
         },
@@ -147,6 +150,7 @@ return {
           width = 64,
           height = 1280,
           rotation = 0,
+          opacity = 1,
           visible = true,
           properties = {}
         }
@@ -176,6 +180,93 @@ return {
           width = 0,
           height = 0,
           rotation = 0,
+          opacity = 1,
+          visible = true,
+          properties = {}
+        }
+      }
+    },
+    {
+      type = "objectgroup",
+      draworder = "topdown",
+      id = 5,
+      name = "Enemy",
+      class = "",
+      visible = true,
+      opacity = 1,
+      offsetx = 0,
+      offsety = 0,
+      parallaxx = 1,
+      parallaxy = 1,
+      properties = {},
+      objects = {
+        {
+          id = 6,
+          name = "",
+          type = "",
+          shape = "point",
+          x = 145.455,
+          y = 172.249,
+          width = 0,
+          height = 0,
+          rotation = 0,
+          opacity = 1,
+          visible = true,
+          properties = {}
+        },
+        {
+          id = 7,
+          name = "",
+          type = "",
+          shape = "point",
+          x = 1764.59,
+          y = 164.593,
+          width = 0,
+          height = 0,
+          rotation = 0,
+          opacity = 1,
+          visible = true,
+          properties = {}
+        },
+        {
+          id = 8,
+          name = "",
+          type = "",
+          shape = "point",
+          x = 1760.77,
+          y = 1167.46,
+          width = 0,
+          height = 0,
+          rotation = 0,
+          opacity = 1,
+          visible = true,
+          properties = {}
+        },
+        {
+          id = 9,
+          name = "",
+          type = "",
+          shape = "point",
+          x = 164.593,
+          y = 1178.95,
+          width = 0,
+          height = 0,
+          rotation = 0,
+          opacity = 1,
+          visible = true,
+          properties = {}
+        },
+        {
+          id = 10,
+          name = "",
+          type = "",
+          shape = "point",
+          x = 930.144,
+          y = 681.34,
+          width = 0,
+          height = 0,
+          rotation = 0,
+          opacity = 1,
           visible = true,
           properties = {}
         }

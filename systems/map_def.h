@@ -116,6 +116,7 @@ struct map_spawn_ctx_t {
     int player_cell = -1;
     int enemy_n = 0;
     int enemy_cells[256];
+    bool force_enemy = false;  // true 时该层内所有对象都视作敌人（用于独立的 Enemy 层）
 };
 static void map_parse_spawn_obj(jtilemap_object_p obj, void* arg)
 {
@@ -128,7 +129,9 @@ static void map_parse_spawn_obj(jtilemap_object_p obj, void* arg)
     if (col < 0) col = 0; else if (col >= s->mw) col = s->mw - 1;
     if (row < 0) row = 0; else if (row >= s->mh) row = s->mh - 1;
     int cell = row * s->mw + col;
-    if (obj->type && strcmp(obj->type, "enemy") == 0) {
+    // 该层强制为敌人（独立 Enemy 层），或对象 type=="enemy" 时归为敌人；其余归玩家出生点。
+    bool is_enemy = s->force_enemy || (obj->type && strcmp(obj->type, "enemy") == 0);
+    if (is_enemy) {
         if (s->enemy_n < 256) s->enemy_cells[s->enemy_n++] = cell;
     } else {
         s->player_cell = cell;
@@ -138,6 +141,16 @@ static void map_parse_spawn_obj(jtilemap_object_p obj, void* arg)
 static jtilemap_object_layer_p map_find_spawn_layer(jtilemap_p tm)
 {
     static const char* names[] = { "Player", "player", "spawn" };
+    for (const char* n : names) {
+        jtilemap_object_layer_p ol = jtilemap_find_object_layer(tm, n);
+        if (ol) return ol;
+    }
+    return nullptr;
+}
+// 查找敌人对象层：优先 "Enemy"，兼容小写 "enemy" 与地图里误拼的 "Emeny"。
+static jtilemap_object_layer_p map_find_enemy_layer(jtilemap_p tm)
+{
+    static const char* names[] = { "Enemy", "enemy", "Emeny" };
     for (const char* n : names) {
         jtilemap_object_layer_p ol = jtilemap_find_object_layer(tm, n);
         if (ol) return ol;
@@ -203,6 +216,20 @@ static bool map_load_from_tilemap(int level)
         std::memcpy(g_map_info.enemy_cells, sctx.enemy_cells, (size_t)sctx.enemy_n * sizeof(int));
     }
 
+    // 敌人点：独立的 Enemy 层（地图里也可能误拼为 "Emeny"）。该层内所有对象都视作敌人，
+    // 忽略对象自身 type（地图导出时 type 常为空），与上面 spawn 层里 type=="enemy" 的对象合并计入。
+    if (jtilemap_object_layer_p el = map_find_enemy_layer(tm)) {
+        map_spawn_ctx_t ectx;
+        ectx.tw = (tw > 0) ? tw : 60;
+        ectx.th = (th > 0) ? th : 60;
+        ectx.mw = MAP_W;
+        ectx.mh = MAP_H;
+        ectx.force_enemy = true;
+        jtilemap_object_layer_foreach_all(el, map_parse_spawn_obj, &ectx);
+        for (int i = 0; i < ectx.enemy_n && g_map_info.enemy_n < 256; ++i)
+            g_map_info.enemy_cells[g_map_info.enemy_n++] = ectx.enemy_cells[i];
+    }
+
     g_map_info.tilemap = tm;   // 玩法数据源与渲染源合一；切关时由 map_load_level 销毁
     return true;
 }
@@ -241,9 +268,6 @@ static void map_build_ascii_grid(int level)
         g_map_grid[r * MAP_W + c] = (ch == '#') ? '#' : '.';
         if (ch == 'P') {
             g_map_info.player_cell = r * MAP_W + c;
-        } else if (ch == 'E') {
-            if (g_map_info.enemy_n < 256)
-                g_map_info.enemy_cells[g_map_info.enemy_n++] = r * MAP_W + c;
         }
         c++;
     }

@@ -33,6 +33,10 @@ struct GlobalState {
     int level = 1;                // 当前选关索引（来自 ctx->selected_level）
     bool level_cleared = false;   // 本关敌人是否已全部清空（给定性推导，双端一致）
 
+    // 敌人补充用的出生点轮转游标（仅权威端推进；客户端不运行 enemy_maintain_system，
+    // 由快照接收新敌人，故该值无需跨端同步）。初始 0。
+    int next_enemy_spawn_idx = 0;
+
     // A* 寻路工作区（存放 pathfind_astar 搜索过程的临时缓冲，含地图可通行性缓存）。
     // 仅作临时计算缓冲，不是帧同步状态、不参与 checksum，不随网络序列化。
     // 放 GlobalState 全局单例（随 ECS ctx 一起 emplace/get），避免函数内 static 数组的

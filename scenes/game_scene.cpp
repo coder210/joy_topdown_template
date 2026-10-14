@@ -90,11 +90,13 @@ void GameScene::Load()
     add_system(ctx, OnUpdate, "bullet", bullet_system);
     add_system(ctx, OnUpdate, "cleanup", cleanup_system);
 
-    // 执行 OnStart phase（生成地图）
-    run_phase(ctx, OnStart, 0);
-
-    // 模式特有初始化（多态分派到子类）
+    // 模式特有初始化（多态分派到子类）：注册 spawn_enemy/snapshot，并建链、注入本地玩家
     init();
+
+    // 执行 OnStart phase（生成地图 + 生成敌人）：必须在 init() 之后，
+    // 因为 spawn_enemy_system 在 initAuthoritative 内才注册到 OnStart；
+    // 若先跑 OnStart，则该系统尚未注册，敌人永远不会被生成。
+    run_phase(ctx, OnStart, 0);
 }
 
 void GameScene::HandleEvent(const void* ev)

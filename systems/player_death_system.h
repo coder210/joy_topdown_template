@@ -9,6 +9,7 @@
 #include "../components/action_state_component.h"
 #include "../components/player_state_input.h"
 #include "../components/transform_component.h"
+#include <vector>
 
 struct Context;
 
@@ -63,14 +64,17 @@ static void player_death_system(entt::registry& registry, Context* ctx, float /*
         }
     }
 
-    // 敌人死亡：标记死亡后保持死亡（不重生），达到"肃清全关"通关条件。
-    // 敌人 body 保留在场景中（dead 标记），渲染/血环/寻路均跳过死亡敌人。
-    auto eview = registry.view<EnemyComponent, HealthComponent>();
-    for (auto e : eview) {
-        auto& h = eview.get<HealthComponent>(e);
-        if (!h.dead && h.hp <= 0) {
-            h.dead = true;
+    // 敌人死亡：HP 归零即销毁实体（不保留尸体）。
+    // 该销毁在两端同 tick 发生（死亡判定确定性一致 → 帧同步两端一致）；
+    // "补满到目标数"由权威端 enemy_maintain_system 负责（生成新敌人并经快照下发）。
+    {
+        std::vector<entt::entity> dead_enemies;
+        auto eview = registry.view<EnemyComponent, HealthComponent>();
+        for (auto e : eview) {
+            if (eview.get<HealthComponent>(e).hp <= 0)
+                dead_enemies.push_back(e);
         }
+        for (auto e : dead_enemies) registry.destroy(e);
     }
 }
 

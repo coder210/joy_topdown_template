@@ -12,33 +12,39 @@
 #include "../components/spawn_point_component.h"
 #include "../systems/spawn_def.h"
 
-// 在 OnStart 阶段运行，按当前关卡 'E' 格确定性创建初始敌人实体
+// 单个敌人实体的创建：从给定 SpawnDef 在出生点生成，并装配全部行为组件。
+// 初始生成（spawn_enemy_system）与维持补充（enemy_maintain_system）共用，保证两份逻辑一致。
+static void spawn_one_enemy(entt::registry& registry, Context* ctx, const SpawnDef& s, int spawn_idx) {
+    entt::entity e = registry.create();
+    registry.emplace<IdComponent>(e, get_entity_id(ctx));
+    registry.emplace<EnemyComponent>(e);
+    registry.emplace<SpawnIdxComponent>(e, spawn_idx);
+    // 出生格中心 s.x/s.y；碰撞盒 0.8×0.8 以出生点居中，
+    // LogicPosition(左上角) = 中心 - 半宽(0.4)，Transform(渲染中心) = 出生点
+    registry.emplace<LogicPositionComponent>(e, fp_from_float(s.x - 0.4f), fp_from_float(s.y - 0.4f));
+    registry.emplace<LogicRectComponent>(e, fp_from_float(0.8f), fp_from_float(0.8f));
+    registry.emplace<TransformComponent>(e, s.x, s.y, 0.0f, 1.0f, 1.0f);
+
+    registry.emplace<ActionStateComponent>(e);
+    // 血量组件：玩家远程子弹命中扣血；死亡后由 player_death_system 销毁，交由 enemy_maintain_system 补充
+    registry.emplace<HealthComponent>(e, ENEMY_MAX_HP, ENEMY_MAX_HP);
+    registry.emplace<SpawnPointComponent>(e, fp_from_float(s.x), fp_from_float(s.y));
+    registry.emplace<AIComponent>(e,
+        fp_from_float(s.x), fp_from_float(s.y),  // patrol_center
+        fp_from_float(s.patrol_radius),
+        fp_from_float(s.detect_radius),
+        fp_from_float(s.attack_radius)
+    );
+}
+
+// 在 OnStart 阶段运行，按当前关卡 Enemy 层确定性创建初始敌人实体。
+// 数量取 min(出生点数, MAINTAIN_ENEMY_COUNT)，剩余出生点作为后续补充的轮转池。
 static void spawn_enemy_system(entt::registry& registry, Context* ctx, float /*dt*/) {
     int count = 0;
     const SpawnDef* ENEMY_SPAWNS = level_enemy_defs(ctx->selected_level, count);
-
-    for (int i = 0; i < count; i++) {
-        auto& s = ENEMY_SPAWNS[i];
-        entt::entity e = registry.create();
-        registry.emplace<IdComponent>(e, get_entity_id(ctx));
-        registry.emplace<EnemyComponent>(e);
-        registry.emplace<SpawnIdxComponent>(e, i);
-        // 出生格中心 s.x/s.y；碰撞盒 0.8×0.8 以出生点居中，
-        // LogicPosition(左上角) = 中心 - 半宽(0.4)，Transform(渲染中心) = 出生点
-        registry.emplace<LogicPositionComponent>(e, fp_from_float(s.x - 0.4f), fp_from_float(s.y - 0.4f));
-        registry.emplace<LogicRectComponent>(e, fp_from_float(0.8f), fp_from_float(0.8f));
-        registry.emplace<TransformComponent>(e, s.x, s.y, 0.0f, 1.0f, 1.0f);
-
-        registry.emplace<ActionStateComponent>(e);
-        // 血量组件：玩家远程子弹命中扣血；死亡后重生回出生点
-        registry.emplace<HealthComponent>(e, ENEMY_MAX_HP, ENEMY_MAX_HP);
-        registry.emplace<SpawnPointComponent>(e, fp_from_float(s.x), fp_from_float(s.y));
-        registry.emplace<AIComponent>(e,
-            fp_from_float(s.x), fp_from_float(s.y),  // patrol_center
-            fp_from_float(s.patrol_radius),
-            fp_from_float(s.detect_radius),
-            fp_from_float(s.attack_radius)
-        );
+    int n = count < MAINTAIN_ENEMY_COUNT ? count : MAINTAIN_ENEMY_COUNT;
+    for (int i = 0; i < n; i++) {
+        spawn_one_enemy(registry, ctx, ENEMY_SPAWNS[i], i);
     }
 }
 

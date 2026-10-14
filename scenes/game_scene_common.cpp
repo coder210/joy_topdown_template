@@ -8,6 +8,7 @@
 #include "../layers/gameplay_controls_layer.h"
 #include "../network/network_manager.h"
 #include "../systems/spawn_enemy_system.h"
+#include "../systems/enemy_maintain_system.h"
 #include "../systems/snapshot_system.h"
 
 // ============================================================
@@ -101,6 +102,7 @@ void GameSceneCommon::playableHandleEvent(GameScene* self, const void* ev)
 void GameSceneCommon::initAuthoritative(Context* ctx)
 {
     add_system(ctx, OnStart, "spawn_enemy", spawn_enemy_system);
+    add_system(ctx, OnUpdate, "enemy_maintain", enemy_maintain_system);
     add_system(ctx, PostUpdate, "snapshot", snapshot_system);
     auto& gs = ctx->ecs.ctx().get<GlobalState>();
     // 确定性种子：仅由关卡派生（不再依赖 get_ticks()/本地地址），
