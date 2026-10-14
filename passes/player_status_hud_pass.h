@@ -6,6 +6,7 @@
 #include "../components/transform_component.h"
 #include "../components/action_state_component.h"
 #include "../components/health_component.h"
+#include "../asset_manager.h"
 
 static void player_status_hud_pass(entt::registry& ecs, uint32_t local_conv,
         jr2d_p r2d, font_p font)

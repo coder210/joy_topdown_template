@@ -2,6 +2,7 @@
 #include "../asset_manager.h"
 #include <joy/external/cJSON.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 // 移速安全区间（米/秒）。上限 15 保证单 tick 位移 < 1 格（20Hz 下 step<0.75m），
@@ -26,6 +27,7 @@ void CharacterCatalog::setBuiltinDefault()
     d.move_speed = fp_from_float(2.4f);
     d.sprite_dir = "joy_topdown_template/sprites/characters/green/";
     d.weapon = "sword";                  // 对应武器（单一固定，无切换）
+    d.color  = 0xFF4394;                 // 默认绿（与内置 warrior 一致）
     d.anims[ANIM_IDLE].file = "idle";   // Scribble 角色为单帧静态，其余动画渲染降级 idle
     defs_.push_back(d);
     byKey_[d.key] = d.id;
@@ -89,6 +91,10 @@ void CharacterCatalog::load()
 
         v = cJSON_GetObjectItem(ch, "weapon");
         if (v && v->type == cJSON_String && v->valuestring) d.weapon = v->valuestring;
+
+        v = cJSON_GetObjectItem(ch, "color");
+        if (v && v->type == cJSON_String && v->valuestring)
+            d.color = (uint32_t)std::strtoul(v->valuestring, nullptr, 16);   // "0xFF4394" → 0xFF4394
 
         cJSON* stats = cJSON_GetObjectItem(ch, "stats");
         if (stats) {

@@ -263,11 +263,11 @@ void GameScene::Render()
     // 模式特有渲染（碰撞调试、HUD 等）
     render();
 
-    // 玩家状态 HUD（本地有玩家的模式显示）
-    /*if (ctx->mode != MODE_SERVER) {
+    // 玩家状态 HUD（本地有玩家的模式显示）：血量文字 + 绿色胶囊血条
+    if (ctx->mode != MODE_SERVER) {
         player_status_hud_pass(ctx->ecs, net_session(ctx).local_conv, ctx->r2d,
             AssetManager::GetInstance()->GetSimheiFont28());
-    }*/
+    }
 
     // 当前逻辑帧号 + 实测逻辑帧率 + 敌人数量 + 全局实体 id
     int frame_id = (ctx->mode == MODE_SERVER || ctx->mode == MODE_HOST)

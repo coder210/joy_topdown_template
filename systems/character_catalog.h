@@ -38,6 +38,7 @@ struct CharacterDef {
     fp_t        move_speed = 0;      // stats.speed（米/秒，已定点化）
     std::string sprite_dir;          // 精灵目录（运行时相对路径）
     std::string weapon;              // 对应武器 key（如 "sword"），由角色类型固定持有，无武器切换
+    uint32_t    color = 0xFF4394;   // 角色主色（0xRRGGBB），用于血条/描边等
     CharacterAnim anims[ANIM_COUNT]; // 按 CharacterAnimId 索引
 };
 

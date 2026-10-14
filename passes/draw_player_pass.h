@@ -419,6 +419,29 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                 if (weapon_front)
                         draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,
                                 has_mouse_aim, mouse_aim_deg, pc.char_id);
+
+                // 玩家血条：两个重叠矩形——底层黑色底框，上层玩家颜色，长度由血量决定。
+                // 跟随玩家、画在玩家正下方并与玩家水平居中平行（世界空间，随摄像机移动）。纯渲染，不进快照/帧同步。
+                if (registry.all_of<HealthComponent>(e)) {
+                        auto& hc = registry.get<HealthComponent>(e);
+                        float ratio = (hc.max_hp > 0) ? ((float)hc.hp / (float)hc.max_hp) : 0.0f;
+                        if (ratio < 0.0f) ratio = 0.0f;
+                        if (ratio > 1.0f) ratio = 1.0f;
+
+                        const float barW = 48.0f;     // 满血血条像素宽（比 64 窄 1/4）
+                        const float barH = 16.0f;     // 血条高（高度翻倍）
+                        // 玩家精灵以 (sx,sy) 为中心、显示高约 50px（半高 25px）→ 血条置于其正下方并水平居中。
+                        float bx = sx - barW * 0.5f;  // 水平居中于玩家
+                        float by = sy + 25.0f + 4.0f; // 玩家底部之下（半高 25 + 间隔 4）
+
+                        // 底层：黑色底框
+                        r2d_set_color(ctx->r2d, 0, 0, 0, 255);
+                        shape_draw_rectangle(ctx->r2d, "fill", jrect_t{ bx, by, barW, barH });
+
+                        // 上层：统一绿色，长度按血量（左对齐，覆盖在底框之上）
+                        r2d_set_color(ctx->r2d, 60, 200, 95, 255);
+                        shape_draw_rectangle(ctx->r2d, "fill", jrect_t{ bx, by, barW * ratio, barH });
+                }
         }
 }
 
