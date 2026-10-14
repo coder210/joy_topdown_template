@@ -103,7 +103,11 @@ void GameSceneCommon::initAuthoritative(Context* ctx)
     add_system(ctx, OnStart, "spawn_enemy", spawn_enemy_system);
     add_system(ctx, PostUpdate, "snapshot", snapshot_system);
     auto& gs = ctx->ecs.ctx().get<GlobalState>();
-    gs.random_seed = (int)(get_ticks() ^ ((uintptr_t)&gs & 0xFFFF));
+    // 确定性种子：仅由关卡派生（不再依赖 get_ticks()/本地地址），
+    // 保证单机、同进程多端、以及未走 loading 握手时，两端 RNG 序列一致。
+    // 联网时服务端仍会经 loading 协议下发其 seed+完整 LCG 状态覆盖此值（见 network_manager.cpp）。
+    uint32_t lvl = (uint32_t)gs.level;
+    gs.random_seed = (int)(0x9E3779B1u + lvl * 2654435761u);
     gs.random = lcg_random_create((uint64_t)(uint32_t)gs.random_seed);
 }
 

@@ -154,9 +154,8 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
         }
 
         // ---- 2) 拉弓：锁存瞄准角，等 SHOOT_DRAW_TICKS 后才离弦（见函数头注释）----
-        // 触发拉弓动画（复用 ATTACK 状态与 attack_timer，与近战同源）+ 设置射击冷却
-        act.state               = ActionStateComponent::ATTACK;
-        act.attack_timer        = ActionStateComponent::ATTACK_DURATION;
+        // 攻击状态/attack_timer 已由 input_consume_input_system 在"按下攻击键"时统一置位
+        // （按钮→动画计时，全武器通用，本系统不再重复设），这里只负责"弓发射"专有状态：
         act.bullet_cooldown     = ActionStateComponent::BULLET_COOLDOWN;
         act.pending_shoot_timer = ActionStateComponent::SHOOT_DRAW_TICKS;
         act.pending_shoot_yaw   = act.aim_yaw;
