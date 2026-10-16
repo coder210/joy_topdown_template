@@ -63,6 +63,11 @@ struct Context {
         // 由 GameplayControlsLayer 的 on_mousemoved 写入；无鼠标(服务端/未移动过)时 mouse_valid=false。
         vec2_t mouse_logical = { -1.0f, -1.0f };
         bool   mouse_valid   = false;
+
+        // ========== 摇杆瞄准（移动端，无鼠标时替代鼠标瞄准）==========
+        // 由 GameplayControlsLayer 在拖动左摇杆时写入量化角(0..254)，-1 表示尚未设置。
+        // collect_aim_yaw_q 在鼠标无效时回落到此值，保证帧同步一致。
+        int aim_stick_yaw_q = -1;
 };
 
 // ========== System 调度基础设施 ==========

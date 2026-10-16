@@ -6,6 +6,7 @@
 #include "../asset_manager.h"
 #include "../components/player_component.h"
 #include "../components/action_state_component.h"
+#include "../protocol.h"   // aim_yaw_quantize（摇杆瞄准角量化，与鼠标同约定）
 
 static const float GC_PI = 3.14159265f;
 
@@ -112,12 +113,12 @@ void GameplayControlsLayer::sendGameplayControlEvent(int event_code)
 
 GameplayControlsLayer::GameplayControlsLayer(Context* ctx) : UILayer(ctx)
 {
-        load_dpad_panel();
+        load_controls();
 }
 
 GameplayControlsLayer::~GameplayControlsLayer() = default;
 
-void GameplayControlsLayer::add_button(int idx, button_p* slot,
+void GameplayControlsLayer::add_button(button_p* slot, gc_button_meta* meta,
                 float cx, float cy, float wf, float hf,
                 const char* label, int coolType)
 {
@@ -128,19 +129,24 @@ void GameplayControlsLayer::add_button(int idx, button_p* slot,
         r2d_get_logical_presentation(ctx_->r2d, &lw, &lh, NULL);
         float w = wf * (float)lw, h = hf * (float)lh;
         float x = (cx - wf * 0.5f) * (float)lw, y = (cy - hf * 0.5f) * (float)lh;
-        metas[idx] = { b, ctx_, w, h, x, y, label, coolType };
+        *meta = { b, ctx_, w, h, x, y, label, coolType };
 }
 
-void GameplayControlsLayer::load_dpad_panel()
+void GameplayControlsLayer::load_controls()
 {
-        // 俯视十字方向键（左/右/上/下）：用 dpad_element_* 素材，自带箭头，不叠文字。
-        // 攻击键为通用圆钮：用 button_circle 素材 + 圆心墨黑「攻」字，带冷却环。
-        add_button(0, &btn_left,   0.09000f, 0.82000f, 0.09000f, 0.14000f, "左", 0);
-        add_button(1, &btn_right,0.27000f, 0.82000f, 0.09000f, 0.14000f, "右", 0);
-        add_button(2, &btn_up,   0.18000f, 0.71000f, 0.09000f, 0.14000f, "上", 0);
-        add_button(3, &btn_down, 0.18000f, 0.90000f, 0.09000f, 0.14000f, "下", 0);
-        add_button(4, &btn_attack,0.92500f, 0.89375f, 0.13333f, 0.20000f, "攻", 1);
+        // 左下左摇杆：同时作为移动方向与瞄准方向（移动端无鼠标时的瞄准来源）。
+        // 注意：joystick_create 的 cx/cy/radius 均为“逻辑分辨率的比例(0~1)”，内部会乘以宽高，
+        //       不是像素坐标，传像素值会让中心跑到屏幕外导致摇杆不可见。
+        // cy/radius 取值保证整个基底圆(及满推时的摇杆头)都落在 480x320 窗口内，不裁边。
+        // 纹理由 joystick_set_textures 提供（无纹理则退回纯绘制）。
+        move_stick = joystick_create(ctx_->r2d, 0.17f, 0.70f, 0.15f);
+        joystick_set_textures(move_stick,
+                "joy_topdown_template/sprites/ui/joystick_base.png",
+                "joy_topdown_template/sprites/ui/joystick_nub.png");
+        joystick_set_dir_mode(move_stick, JOYSTICK_DIR_4WAY);   // 限制为 上/下/左/右 四向
 
+        // 右下攻击键：通用圆钮 + 圆心墨黑「攻」字 + 冷却环（保持原样）。
+        add_button(&btn_attack, &attack_meta, 0.92500f, 0.89375f, 0.13333f, 0.20000f, "攻", 1);
 }
 
 void GameplayControlsLayer::HandleEvent(const void* ev)
@@ -149,67 +155,106 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
         cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
                 (void)btn;
                 auto* self = (GameplayControlsLayer*)arg;
-                auto hit = [&](button_p b) { return button_is_pressed(b, x, y); };
-                if (self->pressed_btn) return;   // 已按住一个钮，忽略后续按下
-                if (self->btn_left && hit(self->btn_left)) {
-                        self->pressed_btn = self->btn_left; self->pressed_code = GAMEPLAY_CONTROL_RELEASE_LEFT;
-                        GameplayControlsLayer::sendGameplayControlEvent(GAMEPLAY_CONTROL_LEFT);
-                } else if (self->btn_right && hit(self->btn_right)) {
-                        self->pressed_btn = self->btn_right; self->pressed_code = GAMEPLAY_CONTROL_RELEASE_RIGHT;
-                        GameplayControlsLayer::sendGameplayControlEvent(GAMEPLAY_CONTROL_RIGHT);
-                } else if (self->btn_up && hit(self->btn_up)) {
-                        self->pressed_btn = self->btn_up; self->pressed_code = GAMEPLAY_CONTROL_RELEASE_UP;
-                        GameplayControlsLayer::sendGameplayControlEvent(GAMEPLAY_CONTROL_UP);
-                } else if (self->btn_down && hit(self->btn_down)) {
-                        self->pressed_btn = self->btn_down; self->pressed_code = GAMEPLAY_CONTROL_RELEASE_DOWN;
-                        GameplayControlsLayer::sendGameplayControlEvent(GAMEPLAY_CONTROL_DOWN);
-                } else if (self->btn_attack && hit(self->btn_attack) && self->localCoolRatio(1) <= 0.0f) {
-                        self->pressed_btn = self->btn_attack; self->pressed_code = GAMEPLAY_CONTROL_ATTACK;
+                // 攻击键优先（右下圆钮）
+                if (self->btn_attack && button_is_pressed(self->btn_attack, x, y)) {
+                        self->pressed_btn = self->btn_attack;
+                        self->pressed_code = GAMEPLAY_CONTROL_ATTACK;
+                        return;
+                }
+                // 否则交给左摇杆（仅在半径内激活）
+                joystick_touch_down(self->move_stick, x, y);
+                self->stick_active = joystick_is_dragging(self->move_stick) ? 1 : 0;
+                if (self->stick_active) {
+                        self->ctx_->mouse_valid = false;   // 拖动摇杆时让 aim 走摇杆而非鼠标
+                        self->updateStick();
                 }
         };
         cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
                 (void)btn;
                 auto* self = (GameplayControlsLayer*)arg;
-                if (!self->pressed_btn) return;
-                button_p b = self->pressed_btn;
-                int code = self->pressed_code;
-                self->pressed_btn = NULL;
-                self->pressed_code = 0;
-                button_set_pressed(b, false);
-                if (b == self->btn_attack) {
-                        // 技能：完整点击（松开仍在按钮内）才触发一次
+                if (self->pressed_btn == self->btn_attack) {
+                        button_p b = self->pressed_btn;
+                        self->pressed_btn = NULL;
+                        self->pressed_code = 0;
+                        button_set_pressed(b, false);
                         if (!button_is_hovered(b, x, y)) return;
-                        int coolType = 1;
-                        if (self->localCoolRatio(coolType) > 0.0f) return;
-                        GameplayControlsLayer::sendGameplayControlEvent(code);
-                } else {
-                        // 方向键：松开即清除对应位移位
-                        GameplayControlsLayer::sendGameplayControlEvent(code);
+                        if (self->localCoolRatio(1) > 0.0f) return;
+                        GameplayControlsLayer::sendGameplayControlEvent(GAMEPLAY_CONTROL_ATTACK);
+                        return;
+                }
+                if (self->stick_active) {
+                        joystick_touch_up(self->move_stick);
+                        self->stick_active = 0;
+                        // 清除移动方向位（保留瞄准角锁存，仍可朝该方向开火）
+                        if (self->last_set_ev) {
+                                GameplayControlsLayer::sendGameplayControlEvent(self->last_rel_ev);
+                                self->last_set_ev = 0; self->last_rel_ev = 0;
+                        }
                 }
         };
         cbs.on_mousemoved = [](float x, float y, float dx, float dy, void* arg) {
                 (void)dx; (void)dy;
                 auto* self = (GameplayControlsLayer*)arg;
-                // 事件给的是窗口像素；换算到逻辑坐标(480x320)供渲染层做鼠标瞄准（letterbox 自动处理）
+                if (self->stick_active) {
+                        joystick_touch_move(self->move_stick, x, y);
+                        self->updateStick();
+                        self->ctx_->mouse_valid = false;   // 拖动摇杆时瞄准走摇杆而非鼠标
+                        return;
+                }
+                // 非摇杆拖动：桌面端用鼠标瞄准；移动端(MOBILE_TOUCH)不污染瞄准
+#ifndef MOBILE_TOUCH
                 self->ctx_->mouse_logical = r2d_coordinates_from_window(self->ctx_->r2d, x, y);
                 self->ctx_->mouse_valid   = true;
+#endif
         };
         dispatch_event(cbs, ev, this);
 }
 
 void GameplayControlsLayer::Destroy()
 {
-        for (int i = 0; i < 5; i++) {
-                if (metas[i].btn) { button_destroy(metas[i].btn); metas[i].btn = NULL; }
-        }
-        btn_left = btn_right = btn_up = btn_down = NULL;
+        if (attack_meta.btn) { button_destroy(attack_meta.btn); attack_meta.btn = NULL; }
         btn_attack = NULL;
+        if (move_stick) { joystick_destroy(move_stick); move_stick = NULL; }
         pressed_btn = NULL;
         pressed_code = 0;
+        stick_active = 0; last_set_ev = 0; last_rel_ev = 0;
+}
+
+// 把左摇杆向量转成：
+//   ① 移动方向位（4 向，经 GAMEPLAY_CONTROL 事件进入 current_input_mask）
+//   ② 瞄准角锁存（量化 0..254，写入 ctx->aim_stick_yaw_q，供 collect_aim_yaw_q 在鼠标无效时回落）
+// 松手回中（mag<=deadzone）时只清除移动位，瞄准角保留（仍可朝最后方向开火）。
+void GameplayControlsLayer::updateStick()
+{
+        if (!move_stick || !ctx_) return;
+        vec2_t dir = joystick_get_direction(move_stick);
+        float mag = joystick_get_magnitude(move_stick);
+        if (mag > 0.25f) {
+                int set_ev = 0, rel_ev = 0;
+                if (fabsf(dir.x) >= fabsf(dir.y)) {
+                        if (dir.x > 0.0f) { set_ev = GAMEPLAY_CONTROL_RIGHT; rel_ev = GAMEPLAY_CONTROL_RELEASE_RIGHT; }
+                        else               { set_ev = GAMEPLAY_CONTROL_LEFT;  rel_ev = GAMEPLAY_CONTROL_RELEASE_LEFT;  }
+                } else {
+                        if (dir.y > 0.0f) { set_ev = GAMEPLAY_CONTROL_DOWN;  rel_ev = GAMEPLAY_CONTROL_RELEASE_DOWN;  }
+                        else               { set_ev = GAMEPLAY_CONTROL_UP;    rel_ev = GAMEPLAY_CONTROL_RELEASE_UP;    }
+                }
+                // 瞄准角：与鼠标同约定（屏幕 y 向下，atan2(dy,dx)）
+                float deg = atan2f(dir.y, dir.x) * 180.0f / 3.1415926f;
+                ctx_->aim_stick_yaw_q = aim_yaw_quantize(deg);
+                if (set_ev != last_set_ev) {
+                        if (last_set_ev) sendGameplayControlEvent(last_rel_ev);
+                        sendGameplayControlEvent(set_ev);
+                        last_set_ev = set_ev; last_rel_ev = rel_ev;
+                }
+        } else {
+                if (last_set_ev) { sendGameplayControlEvent(last_rel_ev); last_set_ev = 0; last_rel_ev = 0; }
+                // 保留 aim_stick_yaw_q 锁存
+        }
 }
 
 void GameplayControlsLayer::Render()
 {
         if (!ctx_) return;
-        for (int i = 0; i < 5; i++) drawButton(&metas[i]);
+        drawButton(&attack_meta);
+        if (move_stick) joystick_draw(move_stick);
 }

@@ -114,24 +114,32 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
 // 返回 0..254（有效角度）或 kAimYawInvalid（无鼠标 / 本地玩家不存在）。
 static int collect_aim_yaw_q(Context* ctx)
 {
-    if (!ctx || !ctx->mouse_valid) return kAimYawInvalid;
+    if (!ctx) return kAimYawInvalid;
 
-    const auto& gs   = ctx->ecs.ctx().get<GlobalState>();
-    const int   conv = (int)net_session(ctx).local_conv;
+    // 1) 桌面端：鼠标有效时优先用鼠标瞄准
+    if (ctx->mouse_valid) {
+        const auto& gs   = ctx->ecs.ctx().get<GlobalState>();
+        const int   conv = (int)net_session(ctx).local_conv;
 
-    auto view = ctx->ecs.view<PlayerComponent, LogicPositionComponent>();
-    for (auto e : view) {
-        if (view.get<PlayerComponent>(e).conv != conv) continue;
-        const auto& lp = view.get<LogicPositionComponent>(e);
-        // 逻辑像素 → 世界(米)：px = PPM * (world - cam)
-        const float wx = gs.camera_position.x + ctx->mouse_logical.x / (float)PIXELS_PER_METER;
-        const float wy = gs.camera_position.y + ctx->mouse_logical.y / (float)PIXELS_PER_METER;
-        const float dx = wx - fp_to_float(lp.x);
-        const float dy = wy - fp_to_float(lp.y);
-        if (dx * dx + dy * dy < 1e-6f) return kAimYawInvalid;
-        float deg = atan2f(dy, dx) * 180.0f / 3.1415926f;   // 屏幕 y 向下，顺时针为正
-        return aim_yaw_quantize(deg);
+        auto view = ctx->ecs.view<PlayerComponent, LogicPositionComponent>();
+        for (auto e : view) {
+            if (view.get<PlayerComponent>(e).conv != conv) continue;
+            const auto& lp = view.get<LogicPositionComponent>(e);
+            // 逻辑像素 → 世界(米)：px = PPM * (world - cam)
+            const float wx = gs.camera_position.x + ctx->mouse_logical.x / (float)PIXELS_PER_METER;
+            const float wy = gs.camera_position.y + ctx->mouse_logical.y / (float)PIXELS_PER_METER;
+            const float dx = wx - fp_to_float(lp.x);
+            const float dy = wy - fp_to_float(lp.y);
+            if (dx * dx + dy * dy < 1e-6f) return kAimYawInvalid;
+            float deg = atan2f(dy, dx) * 180.0f / 3.1415926f;   // 屏幕 y 向下，顺时针为正
+            return aim_yaw_quantize(deg);
+        }
+        // 鼠标有效但无本地玩家：落到摇杆
     }
+
+    // 2) 移动端（无鼠标）：用摇杆锁存的瞄准角
+    if (ctx->aim_stick_yaw_q >= 0) return ctx->aim_stick_yaw_q;
+
     return kAimYawInvalid;
 }
 

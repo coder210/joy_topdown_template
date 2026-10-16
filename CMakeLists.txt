@@ -9,6 +9,8 @@ if (ANDROID)
     message(STATUS "MOBILE_ASSETS_DIR = '${MOBILE_ASSETS_DIR}'")
     set(EXECUTABLE_NAME main)
     add_library(${EXECUTABLE_NAME} SHARED)
+    # 移动端（触屏模拟成鼠标）下，禁止用触屏位置覆盖鼠标瞄准，避免无鼠标时瞄准错乱
+    target_compile_definitions(${EXECUTABLE_NAME} PRIVATE MOBILE_TOUCH)
 else()
     add_executable(${EXECUTABLE_NAME})
 endif()

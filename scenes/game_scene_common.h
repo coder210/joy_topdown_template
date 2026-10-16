@@ -33,9 +33,9 @@ struct ModeConfig {
 // ===== 全部模式差异就这 4 行（唯一真源）=====
 static const ModeConfig kModeConfigs[] = {
     /* MODE_SINGLE */ { true,  true,  Transport::None,   true,  false, "checksum_log.txt"        },
-    /* MODE_HOST   */ { true,  true,  Transport::Server, false, true,  "checksum_log_server.txt" },
+    /* MODE_HOST   */ { true,  true,  Transport::Server, false, false, "checksum_log_server.txt" },
     /* MODE_CLIENT */ { false, true,  Transport::Client, true,  false, "checksum_log.txt"        },
-    /* MODE_SERVER */ { true,  false, Transport::Server, false, true,  "checksum_log_server.txt" },
+    /* MODE_SERVER */ { true,  false, Transport::Server, false, false, "checksum_log_server.txt" },
 };
 
 inline const ModeConfig& mode_config(GameModeKind kind) { return kModeConfigs[(int)kind]; }

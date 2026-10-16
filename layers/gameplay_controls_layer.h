@@ -21,7 +21,7 @@ struct gc_button_meta {
         button_p btn;
         Context* ctx;
         float w, h, x, y;
-        const char* label;      // 圆心文字（上/下/左/右/攻/射/线）；同时用于选择按钮纹理
+        const char* label;      // 圆心文字（攻）；同时用于选择按钮纹理
         int coolType;
 };
 
@@ -36,18 +36,22 @@ public:
     void Destroy() override;
 
 private:
-    button_p btn_left = NULL, btn_right = NULL;
-    button_p btn_up = NULL, btn_down = NULL;
-    button_p btn_attack = NULL;
-    button_p pressed_btn = NULL;   // 当前按住中的按钮（方向键或技能键）
-    int      pressed_code = 0;     // 松开时的事件码：技能=触发码，方向=RELEASE_*
-    gc_button_meta metas[5] = {};
-    void add_button(int idx, button_p* slot,
+    button_p btn_attack = NULL;       // 右下攻击键（保持原样）
+    gc_button_meta attack_meta = {};
+    joystick_p move_stick = NULL;     // 左下左摇杆：同时用于移动方向 + 瞄准方向
+    int      stick_active = 0;        // 当前触点是否正在驱动摇杆
+    int      last_set_ev = 0;         // 上次发送的 SET 方向事件（方向变化发 RELEASE 用）
+    int      last_rel_ev = 0;
+    button_p pressed_btn = NULL;      // 当前按住中的按钮（仅攻击键）
+    int      pressed_code = 0;
+
+    void add_button(button_p* slot, gc_button_meta* meta,
                     float cx, float cy, float wf, float hf,
                     const char* label, int coolType);
-    void load_dpad_panel();
+    void load_controls();             // 创建左摇杆 + 攻击键
+    void updateStick();               // 摇杆向量 → 移动位 + 锁存瞄准角
 
-    // ---- 实现辅助（原文件内 static 自由函数，改为成员以直接访问 ctx_）----
+    // ---- 实现辅助 ----
     static void sendGameplayControlEvent(int event_code);
     float localCoolRatio(int coolType);
     void drawCoolRing(float cx, float cy, float R, float thick, float frac);
