@@ -7,6 +7,7 @@
 #include "../components/player_component.h"
 #include "../components/action_state_component.h"
 #include "../protocol.h"   // aim_yaw_quantize（摇杆瞄准角量化，与鼠标同约定）
+#include "../context.h"     // game_runtime（读取 current_input_mask 键盘位）
 
 static const float GC_PI = 3.14159265f;
 
@@ -269,6 +270,22 @@ void GameplayControlsLayer::updateStick()
 void GameplayControlsLayer::Render()
 {
         if (!ctx_) return;
+
+        // 键盘输入同步到虚拟控件：物理键盘按下时，屏幕上的摇杆/攻击键给出对应反馈。
+        // 只同步显示，不改任何逻辑；触摸操作时跳过键盘同步，避免两者打架。
+        int kb = game_runtime(ctx_).current_input_mask;
+        if (!stick_active && move_stick) {
+                float dx = 0.0f, dy = 0.0f;
+                if (kb & INPUT_RIGHT) dx += 1.0f;
+                if (kb & INPUT_LEFT)  dx -= 1.0f;
+                if (kb & INPUT_DOWN)  dy += 1.0f;
+                if (kb & INPUT_UP)    dy -= 1.0f;
+                joystick_set_vector(move_stick, dx, dy);   // (0,0) 自动回中
+        }
+        // 攻击键：空格(INPUT_ATTACK)按下时显示按下态；触摸按下时由触摸路径管理，不覆盖
+        if (pressed_btn != btn_attack)
+                button_set_pressed(btn_attack, (kb & INPUT_ATTACK) != 0);
+
         drawButton(&attack_meta);
         if (move_stick) joystick_draw(move_stick);
 }

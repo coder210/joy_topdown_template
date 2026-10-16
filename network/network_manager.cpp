@@ -109,35 +109,33 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
         netclient_send(ctx_->netclient, data.c_str(), (int)data.size());
 }
 
-// ===== 本地鼠标瞄准角（量化后随输入上传，供所有端同步"武器指向鼠标"的表现）=====
+// ===== 本地瞄准角（量化后随输入上传，供所有端同步"武器指向"的表现）=====
 // 只在本机计算并量化成整数，两端按同一个整数还原角度，故帧同步一致（浮点不跨端）。
-// 返回 0..254（有效角度）或 kAimYawInvalid（无鼠标 / 本地玩家不存在）。
+// 来源优先级：键盘方向 > 摇杆（移动端兜底）。不再使用鼠标位置瞄准（取消"鼠标旋转"）。
+// 键盘方向天然为 4 向（上/下/左/右），仍经 aim_yaw_quantize 量化成 0..254；
+// 该 255 档量化逻辑保持不变——以后改回模拟输入（如摇杆全方向）即可恢复 255 档细分。
+// 返回 0..254（有效角度）或 kAimYawInvalid（无输入方向 / 本地玩家不存在）。
 static int collect_aim_yaw_q(Context* ctx)
 {
     if (!ctx) return kAimYawInvalid;
 
-    // 1) 桌面端：鼠标有效时优先用鼠标瞄准
-    if (ctx->mouse_valid) {
-        const auto& gs   = ctx->ecs.ctx().get<GlobalState>();
-        const int   conv = (int)net_session(ctx).local_conv;
-
-        auto view = ctx->ecs.view<PlayerComponent, LogicPositionComponent>();
-        for (auto e : view) {
-            if (view.get<PlayerComponent>(e).conv != conv) continue;
-            const auto& lp = view.get<LogicPositionComponent>(e);
-            // 逻辑像素 → 世界(米)：px = PPM * (world - cam)
-            const float wx = gs.camera_position.x + ctx->mouse_logical.x / (float)PIXELS_PER_METER;
-            const float wy = gs.camera_position.y + ctx->mouse_logical.y / (float)PIXELS_PER_METER;
-            const float dx = wx - fp_to_float(lp.x);
-            const float dy = wy - fp_to_float(lp.y);
-            if (dx * dx + dy * dy < 1e-6f) return kAimYawInvalid;
-            float deg = atan2f(dy, dx) * 180.0f / 3.1415926f;   // 屏幕 y 向下，顺时针为正
-            return aim_yaw_quantize(deg);
+    // 1) 键盘方向（4 向）：键盘按下时瞄准=键盘方向；松手后锁存上一次方向（仍可向该方向开火）
+    int kb_mask = game_runtime(ctx).current_input_mask & INPUT_DIR_MASK;
+    if (has_dir(kb_mask)) {
+        int d = input_to_dir(kb_mask);            // 0=下 1=左 2=右 3=上
+        float deg = 0.0f;
+        switch (d) {
+            case 0: deg =  90.0f; break;          // 下
+            case 1: deg = 180.0f; break;          // 左
+            case 2: deg =   0.0f; break;          // 右
+            case 3: deg = 270.0f; break;          // 上
         }
-        // 鼠标有效但无本地玩家：落到摇杆
+        ctx->aim_keyboard_yaw_q = aim_yaw_quantize(deg);
+        return ctx->aim_keyboard_yaw_q;
     }
+    if (ctx->aim_keyboard_yaw_q >= 0) return ctx->aim_keyboard_yaw_q;   // 锁存：停步后仍朝最后方向
 
-    // 2) 移动端（无鼠标）：用摇杆锁存的瞄准角
+    // 2) 移动端（无键盘）：用摇杆锁存的瞄准角
     if (ctx->aim_stick_yaw_q >= 0) return ctx->aim_stick_yaw_q;
 
     return kAimYawInvalid;
