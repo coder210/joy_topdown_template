@@ -140,9 +140,23 @@ void GameplayControlsLayer::load_controls()
         // cy/radius 取值保证整个基底圆(及满推时的摇杆头)都落在 480x320 窗口内，不裁边。
         // 纹理由 joystick_set_textures 提供（无纹理则退回纯绘制）。
         move_stick = joystick_create(ctx_->r2d, 0.17f, 0.70f, 0.15f);
+        // 默认纹理（全方向）→ Style D
         joystick_set_textures(move_stick,
-                "joy_topdown_template/sprites/ui/joystick_base.png",
-                "joy_topdown_template/sprites/ui/joystick_nub.png");
+                "joy_topdown_template/sprites/ui/joystick_circle_pad_d.png",
+                "joy_topdown_template/sprites/ui/joystick_circle_nub_c.png");
+        // 各方向模式对应不同纹理（根“几向”选择）
+        joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_4WAY,
+                "joy_topdown_template/sprites/ui/joystick_circle_pad_a.png",
+                "joy_topdown_template/sprites/ui/joystick_circle_nub_a.png");
+        joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_8WAY,
+                "joy_topdown_template/sprites/ui/joystick_circle_pad_b.png",
+                "joy_topdown_template/sprites/ui/joystick_circle_nub_b.png");
+        joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_VERTICAL,
+                "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
+                "joy_topdown_template/sprites/ui/joystick_circle_nub_a.png");
+        joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_HORIZONTAL,
+                "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
+                "joy_topdown_template/sprites/ui/joystick_circle_nub_b.png");
         joystick_set_dir_mode(move_stick, JOYSTICK_DIR_4WAY);   // 限制为 上/下/左/右 四向
 
         // 右下攻击键：通用圆钮 + 圆心墨黑「攻」字 + 冷却环（保持原样）。
