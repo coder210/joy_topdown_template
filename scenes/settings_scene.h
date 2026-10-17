@@ -27,6 +27,8 @@ private:
     slider_p bgm_slider = NULL, sfx_slider = NULL;
     checkbox_p fullscreen_cb = NULL, collision_cb = NULL;
     button_p btn_back = NULL;
+    uint32_t   preview_dev  = 0;   // BGM 试听用独立音频设备（与游戏场景 BGM 设备互不干扰）
+    audio_bgm_p preview_bgm = NULL;
     void sync_settings();   // 原 free 函数，改为成员以访问 private 字段
 };
 

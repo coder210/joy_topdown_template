@@ -30,6 +30,7 @@ void SettingsScene::sync_settings() {
     if (bgm != ctx->settings.bgm_volume) {
         ctx->settings.bgm_volume = bgm;
         if (ctx->bgm) audio_bgm_set_gain(ctx->bgm, bgm);
+        if (preview_bgm) audio_bgm_set_gain(preview_bgm, bgm);   // 设置页试听流同步音量
         changed = true;
     }
 
@@ -134,6 +135,9 @@ void SettingsScene::Render() {
 
 void SettingsScene::Destroy() {
     auto* self = this;
+    // 停止并释放 BGM 试听（独立设备），避免回到菜单后仍响
+    if (preview_bgm) { audio_bgm_destroy(preview_bgm); preview_bgm = NULL; }
+    if (preview_dev) { audio_close_device(preview_dev); preview_dev = 0; }
     if (self->ip_input) inputbox_destroy(self->ip_input);
     if (self->port_input) inputbox_destroy(self->port_input);
     if (self->bgm_slider) slider_destroy(self->bgm_slider);
@@ -165,6 +169,28 @@ void SettingsScene::Load() {
     self->sfx_slider = slider_create(ctx->r2d, 0.22917f, 0.55313f, 0.41667f, 0.04375f, 0.0f, 1.0f, ctx->settings.sfx_volume);
     slider_set_colors(self->bgm_slider, {200,200,200,255}, {50,50,60,255}, {80,80,80,255}, {100,100,100,255});
     slider_set_colors(self->sfx_slider, {200,200,200,255}, {50,50,60,255}, {80,80,80,255}, {100,100,100,255});
+
+    // 设置页 BGM 试听：自建独立音频设备播放 bgm（与游戏场景的 BGM 设备互不干扰），
+    // 进设置页即开始循环播放，使"音乐"滑块在此即可实时听到音量变化。返回时 Destroy 停止。
+    {
+        auto* am = AssetManager::GetInstance();
+        const char* bgm_path = am ? am->GetResourcePath(AssetManager::kCatAudio, "bgm")
+                                  : "joy_topdown_template/audio/bgm.wav";
+        if (bgm_path) {
+            preview_dev = audio_open_device();
+            if (preview_dev) {
+                // 按扩展名分派解码器：bgm.wav 是 WAV，必须走 audio_bgm_create(SDL_LoadWAV)；
+                // 直接喂 audio_bgm_create_ogg 会因 OGG 解码器把 WAV 头当 OGG 读取而越界崩溃。
+                const char* dot = strrchr(bgm_path, '.');
+                if      (dot && _stricmp(dot, ".ogg")  == 0) preview_bgm = audio_bgm_create_ogg(bgm_path, preview_dev);
+                else if (dot && _stricmp(dot, ".mp3")  == 0) preview_bgm = audio_bgm_create_mp3(bgm_path, preview_dev);
+                else if (dot && _stricmp(dot, ".flac") == 0) preview_bgm = audio_bgm_create_flac(bgm_path, preview_dev);
+                else                                        preview_bgm = audio_bgm_create(bgm_path, preview_dev);
+                if (preview_bgm) audio_bgm_set_gain(preview_bgm, ctx->settings.bgm_volume);
+                else { audio_close_device(preview_dev); preview_dev = 0; }
+            }
+        }
+    }
 
     // 全屏复选框
     self->fullscreen_cb = checkbox_create(0.22917f, 0.66250f, 0.04167f, "全屏");
