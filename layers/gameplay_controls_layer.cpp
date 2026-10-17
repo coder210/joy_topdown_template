@@ -243,8 +243,9 @@ void GameplayControlsLayer::Destroy()
 }
 
 // 把左摇杆向量转成移动方向位（八向，与键盘 WASD 共用 current_input_mask 的 4 个方向位）。
-// 按 dx/dy 符号分别置位：左右/上下可同时置 → 斜向移动；松手回中(mag<=deadzone)清除移动位，
-// 瞄准角仍锁存（仍可朝最后方向开火）。
+// 每次调用都"先清后设"：清掉四个方向位再按当前向量置位，保证方向位始终等于摇杆当前指向
+// （不清会残留旧方向，换方向时会走出错误斜向）。左右/上下可同时置 → 斜向移动；
+// 回中(mag<=deadzone)自然为空；瞄准角始终锁存（仍可朝最后方向开火）。
 // 仅在摇杆被拖动时调用（HandleEvent 的 press/move 路径），不碰键盘输入；
 // 纯键盘游玩时此函数不被调用，键盘位不受干扰。
 void GameplayControlsLayer::updateStick()
@@ -253,8 +254,14 @@ void GameplayControlsLayer::updateStick()
         vec2_t dir = joystick_get_direction(move_stick);
         float mag = joystick_get_magnitude(move_stick);
         int* mask = &game_runtime(ctx_).current_input_mask;
+        // 关键：每次更新先无条件清掉四个方向位，再按"当前"摇杆向量重新置位。
+        // 之前只做 |= 置位、从不清除，导致"从右直接拖到上"时旧的 RIGHT 位残留，
+        // 变成 RIGHT+UP 同时按下 → 走右上斜向，摇杆方向与移动方向不符，
+        // 必须松手（清空全部位）再拖才正确。现在每个拖动事件都完整重算，方向实时跟随。
+        *mask &= ~(INPUT_UP | INPUT_DOWN | INPUT_LEFT | INPUT_RIGHT);
+
         if (mag > 0.25f) {
-                // 八向：独立置位每个方向，左右/上下可同时 → 斜向移动
+                // 八向：按当前向量独立置位，左右/上下可同时 → 斜向移动
                 if (dir.y < -0.35f) *mask |= INPUT_UP;
                 if (dir.y >  0.35f) *mask |= INPUT_DOWN;
                 if (dir.x < -0.35f) *mask |= INPUT_LEFT;
@@ -262,10 +269,8 @@ void GameplayControlsLayer::updateStick()
                 // 瞄准角：模拟全方向（与鼠标同约定，屏幕 y 向下、顺时针为正）
                 float deg = atan2f(dir.y, dir.x) * 180.0f / 3.1415926f;
                 ctx_->aim_stick_yaw_q = aim_yaw_quantize(deg);
-        } else {
-                // 松手回中：清除移动位（保留瞄准角锁存）
-                *mask &= ~(INPUT_UP | INPUT_DOWN | INPUT_LEFT | INPUT_RIGHT);
         }
+        // 回中(mag<=deadzone)：上面已清零 → 无方向位；瞄准角仍锁存（可朝最后方向开火）
         last_set_ev = 0; last_rel_ev = 0;   // 不再走单方向 GAMEPLAY_CONTROL 事件
 }
 
