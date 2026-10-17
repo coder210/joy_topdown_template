@@ -39,14 +39,15 @@ struct ActionStateComponent {
     int bullet_cooldown = 0;
     static constexpr int BULLET_COOLDOWN = 12;  // 0.6s @ 20Hz
 
-    // 待发射（拉弓离弦前）：按下射击时锁存瞄准角并置计时，由 player_shoot_system 每 tick 递减；
-    // 减到 0 的那一 tick 才用玩家"当时"的位置生成箭并飞出——这样边移动边射时箭的出生点
-    // 会跟着玩家走，不会停在按下瞬间的旧位置。0 = 无待发射。
-    int pending_shoot_timer = 0;
-    int pending_shoot_yaw   = kAimYawInvalid;   // 按下时锁存的量化瞄准角（0..254）
-
-    // 拉弓时长（tick）：从按下射击到"箭离弦"的 tick 数。逻辑层（player_shoot_system 的
-    // pending 计时）与渲染层（draw_player_pass 的搭箭/松放分界）**共用此常量**，
-    // 保证"箭飞出"与"弓切到无箭纹理"严格同 tick，不会两边各写一个值而漂移。
+    // 射击节奏（tick）：弓的攻击动画中，前 SHOOT_DRAW_TICKS 为"撒放"、其余为"回位"。
+    // 现仅供渲染层（draw_player_pass）画弓的后撤/回位动作：箭实体在按下攻击键的当 tick
+    // 就生成，逻辑层不再需要"拉弓等待"计时，故本常量只描述视觉节奏。
     static constexpr int SHOOT_DRAW_TICKS = 5;
+
+    // 空弦计时（tick）：player_shoot_system 每次真的射出箭时置满，之后每 tick 无条件递减，
+    // 归零 = 重新搭箭。渲染层据此在"无箭帧"停留一小段后自动回到"有箭帧"——
+    // 这样连续快按攻击键（attack_timer 被反复重置、攻击态恒真）也能看到
+    // 有箭→无箭→有箭 的完整循环，不会永久卡在无箭帧。
+    int arrow_gone_timer = 0;
+    static constexpr int ARROW_GONE_TICKS = 5;  // 0.25s @20Hz（对齐 SHOOT_DRAW_TICKS：撒放=空弦）
 };

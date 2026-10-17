@@ -100,9 +100,9 @@ static void spawn_player_bullet(entt::registry& registry, Context* ctx,
 // 方向只取自 ActionStateComponent.aim_yaw（鼠标量化角，0..254 映射 0..360°）；上下左右键不参与。
 // 帧同步确定性：aim_yaw 由同步输入推导，两端一致；方向用定点查表（见 aim_yaw_dir），逻辑路径无浮点。
 //
-// 拉弓 → 离弦分两阶段：按下射击只锁存瞄准角并置 pending_shoot_timer（不立即生成箭）；
-// 计时减到 0 的当 tick 才用玩家"当时"的位置生成箭并飞出——与渲染层"有箭的弓→无箭的弓"
-// 纹理切换同 tick，且边移动边射时出生点跟随玩家，不会滞后于按下瞬间。
+// 按下射击即发射：按下攻击键的当 tick 就用玩家"当时位置 + 当时瞄准角"生成箭并飞出，
+// 不再有"拉弓等待"延迟——箭的出生点就是按下瞬间的位置。
+// 弓的动画（有箭帧 → 无箭帧 → 有箭帧）是纯表现层，与箭的生成时机解耦。
 static void player_shoot_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
     auto view = registry.view<PlayerEventInput, ActionStateComponent,
@@ -115,21 +115,15 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
         auto& lrec   = view.get<LogicRectComponent>(e);
         auto& pc     = view.get<PlayerComponent>(e);
 
+        // 空弦计时：每 tick 无条件递减（不受冷却/事件影响），归零即"重新搭箭"→回到有箭帧。
+        if (act.arrow_gone_timer > 0) act.arrow_gone_timer--;
+
         // 仅处理本系统负责的事件类型
         bool has_attack = false;
         for (size_t i = 0; i < events.pending_actions.size(); ++i) {
             if (events.pending_actions[i].type == PlayerEventInput::ATTACK_MELEE) {
                 has_attack = true;
                 break;
-            }
-        }
-
-        // ---- 1) 离弦：拉弓计时归零的当 tick，用"当前"枪口位置生成箭 ----
-        if (act.pending_shoot_timer > 0) {
-            act.pending_shoot_timer--;
-            if (act.pending_shoot_timer == 0 &&
-                act.pending_shoot_yaw != kAimYawInvalid) {
-                spawn_player_bullet(registry, ctx, lpos, lrec, act.pending_shoot_yaw);
             }
         }
 
@@ -153,12 +147,12 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
             continue;
         }
 
-        // ---- 2) 拉弓：锁存瞄准角，等 SHOOT_DRAW_TICKS 后才离弦（见函数头注释）----
+        // ---- 发射：点击瞬间立即用"当前位置 + 当前瞄准角"生成箭（无拉弓延迟）----
         // 攻击状态/attack_timer 已由 input_consume_input_system 在"按下攻击键"时统一置位
-        // （按钮→动画计时，全武器通用，本系统不再重复设），这里只负责"弓发射"专有状态：
-        act.bullet_cooldown     = ActionStateComponent::BULLET_COOLDOWN;
-        act.pending_shoot_timer = ActionStateComponent::SHOOT_DRAW_TICKS;
-        act.pending_shoot_yaw   = act.aim_yaw;
+        // （按钮→动画计时，全武器通用，本系统不再重复设），这里只负责冷却与生成箭：
+        act.bullet_cooldown   = ActionStateComponent::BULLET_COOLDOWN;
+        act.arrow_gone_timer  = ActionStateComponent::ARROW_GONE_TICKS;   // 空弦一小段→再搭箭
+        spawn_player_bullet(registry, ctx, lpos, lrec, act.aim_yaw);
 
         remove_melee_events(events.pending_actions);
     }
