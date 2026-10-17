@@ -327,6 +327,25 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         }
 }
 
+// 血条纯色纹理（运行时用 1×1 像素生成，全局缓存一次）。
+// 为何不用 shape_draw_polygon：它内部走 SDL_RenderGeometry，在本项目
+// 逻辑呈现(LETTERBOX)下不输出；而 image_draw_ex 走 SDL_RenderTextureRotated，
+// 角色/武器都靠它渲染且支持旋转，故改用纹理旋转来画旋转血条。
+static image_p s_hpbar_bg    = NULL;   // 底框（黑）
+static image_p s_hpbar_fg    = NULL;   // 填充（绿）
+
+static void ensure_hpbar_textures(jr2d_p r2d)
+{
+        if (!s_hpbar_bg) {
+                const unsigned char px[4] = { 0, 0, 0, 255 };
+                s_hpbar_bg = image_create_from_data(r2d, px, 1, 1);
+        }
+        if (!s_hpbar_fg) {
+                const unsigned char px[4] = { 60, 200, 95, 255 };
+                s_hpbar_fg = image_create_from_data(r2d, px, 1, 1);
+        }
+}
+
 static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
 {
         auto& cam = registry.ctx().get<GlobalState>().camera_position;
@@ -420,8 +439,8 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                         draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,
                                 has_mouse_aim, mouse_aim_deg, pc.char_id);
 
-                // 玩家血条：两个重叠矩形——底层黑色底框，上层玩家颜色，长度由血量决定。
-                // 跟随玩家，且始终贴在"移动方向的左侧"（面朝方向的左手边），随转身换位。
+                // 玩家血条：两矩形（黑底+绿填充）旋转贴附——长轴沿瞄准方向、挂在其右手法线侧，
+                // 始终与武器平行、随瞄准绕角色转，不会"平行/垂直"乱翻。长度由血量决定。
                 // 世界空间绘制（随摄像机移动）。纯渲染，不进快照/帧同步。
                 if (registry.all_of<HealthComponent>(e)) {
                         auto& hc = registry.get<HealthComponent>(e);
@@ -429,31 +448,48 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                         if (ratio < 0.0f) ratio = 0.0f;
                         if (ratio > 1.0f) ratio = 1.0f;
 
-                        const float barW = 48.0f;     // 满血血条像素宽（比 64 窄 1/4）
-                        const float barH = 16.0f;     // 血条高（高度翻倍）
-                        const float halfBody = 25.0f; // 玩家精灵半高/半宽（显示约 50px）
-                        const float gap      = 4.0f;  // 血条与玩家之间的间隔
-
-                        // 朝向 ac.dir：0=下 1=左 2=右 3=上（屏幕 y 向下）。
-                        // "移动方向的左侧" = 朝向向量左转 90°：(fx,fy) → (fy,-fx)，即：
-                        //   面朝下→屏右、面朝左→屏下、面朝右→屏上、面朝上→屏左。
-                        // 血条本身始终保持水平（从左到右填充，易读），只改变挂载方位。
-                        float bx = sx - barW * 0.5f;          // 默认：垂直居中于玩家
-                        float by = sy - barH * 0.5f;
-                        switch (ac.dir) {
-                                case 0:  bx = sx + halfBody + gap;            break;  // 面朝下 → 贴右侧
-                                case 1:  by = sy + halfBody + gap;            break;  // 面朝左 → 贴下方
-                                case 2:  by = sy - halfBody - gap - barH;     break;  // 面朝右 → 贴上方
-                                default: bx = sx - halfBody - gap - barW;     break;  // 面朝上 → 贴左侧
+                        // 瞄准方向：优先 aim_yaw（鼠标/键盘已量化并随输入同步），否则回退身体朝向
+                        float aim_deg = mouse_aim_deg;
+                        if (!has_mouse_aim) {
+                                switch (ac.dir) {
+                                        case 0: aim_deg = 90.0f;  break;  // 下
+                                        case 1: aim_deg = 180.0f; break;  // 左
+                                        case 2: aim_deg = 0.0f;   break;  // 右
+                                        default: aim_deg = 270.0f; break;  // 上
+                                }
                         }
+                        const float PI = 3.14159265f;
+                        float rad = aim_deg * PI / 180.0f;
+                        float dx = cosf(rad), dy = sinf(rad);     // 瞄准方向（屏幕 y 向下：0=右,90=下）
+                        float nx = -dy, ny = dx;                  // 右手法线侧（绕角色的右侧）
 
-                        // 底层：黑色底框
-                        r2d_set_color(ctx->r2d, 0, 0, 0, 255);
-                        shape_draw_rectangle(ctx->r2d, "fill", jrect_t{ bx, by, barW, barH });
+                        const float barL = 48.0f;     // 满血时长轴（沿瞄准方向）
+                        const float barT = 12.0f;     // 厚度（沿法线侧）
+                        const float halfBody = 25.0f; // 玩家精灵半高/半宽（显示约 50px）
+                        const float gap      = 4.0f;  // 与玩家之间的间隔
+                        float off = halfBody + gap + barT * 0.5f;  // 沿法线侧外移，贴住角色右侧
+                        float cx = sx + nx * off;     // 血条中心
+                        float cy = sy + ny * off;
 
-                        // 上层：统一绿色，长度按血量（左对齐，覆盖在底框之上）
-                        r2d_set_color(ctx->r2d, 60, 200, 95, 255);
-                        shape_draw_rectangle(ctx->r2d, "fill", jrect_t{ bx, by, barW * ratio, barH });
+                        // 用 1×1 纯色纹理 + image_draw_ex 旋转绘制（SDL_RenderTextureRotated）：
+                        // 纹理缩放到血条尺寸(len×thick)、绕纹理中心旋转 rad（瞄准角）。
+                        // 长轴 = 瞄准方向、中心 = 右手法线侧偏移点 → 与武器平行、挂在其右侧。
+                        ensure_hpbar_textures(ctx->r2d);
+                        auto draw_rot_bar = [&](float ccx, float ccy, float len, float thick, image_p tex) {
+                                if (!tex || len <= 0.0f) return;
+                                jrect_t src = { 0.0f, 0.0f, 1.0f, 1.0f };   // 1×1 整张
+                                vec2_t pos = { ccx, ccy };
+                                vec2_t scl = { len, thick };                // 缩放到血条尺寸
+                                vec2_t org = { 0.5f, 0.5f };                // 绕中心旋转
+                                image_draw_ex(tex, &src, pos, rad, scl, org);
+                        };
+                        float hl_full = barL * 0.5f;
+                        float hl_green = barL * ratio * 0.5f;
+                        // 绿填充从 -d 端起、沿瞄准方向延伸至 ratio 长度
+                        float gcx = cx - dx * (hl_full - hl_green);
+                        float gcy = cy - dy * (hl_full - hl_green);
+                        draw_rot_bar(cx, cy, barL, barT, s_hpbar_bg);             // 黑底框
+                        draw_rot_bar(gcx, gcy, barL * ratio, barT, s_hpbar_fg);   // 绿填充
                 }
         }
 }
