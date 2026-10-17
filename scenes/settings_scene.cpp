@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include "settings_scene.h"
 #include "../ui_style.h"
+#include "../ui_sfx.h"
 #include "../asset_manager.h"
 
 static void apply_fullscreen(Context* ctx) {
@@ -36,6 +37,7 @@ void SettingsScene::sync_settings() {
     if (sfx != ctx->settings.sfx_volume) {
         ctx->settings.sfx_volume = sfx;
         if (ctx->step_sound) audio_shot_set_gain(ctx->step_sound, sfx);
+        UiSfx::Get().setGain(sfx);   // UI 点击音跟随"音效"滑块实时生效
         changed = true;
     }
 
@@ -60,13 +62,20 @@ void SettingsScene::HandleUiEvent(const void* e) {
         if (self->port_input)  inputbox_process_event(self->port_input, ev);
         if (self->bgm_slider)  slider_process_event(self->bgm_slider, ev);
         if (self->sfx_slider)  slider_process_event(self->sfx_slider, ev);
-        if (self->fullscreen_cb) checkbox_process_event(self->fullscreen_cb, ev);
-        if (self->collision_cb) checkbox_process_event(self->collision_cb, ev);
+        // 复选框：仅在"勾选状态发生变化"时响一声 switch（悬停/重复事件不响）
+        auto cb_event = [](checkbox_p cb, const void* e) {
+                if (!cb) return;
+                int before = (int)checkbox_get_state(cb);
+                checkbox_process_event(cb, e);
+                if ((int)checkbox_get_state(cb) != before) UiSfx::Get().play(UiSfx::kSwitch);
+        };
+        cb_event(self->fullscreen_cb, ev);
+        cb_event(self->collision_cb, ev);
     };
     cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
         (void)btn;
         SettingsScene* self = (SettingsScene*)arg;
-        if (self->btn_back && button_is_pressed(self->btn_back, x, y))
+        if (self->btn_back && ui_button_hit(self->btn_back, x, y))
             push_user_event(SETTINGS_EVENT, SETTINGS_EVENT_BACK);
     };
     cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {

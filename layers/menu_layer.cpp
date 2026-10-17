@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "menu_layer.h"
 #include "../ui_style.h"
+#include "../ui_sfx.h"
 #include "../asset_manager.h"
 
 // 白底黑框按钮：无贴图，白色填充 + 黑色描边（button_draw 自带线框）+ 黑色文字
@@ -68,7 +69,7 @@ void MenuLayer::HandleEvent(const void* ev)
         cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
                 (void)btn;
                 auto* self = (MenuLayer*)arg;
-                auto hit = [&](button_p b) { return button_is_pressed(b, x, y); };
+                auto hit = [&](button_p b) { return ui_button_hit(b, x, y); };
                 if (self->btn_start && hit(self->btn_start))   MenuLayer::sendMenuEvent(MENU_EVENT_START);
                 if (self->btn_online && hit(self->btn_online))  MenuLayer::sendMenuEvent(MENU_EVENT_ONLINE);
                 if (self->btn_settings && hit(self->btn_settings)) MenuLayer::sendMenuEvent(MENU_EVENT_SETTINGS);

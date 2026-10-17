@@ -16,7 +16,7 @@ struct Context;
 static constexpr const char* kTerrainAtlasPath = "joy_topdown_template/tilesheet.png";
 
 // 地图地形渲染：按 64×64 网格逐格贴图集瓦片（Scribble 手绘白底深线风格）。
-// 图集缺失时兜底为纯色块（墙=墨色、地面=浅宣纸色），保证仍可运行。
+// 图集缺失时兜底为纯色块（墙=墨色、地面=纯白），保证仍可运行。
 // 格子尺寸每格 1 米（=50px），与实体/相机渲染的 1米=50px 精确一致，保证对齐。
 static void draw_map_pass(Context* ctx)
 {
@@ -24,8 +24,9 @@ static void draw_map_pass(Context* ctx)
     float cx = meters_to_pixels(gs.camera_position.x);
     float cy = meters_to_pixels(gs.camera_position.y);
 
-    // 地面底色：先整屏铺浅宣纸色（可通行区域）
-    r2d_set_color(ctx->r2d, 250, 248, 244, 255);
+    // 地面底色：先整屏铺纯白（可通行区域）。地图 Background 层的空瓦片(GID=0)处
+    // 即为透明，透出的就是这层颜色，故它是玩家看到的"背景"主色。
+    r2d_set_color(ctx->r2d, 255, 255, 255, 255);
     jrect_t floor = { 0, 0, 480.0f, 320.0f };
     shape_draw_rectangle(ctx->r2d, "fill", floor);
 

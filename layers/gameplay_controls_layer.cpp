@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "gameplay_controls_layer.h"
 #include "../ui_style.h"
+#include "../ui_sfx.h"
 #include "../asset_manager.h"
 #include "../components/player_component.h"
 #include "../components/action_state_component.h"
@@ -171,7 +172,7 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                 (void)btn;
                 auto* self = (GameplayControlsLayer*)arg;
                 // 攻击键优先（右下圆钮）
-                if (self->btn_attack && button_is_pressed(self->btn_attack, x, y)) {
+                if (self->btn_attack && ui_button_hit(self->btn_attack, x, y, UiSfx::kTap)) {
                         self->pressed_btn = self->btn_attack;
                         self->pressed_code = GAMEPLAY_CONTROL_ATTACK;
                         return;

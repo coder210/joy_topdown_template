@@ -4,6 +4,7 @@
 #include "character_select_scene.h"
 #include "loading_scene.h"
 #include "../ui_style.h"
+#include "../ui_sfx.h"
 #include "../asset_manager.h"
 #include "../systems/character_catalog.h"
 
@@ -107,15 +108,15 @@ void LevelSelectScene::HandleUiEvent(const void* e) {
         (void)btn;
         LevelSelectScene* self = (LevelSelectScene*)arg;
         for (int i = 0; i < LEVEL_META_COUNT; i++)
-            if (self->btn_levels[i] && button_is_pressed(self->btn_levels[i], x, y))
+            if (self->btn_levels[i] && ui_button_hit(self->btn_levels[i], x, y))
                 self->selected = i;
-        if (self->btn_confirm && button_is_pressed(self->btn_confirm, x, y)) {
+        if (self->btn_confirm && ui_button_hit(self->btn_confirm, x, y)) {
             self->ctx()->selected_level = self->selected + 1;
             request_scene(self->ctx(),
                 new LoadingScene(self->ctx(), self->target_mode));
             return; // 已登记切换，立即返回避免处理后续回调
         }
-        if (self->btn_back && button_is_pressed(self->btn_back, x, y))
+        if (self->btn_back && ui_button_hit(self->btn_back, x, y))
             request_scene(self->ctx(),
                 new CharacterSelectScene(self->ctx(), self->target_mode));
     };

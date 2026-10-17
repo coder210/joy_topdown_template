@@ -4,6 +4,7 @@
 #include "level_select_scene.h"
 #include "main_scene.h"
 #include "../ui_style.h"
+#include "../ui_sfx.h"
 #include "../asset_manager.h"
 
 // 延迟切换：登记目标场景并推送 TRANSITION_EVENT，由 SceneManager 在本次事件分发结束后执行替换
@@ -43,13 +44,13 @@ void VictoryScene::HandleUiEvent(const void* e) {
         (void)btn;
         VictoryScene* self = (VictoryScene*)arg;
         // 再战一局：回选关页（沿用当前模式）
-        if (self->btn_replay && button_is_pressed(self->btn_replay, x, y)) {
+        if (self->btn_replay && ui_button_hit(self->btn_replay, x, y)) {
             request_scene(self->ctx(),
                     new LevelSelectScene(self->ctx(), self->ctx()->mode));
             return; // 已登记切换，立即返回避免处理后续回调
         }
         // 回主菜单
-        if (self->btn_menu && button_is_pressed(self->btn_menu, x, y))
+        if (self->btn_menu && ui_button_hit(self->btn_menu, x, y))
             request_scene(self->ctx(),
                     new MainScene(self->ctx()));
     };

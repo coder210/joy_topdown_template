@@ -11,7 +11,10 @@
     },
     "audio": {
         "footstep": "joy_topdown_template/audio/footstep.wav",
-        "bgm": "joy_topdown_template/audio/bgm.wav"
+        "bgm": "joy_topdown_template/audio/bgm.wav",
+        "click": "joy_topdown_template/audio/click-a.ogg",
+        "switch": "joy_topdown_template/audio/switch-a.ogg",
+        "tap": "joy_topdown_template/audio/tap-a.ogg"
     },
     "config": {
         "characters": "joy_topdown_template/data/characters.json",

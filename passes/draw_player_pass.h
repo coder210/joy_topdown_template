@@ -421,7 +421,8 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                                 has_mouse_aim, mouse_aim_deg, pc.char_id);
 
                 // 玩家血条：两个重叠矩形——底层黑色底框，上层玩家颜色，长度由血量决定。
-                // 跟随玩家、画在玩家正下方并与玩家水平居中平行（世界空间，随摄像机移动）。纯渲染，不进快照/帧同步。
+                // 跟随玩家，且始终贴在"移动方向的左侧"（面朝方向的左手边），随转身换位。
+                // 世界空间绘制（随摄像机移动）。纯渲染，不进快照/帧同步。
                 if (registry.all_of<HealthComponent>(e)) {
                         auto& hc = registry.get<HealthComponent>(e);
                         float ratio = (hc.max_hp > 0) ? ((float)hc.hp / (float)hc.max_hp) : 0.0f;
@@ -430,9 +431,21 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
 
                         const float barW = 48.0f;     // 满血血条像素宽（比 64 窄 1/4）
                         const float barH = 16.0f;     // 血条高（高度翻倍）
-                        // 玩家精灵以 (sx,sy) 为中心、显示高约 50px（半高 25px）→ 血条置于其正下方并水平居中。
-                        float bx = sx - barW * 0.5f;  // 水平居中于玩家
-                        float by = sy + 25.0f + 4.0f; // 玩家底部之下（半高 25 + 间隔 4）
+                        const float halfBody = 25.0f; // 玩家精灵半高/半宽（显示约 50px）
+                        const float gap      = 4.0f;  // 血条与玩家之间的间隔
+
+                        // 朝向 ac.dir：0=下 1=左 2=右 3=上（屏幕 y 向下）。
+                        // "移动方向的左侧" = 朝向向量左转 90°：(fx,fy) → (fy,-fx)，即：
+                        //   面朝下→屏右、面朝左→屏下、面朝右→屏上、面朝上→屏左。
+                        // 血条本身始终保持水平（从左到右填充，易读），只改变挂载方位。
+                        float bx = sx - barW * 0.5f;          // 默认：垂直居中于玩家
+                        float by = sy - barH * 0.5f;
+                        switch (ac.dir) {
+                                case 0:  bx = sx + halfBody + gap;            break;  // 面朝下 → 贴右侧
+                                case 1:  by = sy + halfBody + gap;            break;  // 面朝左 → 贴下方
+                                case 2:  by = sy - halfBody - gap - barH;     break;  // 面朝右 → 贴上方
+                                default: bx = sx - halfBody - gap - barW;     break;  // 面朝上 → 贴左侧
+                        }
 
                         // 底层：黑色底框
                         r2d_set_color(ctx->r2d, 0, 0, 0, 255);

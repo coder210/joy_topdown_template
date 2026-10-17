@@ -16,6 +16,7 @@
 #include "scenes/character_select_scene.h"
 #include "scenes/victory_scene.h"
 #include "layers/menu_layer.h"
+#include "ui_sfx.h"
 #include "passes/draw_fps_pass.h"
 #include "systems/character_catalog.h"
 
@@ -91,6 +92,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         *appstate = ctx;
         ctx->mode = parse_mode(argc, argv);
         settings_load(&ctx->settings);
+        UiSfx::Get().setGain(ctx->settings.sfx_volume);   // UI 音效与游戏内音效同一档音量
         log_info("settings loaded: ip=%s port=%d bgm=%f sfx=%f fullscreen=%d",
                 ctx->settings.server_ip, ctx->settings.server_port,
                 ctx->settings.bgm_volume, ctx->settings.sfx_volume,
@@ -258,6 +260,7 @@ SDL_AppResult SDL_AppIterate(void*)
 void SDL_AppQuit(void*, SDL_AppResult)
 {
         delete g_mgr;
+        UiSfx::Get().shutdown();   // UI 音效自带的音频设备（与游戏场景的设备独立）
         r2d_destroy(ctx->r2d);
         destroy_window(ctx->window);
         delete ctx;

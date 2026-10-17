@@ -1,5 +1,6 @@
 #include "online_scene.h"
 #include "../ui_style.h"
+#include "../ui_sfx.h"
 #include "../asset_manager.h"
 
 OnlineScene::OnlineScene(Context* ctx) : Scene(ctx, "Online") {}
@@ -57,7 +58,7 @@ void OnlineScene::HandleUiEvent(const void* e) {
     cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
         (void)btn;
         OnlineScene* self = (OnlineScene*)arg;
-        auto hit = [&](button_p b) { return button_is_pressed(b, x, y); };
+        auto hit = [&](button_p b) { return ui_button_hit(b, x, y); };
         if (self->btn_host && hit(self->btn_host))
             push_user_event(ONLINE_EVENT, ONLINE_EVENT_HOST);
         if (self->btn_client && hit(self->btn_client))

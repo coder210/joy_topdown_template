@@ -5,6 +5,7 @@
 #include "main_scene.h"
 #include "online_scene.h"
 #include "../ui_style.h"
+#include "../ui_sfx.h"
 #include "../asset_manager.h"
 #include "../systems/character_catalog.h"
 #include "../systems/weapon_catalog.h"
@@ -160,9 +161,9 @@ void CharacterSelectScene::HandleUiEvent(const void* e) {
         (void)btn;
         CharacterSelectScene* self = (CharacterSelectScene*)arg;
         for (int i = 0; i < (int)g_characterCatalog.size(); i++)
-            if (self->btn_cards[i] && button_is_pressed(self->btn_cards[i], x, y))
+            if (self->btn_cards[i] && ui_button_hit(self->btn_cards[i], x, y))
                 self->selected = i;
-        if (self->btn_confirm && button_is_pressed(self->btn_confirm, x, y)) {
+        if (self->btn_confirm && ui_button_hit(self->btn_confirm, x, y)) {
             const char* nick = self->nickname_input
                 ? inputbox_get_text(self->nickname_input) : "";
             const char* s = nick;
@@ -176,7 +177,7 @@ void CharacterSelectScene::HandleUiEvent(const void* e) {
             else self->go_to_level();
             return; // scene 已替换、self 已释放，必须立即返回
         }
-        if (self->btn_back && button_is_pressed(self->btn_back, x, y))
+        if (self->btn_back && ui_button_hit(self->btn_back, x, y))
             self->go_back();
     };
     cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
