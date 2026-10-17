@@ -186,6 +186,10 @@ static float dir_to_angle_deg(int dir)
 // 由 ActionStateComponent.aim_yaw 还原（鼠标量化角随输入同步到所有客户端，两端一致）。
 // 所有武器（近战 + 远程）一律由此驱动朝向：收势指向光标、攻击沿光标方向；
 // 键盘上下左右不参与方向（否则移动朝向会和鼠标朝向打架）；无瞄准数据时竖直朝上。
+// 持握距离倍率：把武器(含握点/手)沿瞄准方向整体推离角色。1.0 = 原距离，>1 更远。
+// 只放大径向(沿瞄准方向)分量，不放大侧向的"手高"侧移，避免武器往一边歪。
+static const float kWeaponHoldDistScale = 1.35f;
+
 static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                              float role_scale, const ActionStateComponent& ac, bool flip_h,
                              bool has_mouse_aim, float mouse_aim_deg, int char_id)
@@ -275,18 +279,18 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         vec2_t pos;
         if (!attacking && wd.kind == 1 && !has_mouse_aim) {
                 pos.x = cx + (flip_h ? -ry : ry) * 1.8f;
-                pos.y = cy - rr * 0.9f;
+                pos.y = cy - rr * 0.9f * kWeaponHoldDistScale;
         } else if (!attacking) {
                 // 远程(弓)：沿瞄准方向(鼠标)正前方持握，与键盘朝向无关
                 const float rad0 = aim * 3.1415926f / 180.0f;
-                pos.x = cx + cosf(rad0) * rr * 1.15f;
-                pos.y = cy + sinf(rad0) * rr * 1.15f;
+                pos.x = cx + cosf(rad0) * rr * 1.15f * kWeaponHoldDistScale;
+                pos.y = cy + sinf(rad0) * rr * 1.15f * kWeaponHoldDistScale;
         } else {
                 // 攻击：近战挥扫时带手高侧移(ry)；远程(弓)只沿瞄准方向前后移动，
                 // 不加侧移——否则拉弓时弓会向一侧偏（瞄准朝上时表现为向右）。
                 const float perp = (wd.kind == 0) ? 0.0f : ry;
-                pos.x = cx + cosf(rad) * rr - sinf(rad) * perp;
-                pos.y = cy + sinf(rad) * rr + cosf(rad) * perp;
+                pos.x = cx + cosf(rad) * rr * kWeaponHoldDistScale - sinf(rad) * perp;
+                pos.y = cy + sinf(rad) * rr * kWeaponHoldDistScale + cosf(rad) * perp;
         }
         vec2_t scl    = { scale, scale };                  // 不随角色翻转，武器独立旋转
         // 旋转轴 = 握点（素材上"手握的位置"，如弓上的蓝点标记）：武器绕握点旋转，
@@ -323,26 +327,107 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                         vec2_t hscl    = { role_scale, role_scale };
                         vec2_t horigin = { hw * 0.5f, hh * 0.5f };
                         image_draw_ex(handImg, &handCell, handPos, 0.0f, hscl, horigin);
+
+                        // 拉弦手：拉弓阶段(useArrow，弦上搭箭)在"箭与弦相交"处再画一只手。
+                        // 该点取自素材实测：tilesheet col5(320,576) 格内弦的 V 形顶点/箭尾搭弦点
+                        // ≈(32,50)，相对握点(origin，未配置时=格中心32,32)沿箭尾方向约 18px。
+                        // 随武器旋转角变换到屏幕：握点 + R(ang)·(nock-grip)·scale——
+                        // 瞄右时在弓后(左)、瞄上时在弓下，永远位于弓与射手之间。
+                        if (wd.kind == 0 && useArrow) {
+                                const float ndx = (32.0f - origin.x) * scale;
+                                const float ndy = (50.0f - origin.y) * scale;
+                                const float hc2 = cosf(ang), hs2 = sinf(ang);
+                                vec2_t stringPos = { pos.x + ndx * hc2 - ndy * hs2,
+                                                     pos.y + ndx * hs2 + ndy * hc2 };
+                                image_draw_ex(handImg, &handCell, stringPos, 0.0f, hscl, horigin);
+                        }
                 }
         }
 }
 
-// 血条纯色纹理（运行时用 1×1 像素生成，全局缓存一次）。
-// 为何不用 shape_draw_polygon：它内部走 SDL_RenderGeometry，在本项目
-// 逻辑呈现(LETTERBOX)下不输出；而 image_draw_ex 走 SDL_RenderTextureRotated，
-// 角色/武器都靠它渲染且支持旋转，故改用纹理旋转来画旋转血条。
-static image_p s_hpbar_bg    = NULL;   // 底框（黑）
-static image_p s_hpbar_fg    = NULL;   // 填充（绿）
+// ---------------- 玩家血条：水墨朱砂·胶囊细条 ----------------
+// 引擎 shape_draw_polygon 走 SDL_RenderGeometry，在逻辑呈现(LETTERBOX)下不渲染；
+// image_draw_ex 走 SDL_RenderTextureRotated（角色/武器都在用）可靠且支持旋转。
+// 故血条用 CPU 逐像素生成的胶囊纹理（抗锯齿圆角、两端半圆）+ 旋转绘制。
+// 轨道纹理固定（缓存一次）；填充纹理随 HP 换色/换长，每帧更新像素。
+static const int HPBAR_W   = 36;   // 内芯长（像素）
+static const int HPBAR_H   = 12;   // 内芯厚（像素）
+static const int HPBAR_PAD = 1;    // 外描边 1px
+
+static image_p s_hpbar_track = NULL;   // 轨道+描边（38×8）
+static image_p s_hpbar_fill  = NULL;   // 填充（36×6，流式，每帧更新）
+
+// 通用胶囊像素：在 buf(W×H, RGBA32) 画一条从 x=0 到 x=fillLen 的胶囊（两端半圆、1px 羽化）。
+static void hpbar_gen_capsule(uint8_t* buf, int W, int H, float fillLen,
+                              uint8_t R, uint8_t G, uint8_t B, uint8_t A)
+{
+        memset(buf, 0, (size_t)W * H * 4);
+        if (fillLen <= 0.0f) return;
+        if (fillLen > (float)W) fillLen = (float)W;
+        float cy = H * 0.5f;
+        float rad = H * 0.5f;
+        float x0 = rad, x1 = fillLen - rad;
+        if (x1 < x0) {                       // 太短：退化为圆帽
+                rad = fillLen * 0.5f;
+                if (rad < 0.5f) rad = 0.5f;
+                x0 = x1 = fillLen * 0.5f;
+        }
+        for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                        float px = x + 0.5f, py = y + 0.5f;
+                        float dx = (px < x0) ? (x0 - px) : ((px > x1) ? (px - x1) : 0.0f);
+                        float dy = py - cy;
+                        float cov = rad - sqrtf(dx * dx + dy * dy) + 0.5f;   // 1px 抗锯齿
+                        if (cov <= 0.0f) continue;
+                        if (cov > 1.0f) cov = 1.0f;
+                        uint8_t* p = buf + ((size_t)y * W + x) * 4;
+                        p[0] = R; p[1] = G; p[2] = B;
+                        p[3] = (uint8_t)(A * cov);
+                }
+        }
+}
+
+// 轨道+描边：外 1px 深墨描边、内部半透明墨（同一墨色，靠 alpha 深浅区分）。
+static void hpbar_gen_track(uint8_t* buf, int W, int H)
+{
+        memset(buf, 0, (size_t)W * H * 4);
+        float cy = H * 0.5f;
+        float rOut = H * 0.5f;
+        float rIn  = rOut - (float)HPBAR_PAD;
+        float x0o = rOut, x1o = W - rOut;
+        for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                        float px = x + 0.5f, py = y + 0.5f;
+                        float dx = (px < x0o) ? (x0o - px) : ((px > x1o) ? (px - x1o) : 0.0f);
+                        float dy = py - cy;
+                        float covO = rOut - sqrtf(dx * dx + dy * dy) + 0.5f;
+                        if (covO <= 0.0f) continue;
+                        if (covO > 1.0f) covO = 1.0f;
+                        float covI = rIn - sqrtf(dx * dx + dy * dy) + 0.5f;
+                        uint8_t* p = buf + ((size_t)y * W + x) * 4;
+                        p[0] = 40; p[1] = 40; p[2] = 45;
+                        if (covI >= 1.0f) p[3] = 120;                    // 内部：半透明墨
+                        else              p[3] = (uint8_t)(205.0f * covO); // 描边：更实
+                }
+        }
+}
 
 static void ensure_hpbar_textures(jr2d_p r2d)
 {
-        if (!s_hpbar_bg) {
-                const unsigned char px[4] = { 0, 0, 0, 255 };
-                s_hpbar_bg = image_create_from_data(r2d, px, 1, 1);
+        if (!s_hpbar_track) {
+                const int W = HPBAR_W + HPBAR_PAD * 2, H = HPBAR_H + HPBAR_PAD * 2;
+                s_hpbar_track = image_create_empty(r2d, W, H);
+                if (s_hpbar_track) {
+                        uint8_t buf[(HPBAR_W + 2) * (HPBAR_H + 2) * 4];
+                        hpbar_gen_track(buf, W, H);
+                        jrect_t r = { 0, 0, (float)W, (float)H };
+                        image_update(s_hpbar_track, &r, buf, W * 4);
+                        image_set_blend_mode(s_hpbar_track, JR2D_BLEND_BLEND);
+                }
         }
-        if (!s_hpbar_fg) {
-                const unsigned char px[4] = { 60, 200, 95, 255 };
-                s_hpbar_fg = image_create_from_data(r2d, px, 1, 1);
+        if (!s_hpbar_fill) {
+                s_hpbar_fill = image_create_empty(r2d, HPBAR_W, HPBAR_H);
+                if (s_hpbar_fill) image_set_blend_mode(s_hpbar_fill, JR2D_BLEND_BLEND);
         }
 }
 
@@ -463,33 +548,40 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                         float dx = cosf(rad), dy = sinf(rad);     // 瞄准方向（屏幕 y 向下：0=右,90=下）
                         float nx = -dy, ny = dx;                  // 右手法线侧（绕角色的右侧）
 
-                        const float barL = 48.0f;     // 满血时长轴（沿瞄准方向）
-                        const float barT = 12.0f;     // 厚度（沿法线侧）
-                        const float halfBody = 25.0f; // 玩家精灵半高/半宽（显示约 50px）
-                        const float gap      = 4.0f;  // 与玩家之间的间隔
-                        float off = halfBody + gap + barT * 0.5f;  // 沿法线侧外移，贴住角色右侧
-                        float cx = sx + nx * off;     // 血条中心
+                        // 水墨胶囊血条：内芯 36×6、外 1px 墨描边、间距 3。长轴=瞄准方向。
+                        const float barT = (float)HPBAR_H;   // 内芯厚
+                        const float halfBody = 25.0f;        // 玩家精灵半高/半宽（显示约 50px）
+                        const float gap      = 3.0f;         // 与玩家之间的间隔
+                        float off = halfBody + gap + barT * 0.5f + (float)HPBAR_PAD;  // 沿法线侧外移
+                        float cx = sx + nx * off;            // 血条中心
                         float cy = sy + ny * off;
 
-                        // 用 1×1 纯色纹理 + image_draw_ex 旋转绘制（SDL_RenderTextureRotated）：
-                        // 纹理缩放到血条尺寸(len×thick)、绕纹理中心旋转 rad（瞄准角）。
-                        // 长轴 = 瞄准方向、中心 = 右手法线侧偏移点 → 与武器平行、挂在其右侧。
                         ensure_hpbar_textures(ctx->r2d);
-                        auto draw_rot_bar = [&](float ccx, float ccy, float len, float thick, image_p tex) {
-                                if (!tex || len <= 0.0f) return;
-                                jrect_t src = { 0.0f, 0.0f, 1.0f, 1.0f };   // 1×1 整张
-                                vec2_t pos = { ccx, ccy };
-                                vec2_t scl = { len, thick };                // 缩放到血条尺寸
-                                vec2_t org = { 0.5f, 0.5f };                // 绕中心旋转
+
+                        // 极简墨条：填充平时纯墨 {40,40,45}；仅低血(≤30%)转朱砂 {200,60,50} 作危险提示。
+                        uint8_t fr = 40, fg = 40, fb = 45;
+                        if (ratio <= 0.30f) { fr = 200; fg = 60; fb = 50; }
+
+                        // 填充纹理每帧按当前 HP 长度/颜色重绘（透明圆角胶囊）
+                        if (s_hpbar_fill) {
+                                uint8_t buf[HPBAR_W * HPBAR_H * 4];
+                                hpbar_gen_capsule(buf, HPBAR_W, HPBAR_H,
+                                                  (float)HPBAR_W * ratio, fr, fg, fb, 235);
+                                jrect_t r = { 0, 0, (float)HPBAR_W, (float)HPBAR_H };
+                                image_update(s_hpbar_fill, &r, buf, HPBAR_W * 4);
+                        }
+
+                        // 1:1 绘制（纹理已是目标像素尺寸），绕中心旋转 rad（瞄准角）
+                        auto draw_bar = [&](image_p tex, float wpx, float hpx) {
+                                if (!tex) return;
+                                jrect_t src = { 0, 0, wpx, hpx };
+                                vec2_t pos = { cx, cy };
+                                vec2_t scl = { 1.0f, 1.0f };
+                                vec2_t org = { wpx * 0.5f, hpx * 0.5f };
                                 image_draw_ex(tex, &src, pos, rad, scl, org);
                         };
-                        float hl_full = barL * 0.5f;
-                        float hl_green = barL * ratio * 0.5f;
-                        // 绿填充从 -d 端起、沿瞄准方向延伸至 ratio 长度
-                        float gcx = cx - dx * (hl_full - hl_green);
-                        float gcy = cy - dy * (hl_full - hl_green);
-                        draw_rot_bar(cx, cy, barL, barT, s_hpbar_bg);             // 黑底框
-                        draw_rot_bar(gcx, gcy, barL * ratio, barT, s_hpbar_fg);   // 绿填充
+                        draw_bar(s_hpbar_track, (float)(HPBAR_W + HPBAR_PAD * 2), (float)(HPBAR_H + HPBAR_PAD * 2));
+                        draw_bar(s_hpbar_fill,  (float)HPBAR_W, (float)HPBAR_H);
                 }
         }
 }
