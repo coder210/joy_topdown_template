@@ -563,9 +563,13 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
 
                         ensure_hpbar_textures(ctx->r2d);
 
-                        // 极简墨条：填充平时纯墨 {40,40,45}；仅低血(≤30%)转朱砂 {200,60,50} 作危险提示。
-                        uint8_t fr = 40, fg = 40, fb = 45;
-                        if (ratio <= 0.30f) { fr = 200; fg = 60; fb = 50; }
+                        // 填充色 = 角色主色：取自 CharacterDef.color（characters.json 按角色配置，
+                        // 值即该角色贴图的主体色，故血条与角色同色）。任何时候都用角色色，
+                        // 不随血量变色（只靠长度表达剩余血量）。
+                        const CharacterDef& cdef = g_characterCatalog.get(pc.char_id);
+                        uint8_t fr = (uint8_t)((cdef.color >> 16) & 0xFF);
+                        uint8_t fg = (uint8_t)((cdef.color >> 8)  & 0xFF);
+                        uint8_t fb = (uint8_t)( cdef.color        & 0xFF);
 
                         // 填充纹理每帧按当前 HP 长度/颜色重绘（透明圆角胶囊）
                         if (s_hpbar_fill) {
