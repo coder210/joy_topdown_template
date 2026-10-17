@@ -25,10 +25,12 @@ void MenuLayer::load_menu_buttons()
         r2d_get_logical_presentation(ctx_->r2d, &logical_width, &logical_height, NULL);
         font_p simhei_font = AssetManager::GetInstance()->GetSimheiFont24();
 
-        int btn_width = 120, btn_height = 50;
+        int btn_width = 120, btn_height = 44;
         int btn_x = (logical_width - btn_width) / 2;
-        int start_y = (logical_height - btn_height * 4 - 60) / 2;
-        int gap = 20;
+        int gap = 12;
+        // 整体下沉：空出顶部标题区域、底部给版本号留白，使四枚按钮垂直均衡。
+        int block = btn_height * 4 + gap * 3;
+        int start_y = (logical_height - block) / 2 + 20;
 
         btn_start = button_create(ctx_->r2d,
                 ((float)btn_x + (float)btn_width * 0.5f) / (float)logical_width,

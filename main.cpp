@@ -103,7 +103,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
         AssetManager::Init();
 
-        ctx->window = create_window("joy_topdown_template", 480, 320);
+        ctx->window = create_window("Joy Topdown", 480, 320);
         ctx->r2d = r2d_create(ctx->window);
         // 优化：letterbox 等比适配，避免拉伸变形（对齐 joy_side_template）
         r2d_set_logical_presentation_mode(ctx->r2d, 480, 320, JOY_LOGICAL_PRESENTATION_LETTERBOX);

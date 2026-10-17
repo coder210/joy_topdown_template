@@ -81,7 +81,9 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
                 else if (strcmp(m->label, "左") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_west.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_west_highlight.png";  isDpad = true; }
                 else if (strcmp(m->label, "右") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_east.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_east_highlight.png";  isDpad = true; }
         }
-        bool pressed = (m->btn == pressed_btn);
+        // 按下态取「触摸按下(pressed_btn) 或 键盘同步(button_get_pressed)」两者之一，
+        // 这样空格/虚拟攻击键都能点亮金色辉光，与方向键经摇杆显示同理。
+        bool pressed = (m->btn == pressed_btn) || button_get_pressed(m->btn);
         auto* am = AssetManager::GetInstance();
         image_p tex = (am && ctx_) ? am->GetImage(r2d, pressed ? hlPath : basePath) : NULL;
         if (tex) {
@@ -151,7 +153,7 @@ void GameplayControlsLayer::load_controls()
                 "joy_topdown_template/sprites/ui/joystick_circle_pad_a.png",
                 "joy_topdown_template/sprites/ui/joystick_circle_nub_a.png");
         joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_8WAY,
-                "joy_topdown_template/sprites/ui/joystick_circle_pad_b.png",
+                "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
                 "joy_topdown_template/sprites/ui/joystick_circle_nub_b.png");
         joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_VERTICAL,
                 "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
@@ -159,7 +161,7 @@ void GameplayControlsLayer::load_controls()
         joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_HORIZONTAL,
                 "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
                 "joy_topdown_template/sprites/ui/joystick_circle_nub_b.png");
-        joystick_set_dir_mode(move_stick, JOYSTICK_DIR_4WAY);   // 限制为 上/下/左/右 四向
+        joystick_set_dir_mode(move_stick, JOYSTICK_DIR_8WAY);   // 八向（含四个斜角），支持斜向移动
 
         // 右下攻击键：通用圆钮 + 圆心墨黑「攻」字 + 冷却环（保持原样）。
         add_button(&btn_attack, &attack_meta, 0.92500f, 0.89375f, 0.13333f, 0.20000f, "攻", 1);
@@ -175,6 +177,10 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                 if (self->btn_attack && ui_button_hit(self->btn_attack, x, y, UiSfx::kTap)) {
                         self->pressed_btn = self->btn_attack;
                         self->pressed_code = GAMEPLAY_CONTROL_ATTACK;
+                        // 与空格完全一致：按下即置 INPUT_ATTACK 位，每帧上报，
+                        // 服务端按冷却自动节流 → 按住 = 持续攻击。不再走一次性事件
+                        // （那条路径的分支是空 break，虚拟键原本根本打不出攻击）。
+                        game_runtime(self->ctx_).current_input_mask |= INPUT_ATTACK;
                         return;
                 }
                 // 否则交给左摇杆（仅在半径内激活）
@@ -193,19 +199,17 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                         self->pressed_btn = NULL;
                         self->pressed_code = 0;
                         button_set_pressed(b, false);
-                        if (!button_is_hovered(b, x, y)) return;
-                        if (self->localCoolRatio(1) > 0.0f) return;
-                        GameplayControlsLayer::sendGameplayControlEvent(GAMEPLAY_CONTROL_ATTACK);
+                        // 与空格一致：松开即清除 INPUT_ATTACK 位（无论在哪松开都清，
+                        // 避免残留位导致“一直打”）。服务端冷却已节流，无需在此判定。
+                        game_runtime(self->ctx_).current_input_mask &= ~INPUT_ATTACK;
                         return;
                 }
                 if (self->stick_active) {
                         joystick_touch_up(self->move_stick);
                         self->stick_active = 0;
-                        // 清除移动方向位（保留瞄准角锁存，仍可朝该方向开火）
-                        if (self->last_set_ev) {
-                                GameplayControlsLayer::sendGameplayControlEvent(self->last_rel_ev);
-                                self->last_set_ev = 0; self->last_rel_ev = 0;
-                        }
+                        // 清除屏幕摇杆的移动方向位（保留瞄准角锁存，仍可朝最后方向开火）
+                        game_runtime(self->ctx_).current_input_mask &= ~(INPUT_UP | INPUT_DOWN | INPUT_LEFT | INPUT_RIGHT);
+                        self->last_set_ev = 0; self->last_rel_ev = 0;
                 }
         };
         cbs.on_mousemoved = [](float x, float y, float dx, float dy, void* arg) {
@@ -228,6 +232,8 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
 
 void GameplayControlsLayer::Destroy()
 {
+        // 若正按住攻击键时销毁（如切场景），清除 INPUT_ATTACK 位，避免残留导致“一直打”
+        if (ctx_) game_runtime(ctx_).current_input_mask &= ~INPUT_ATTACK;
         if (attack_meta.btn) { button_destroy(attack_meta.btn); attack_meta.btn = NULL; }
         btn_attack = NULL;
         if (move_stick) { joystick_destroy(move_stick); move_stick = NULL; }
@@ -236,36 +242,31 @@ void GameplayControlsLayer::Destroy()
         stick_active = 0; last_set_ev = 0; last_rel_ev = 0;
 }
 
-// 把左摇杆向量转成：
-//   ① 移动方向位（4 向，经 GAMEPLAY_CONTROL 事件进入 current_input_mask）
-//   ② 瞄准角锁存（量化 0..254，写入 ctx->aim_stick_yaw_q，供 collect_aim_yaw_q 在鼠标无效时回落）
-// 松手回中（mag<=deadzone）时只清除移动位，瞄准角保留（仍可朝最后方向开火）。
+// 把左摇杆向量转成移动方向位（八向，与键盘 WASD 共用 current_input_mask 的 4 个方向位）。
+// 按 dx/dy 符号分别置位：左右/上下可同时置 → 斜向移动；松手回中(mag<=deadzone)清除移动位，
+// 瞄准角仍锁存（仍可朝最后方向开火）。
+// 仅在摇杆被拖动时调用（HandleEvent 的 press/move 路径），不碰键盘输入；
+// 纯键盘游玩时此函数不被调用，键盘位不受干扰。
 void GameplayControlsLayer::updateStick()
 {
         if (!move_stick || !ctx_) return;
         vec2_t dir = joystick_get_direction(move_stick);
         float mag = joystick_get_magnitude(move_stick);
+        int* mask = &game_runtime(ctx_).current_input_mask;
         if (mag > 0.25f) {
-                int set_ev = 0, rel_ev = 0;
-                if (fabsf(dir.x) >= fabsf(dir.y)) {
-                        if (dir.x > 0.0f) { set_ev = GAMEPLAY_CONTROL_RIGHT; rel_ev = GAMEPLAY_CONTROL_RELEASE_RIGHT; }
-                        else               { set_ev = GAMEPLAY_CONTROL_LEFT;  rel_ev = GAMEPLAY_CONTROL_RELEASE_LEFT;  }
-                } else {
-                        if (dir.y > 0.0f) { set_ev = GAMEPLAY_CONTROL_DOWN;  rel_ev = GAMEPLAY_CONTROL_RELEASE_DOWN;  }
-                        else               { set_ev = GAMEPLAY_CONTROL_UP;    rel_ev = GAMEPLAY_CONTROL_RELEASE_UP;    }
-                }
-                // 瞄准角：与鼠标同约定（屏幕 y 向下，atan2(dy,dx)）
+                // 八向：独立置位每个方向，左右/上下可同时 → 斜向移动
+                if (dir.y < -0.35f) *mask |= INPUT_UP;
+                if (dir.y >  0.35f) *mask |= INPUT_DOWN;
+                if (dir.x < -0.35f) *mask |= INPUT_LEFT;
+                if (dir.x >  0.35f) *mask |= INPUT_RIGHT;
+                // 瞄准角：模拟全方向（与鼠标同约定，屏幕 y 向下、顺时针为正）
                 float deg = atan2f(dir.y, dir.x) * 180.0f / 3.1415926f;
                 ctx_->aim_stick_yaw_q = aim_yaw_quantize(deg);
-                if (set_ev != last_set_ev) {
-                        if (last_set_ev) sendGameplayControlEvent(last_rel_ev);
-                        sendGameplayControlEvent(set_ev);
-                        last_set_ev = set_ev; last_rel_ev = rel_ev;
-                }
         } else {
-                if (last_set_ev) { sendGameplayControlEvent(last_rel_ev); last_set_ev = 0; last_rel_ev = 0; }
-                // 保留 aim_stick_yaw_q 锁存
+                // 松手回中：清除移动位（保留瞄准角锁存）
+                *mask &= ~(INPUT_UP | INPUT_DOWN | INPUT_LEFT | INPUT_RIGHT);
         }
+        last_set_ev = 0; last_rel_ev = 0;   // 不再走单方向 GAMEPLAY_CONTROL 事件
 }
 
 void GameplayControlsLayer::Render()

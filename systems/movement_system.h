@@ -85,12 +85,18 @@ static void movement_system(entt::registry& registry, Context* ctx, float /*dt*/
             speed = g_characterCatalog.get(registry.get<PlayerComponent>(e).char_id).move_speed;
         const fp_t step = fp_mul(speed, tick);
 
+        // 斜向归一化：同时按 上下+左右 时，各轴位移乘以 1/√2，使斜向总速度与直线一致
+        // （否则对角线速度=直线×√2≈1.41 倍，跑对角线明显更快）。双端同码，帧同步确定。
+        const bool diagonal = ((bits & 0x3) != 0) && ((bits & 0xC) != 0);
+        const fp_t inv_sqrt2 = fp_from_float(0.70710678f);
+        const fp_t axis_step = diagonal ? fp_mul(step, inv_sqrt2) : step;
+
         // 无碰撞盒（异常实体）时退化为直接位移，保持原有行为
         if (!registry.all_of<LogicRectComponent>(e)) {
-            if (bits & 0x1) p.y = fp_sub(p.y, step);
-            if (bits & 0x2) p.y = fp_add(p.y, step);
-            if (bits & 0x4) p.x = fp_sub(p.x, step);
-            if (bits & 0x8) p.x = fp_add(p.x, step);
+            if (bits & 0x1) p.y = fp_sub(p.y, axis_step);
+            if (bits & 0x2) p.y = fp_add(p.y, axis_step);
+            if (bits & 0x4) p.x = fp_sub(p.x, axis_step);
+            if (bits & 0x8) p.x = fp_add(p.x, axis_step);
             continue;
         }
 
@@ -101,8 +107,8 @@ static void movement_system(entt::registry& registry, Context* ctx, float /*dt*/
         if ((bits & 0x1) || (bits & 0x2)) {
             fp_t cand = p.y;
             int dy = 0;
-            if (bits & 0x1) { cand = fp_sub(cand, step); dy = -1; }   // 上
-            if (bits & 0x2) { cand = fp_add(cand, step); dy = +1; }   // 下
+            if (bits & 0x1) { cand = fp_sub(cand, axis_step); dy = -1; }   // 上
+            if (bits & 0x2) { cand = fp_add(cand, axis_step); dy = +1; }   // 下
             if (!movement_box_blocked(p.x, cand, w, h)) p.y = cand;        // 无障碍则正常移动
             else p.y = movement_snap_axis(p.y, h, cand, dy);               // 撞墙则贴齐墙格边界
         }
@@ -110,8 +116,8 @@ static void movement_system(entt::registry& registry, Context* ctx, float /*dt*/
         if ((bits & 0x4) || (bits & 0x8)) {
             fp_t cand = p.x;
             int dx = 0;
-            if (bits & 0x4) { cand = fp_sub(cand, step); dx = -1; }   // 左
-            if (bits & 0x8) { cand = fp_add(cand, step); dx = +1; }   // 右
+            if (bits & 0x4) { cand = fp_sub(cand, axis_step); dx = -1; }   // 左
+            if (bits & 0x8) { cand = fp_add(cand, axis_step); dx = +1; }   // 右
             if (!movement_box_blocked(cand, p.y, w, h)) p.x = cand;        // 无障碍则正常移动
             else p.x = movement_snap_axis(p.x, w, cand, dx);               // 撞墙则贴齐墙格边界
         }

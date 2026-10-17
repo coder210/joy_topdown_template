@@ -54,8 +54,14 @@ void MainScene::Render() {
     int w, h;
     r2d_get_logical_presentation(r2d, &w, &h, NULL);
 
-    // ---- 细微粒子 ----
-    jcolor_t pc = { 200, 200, 210, 0 };
+    // 背景：白色，与 splash / 游戏内统一
+    jcolor_t bg = { 255, 255, 255, 255 };
+    r2d_set_color(r2d, bg.r, bg.g, bg.b, bg.a);
+    jrect_t full = { 0, 0, (float)w, (float)h };
+    shape_draw_rectangle(r2d, "fill", full);
+
+    // ---- 细微粒子（深色，白底下可见，保持极淡）----
+    jcolor_t pc = { 70, 70, 85, 0 };
     for (int i = 0; i < MAX_PARTICLES; i++) {
         struct particle* p = &self->particles[i];
         float twinkle = 0.5f + 0.5f * sinf(self->elapsed * p->twinkle_speed + p->phase);
@@ -67,22 +73,23 @@ void MainScene::Render() {
         shape_draw_rectangle(r2d, "fill", pr);
     }
 
-    // ---- 标题 ----
+    // ---- 标题（顶部，水平居中）----
     float pulse = 0.8f + 0.2f * sinf(self->elapsed * 1.8f);
-    const char* title = "Project Proxy 2D";
+    const char* title = "Joy Topdown";
     int title_len = (int)strlen(title);
-    int tw_est = title_len * 14;
-    float tx = (w - tw_est) / 2.0f;
-    float ty = 28.0f;
-    jcolor_t tc = { 200, 200, 210, (uint8_t)(pulse * 255.0f) };
-    jtext_printx(r2d, font, title, title_len, tc, tx, ty);
+    jcolor_t tc = { 35, 35, 48, (uint8_t)(pulse * 255.0f) };
+    int tw = 0, th = 0;
+    jtext_measurex(r2d, font, title, title_len, tc, &tw, &th);
+    jtext_printx(r2d, font, title, title_len, tc, (w - tw) / 2.0f, 22.0f);
 
-    // 版本号（底部）
+    // 版本号（底部居中）
     font_p font_small = AssetManager::GetInstance()->GetSimheiFont12();
     if (font_small) {
         const char* ver = "v1.0.0";
-        jcolor_t vc = { 120, 120, 130, 255 };
-        jtext_printx(r2d, font_small, ver, (int)strlen(ver), vc, (w - 50) / 2.0f, h - 20);
+        jcolor_t vc = { 90, 90, 100, 255 };
+        int vw = 0, vh = 0;
+        jtext_measurex(r2d, font_small, ver, (int)strlen(ver), vc, &vw, &vh);
+        jtext_printx(r2d, font_small, ver, (int)strlen(ver), vc, (w - vw) / 2.0f, h - 20);
     }
     // 渲染菜单层（按钮/标题等）：纯 button 层直接绘制
     if (this->menu) this->menu->Render();

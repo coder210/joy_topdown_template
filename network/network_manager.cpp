@@ -1,5 +1,6 @@
 #include "network_manager.h"
 #include <cstring>
+#include <math.h>
 #include <joy/joy.h>
 #include "protocol.h"
 #include "components/global_state_component.h"
@@ -112,24 +113,24 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
 // ===== 本地瞄准角（量化后随输入上传，供所有端同步"武器指向"的表现）=====
 // 只在本机计算并量化成整数，两端按同一个整数还原角度，故帧同步一致（浮点不跨端）。
 // 来源优先级：键盘方向 > 摇杆（移动端兜底）。不再使用鼠标位置瞄准（取消"鼠标旋转"）。
-// 键盘方向天然为 4 向（上/下/左/右），仍经 aim_yaw_quantize 量化成 0..254；
+// 键盘方向现按 dx/dy 合成向量经 atan2 求角，支持八向（含斜角），再 aim_yaw_quantize 量化成 0..254；
 // 该 255 档量化逻辑保持不变——以后改回模拟输入（如摇杆全方向）即可恢复 255 档细分。
 // 返回 0..254（有效角度）或 kAimYawInvalid（无输入方向 / 本地玩家不存在）。
 static int collect_aim_yaw_q(Context* ctx)
 {
     if (!ctx) return kAimYawInvalid;
 
-    // 1) 键盘方向（4 向）：键盘按下时瞄准=键盘方向；松手后锁存上一次方向（仍可向该方向开火）
+    // 1) 键盘方向（八向）：按 dx/dy 符号合成方向向量，atan2 求角；斜向(如左上)即指向斜角，
+    //    武器随之 8 向旋转。松手后锁存上一次方向（仍可向该方向开火）。
     int kb_mask = game_runtime(ctx).current_input_mask & INPUT_DIR_MASK;
     if (has_dir(kb_mask)) {
-        int d = input_to_dir(kb_mask);            // 0=下 1=左 2=右 3=上
-        float deg = 0.0f;
-        switch (d) {
-            case 0: deg =  90.0f; break;          // 下
-            case 1: deg = 180.0f; break;          // 左
-            case 2: deg =   0.0f; break;          // 右
-            case 3: deg = 270.0f; break;          // 上
-        }
+        float dx = 0.0f, dy = 0.0f;
+        if (kb_mask & INPUT_RIGHT) dx += 1.0f;
+        if (kb_mask & INPUT_LEFT)  dx -= 1.0f;
+        if (kb_mask & INPUT_DOWN)  dy += 1.0f;
+        if (kb_mask & INPUT_UP)    dy -= 1.0f;
+        // 屏幕 y 向下，与鼠标/摇杆同约定；dx/dy ∈ {-1,0,1}，斜向成 8 个方向
+        float deg = atan2f(dy, dx) * 180.0f / 3.1415926f;
         ctx->aim_keyboard_yaw_q = aim_yaw_quantize(deg);
         return ctx->aim_keyboard_yaw_q;
     }

@@ -46,8 +46,8 @@ void SplashScene::Render() {
     int w, h;
     r2d_get_logical_presentation(r2d, &w, &h, NULL);
 
-    // 背景
-    jcolor_t bg = { 30, 30, 40, 255 };
+    // 背景：白色
+    jcolor_t bg = { 255, 255, 255, 255 };
     r2d_set_color(r2d, bg.r, bg.g, bg.b, bg.a);
     jrect_t full = { 0, 0, (float)w, (float)h };
     shape_draw_rectangle(r2d, "fill", full);
@@ -59,17 +59,21 @@ void SplashScene::Render() {
         image_draw1(logo, NULL, &dest);
     }
 
-    // 游戏标题（位于 Logo 下方）
-    const char* title = "Project Proxy 2D";
-    jcolor_t title_c = { 200, 200, 200, 255 };
-    jtext_printx(r2d, font, title, (int)strlen(title), title_c, (w - 200) / 2.0f, 170);
+    // 游戏标题（Logo 下方，水平居中）。白底下用深色字保证可读。
+    const char* title = "Joy Topdown";
+    jcolor_t title_c = { 30, 30, 40, 255 };
+    int tw = 0, th = 0;
+    jtext_measurex(r2d, font, title, (int)strlen(title), title_c, &tw, &th);
+    jtext_printx(r2d, font, title, (int)strlen(title), title_c, (w - tw) / 2.0f, 170);
 
-    // 版权信息（底部）
+    // 版权信息（底部居中）
     font_p font_small = AssetManager::GetInstance()->GetSimheiFont12();
     if (font_small) {
-        jcolor_t ver_c = { 120, 120, 130, 255 };
+        jcolor_t ver_c = { 90, 90, 100, 255 };
         const char* dev = "Developed by 大懒虫工作室, 228407354@qq.com";
-        jtext_printx(r2d, font_small, dev, (int)strlen(dev), ver_c, (w - 320) / 2.0f, h - 24);
+        int dw = 0, dh = 0;
+        jtext_measurex(r2d, font_small, dev, (int)strlen(dev), ver_c, &dw, &dh);
+        jtext_printx(r2d, font_small, dev, (int)strlen(dev), ver_c, (w - dw) / 2.0f, h - 24);
     }
 }
 
