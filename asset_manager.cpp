@@ -3,9 +3,9 @@
 #include <cstdio>
 #include <cstring>
 
-// 内置默认关卡数（与 systems/level_sources.h 的 LEVEL_SOURCES_COUNT 对齐）。
+// 内置默认关卡数（与 systems/map_def.h 的 LEVEL_COUNT 对齐）。
 // 仅用于 resources.json 缺失时生成兜底地图路径。
-static const int kDefaultLevelCount = 5;
+static const int kDefaultLevelCount = 8;
 
 // 静态成员初始化
 AssetManager* AssetManager::instance_ = nullptr;

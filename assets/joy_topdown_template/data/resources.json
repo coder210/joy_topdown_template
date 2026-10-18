@@ -7,7 +7,10 @@
         "level2": "joy_topdown_template/levels/level2.lua",
         "level3": "joy_topdown_template/levels/level3.lua",
         "level4": "joy_topdown_template/levels/level4.lua",
-        "level5": "joy_topdown_template/levels/level5.lua"
+        "level5": "joy_topdown_template/levels/level5.lua",
+        "level6": "joy_topdown_template/levels/level6.lua",
+        "level7": "joy_topdown_template/levels/level7.lua",
+        "level8": "joy_topdown_template/levels/level8.lua"
     },
     "audio": {
         "footstep": "joy_topdown_template/audio/footstep.wav",

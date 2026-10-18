@@ -14,11 +14,22 @@ public:
     void Destroy() override;
     void HandleUiEvent(const void* e) override;
 private:
+    // 关卡槽位上限：与 LEVEL_META 条数解耦，加关卡只改 LEVEL_META 即可（不必再扩数组）
+    static const int LEVEL_SLOT_MAX = 12;
     GameModeKind target_mode = MODE_SINGLE;
-    button_p btn_levels[6];
+    button_p btn_levels[LEVEL_SLOT_MAX];
     button_p btn_confirm = NULL, btn_back = NULL;
     int selected = 0;
+    // 各关地图是否已制作（Tiled 导出的 levelN.lua 是否存在）；缺图的关卡标"制作中"且不可进入
+    bool level_ready[LEVEL_SLOT_MAX] = { false };
+    // "此关正在制作中" 提示（模态：显示期间消费所有事件，点击任意处关闭）
+    bool tip_active = false;
+    // 关卡列表纵向滚动（复用引擎 jui 的 scrollview）：关卡增多超出视口时可上下拖动
+    scrollview_p level_view = NULL;
+    float level_base_y[LEVEL_SLOT_MAX] = { 0 };   // 各关在 scroll=0 时的顶边 y
+    void apply_level_scroll();    // 按 scrollview 偏移刷新关卡按钮位置
     void draw_level(int i);   // 原 free 函数，改为成员以访问 private 字段
+    void draw_tip();          // 画"此关正在制作中"模态提示
 };
 
 #endif

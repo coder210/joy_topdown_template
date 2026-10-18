@@ -5,24 +5,22 @@
 #include <cstdio>
 #include <cmath>
 #include <cstring>   // std::memcpy
-#include "level_sources.h"
 #include "../asset_manager.h"   // 关卡 .lua 路径走资源索引单点查询
 
 // 诊断日志（定义见文件末尾）
 static void map_log_load(const char* source, int level);
 
-// 用编译期内嵌 ASCII 填充运行时碰撞/出生网格（前向声明；定义见下）
-
 // jtilemap 渲染资源根：贴图路径经 default_remap 剥掉 ../ 后拼在此前缀之后。
 // 与 adventure2d 的 adventure2d/ 用法一致，且和 resources.json 的 joy_topdown_template/... 同一套相对根。
 static constexpr const char* MAP_ASSET_BASE = "joy_topdown_template/";
-static void map_build_ascii_grid(int level);
 
 // ============================================================
-// 地图布局定义 —— 与 3D 共用手绘关卡（project_proxy3d/shared/systems/level_maps.h）
-// 每关 64×64 ASCII 网格，'#' 墙(碰撞)、'.' 地(可通行)、'P' 玩家出生、'E' 敌人生成。
-// 由 map_load_level 在游戏场景 on_load 时装入运行时网格 g_map_grid；
-// 服务端/客户端解析同一关卡 → 逐格一致，可作帧同步依据。
+// 关卡数据唯一来源：Tiled 地图 → 导出 levels/levelN.lua（路径见 resources.json 的 maps 段）。
+// 玩法网格 g_map_grid 由 map_load_from_tilemap 从 .lua 解析填充：
+//   墙 → "Collision" 对象层的矩形；出生点 → "Player"/"spawn" 对象层；
+//   敌人出生点 → "Enemy" 对象层（或 spawn 层里 type=="enemy" 的对象）。
+// 服务端/客户端解析同一文件 → 逐格一致，可作帧同步依据。
+// 注意：引擎只认 Tiled 的 Lua 导出（.lua），不解析 .tmx（那是编辑器源文件）。
 // ============================================================
 
 // C++11 兼容：
@@ -30,8 +28,9 @@ static void map_build_ascii_grid(int level);
 //  - 可变共享全局（MAP_W/MAP_H/g_map_grid/g_map_info）用「头文件 extern + map_def.cpp 定义」。
 extern int MAP_W;
 extern int MAP_H;
-constexpr int MAP_MAX_CELLS = 64 * 64;                      // 玩法网格/A* 上限，覆盖 64×64 网格
-constexpr int LEVEL_COUNT = LEVEL_SOURCES_COUNT;
+constexpr int MAP_MAX_CELLS = 64 * 64;                      // 玩法网格/A* 上限
+// 关卡总数：须与选关界面 LEVEL_META 条数、resources.json 的 maps 段（level1..levelN）一致。
+constexpr int LEVEL_COUNT = 8;
 
 // 地形类型枚举（渲染用；关卡网格仅含墙/地，树石水均为保留类型）
 enum MapTileType {
@@ -103,9 +102,22 @@ static jtilemap_object_layer_p map_find_collision_layer(jtilemap_p tm)
 // 探测给定路径的关卡 .lua 是否可读（单点路径；候选前缀遍历已由资源索引取代）
 static bool map_tm_probe_path(const char* path)
 {
-    FILE* f = std::fopen(path, "rb");
-    if (f) { std::fclose(f); return true; }
-    return false;
+        FILE* f = std::fopen(path, "rb");
+        if (f) { std::fclose(f); return true; }
+        return false;
+}
+
+// 本关是否"已制作"：resources.json 的 maps 段指向的 levelN.lua 是否存在。
+// 选关界面据此把缺图的关卡标为制作中并阻止进入（避免空图进游戏）。
+static inline bool level_map_available(int level)
+{
+        if (level < 1 || level > LEVEL_COUNT) return false;
+        char map_id[32];
+        snprintf(map_id, sizeof(map_id), "level%d", level);
+        AssetManager* am = AssetManager::GetInstance();
+        const char* rel = am ? am->GetResourcePath(AssetManager::kCatMaps, map_id) : nullptr;
+        if (!rel) return false;
+        return map_tm_probe_path(rel);
 }
 
 // 出生点解析上下文：对象坐标是 Tiled 像素（每瓦片 tw×th 像素），换算成玩法格子。
@@ -246,31 +258,10 @@ static inline void map_load_level(int level)
     g_map_info = {};                    // 清零（enemy_cells 归零）
     g_map_info.level = level;
 
-    // 首选：Tiled .lua 作为玩法+渲染唯一数据源（出生从 spawn 层，墙暂不解析）
+    // 唯一数据源：Tiled 导出的 levelN.lua。缺失/解析失败即视为"该关未制作"，
+    // 由选关界面（level_map_available）拦截并提示，不会带着空图进游戏。
     if (map_load_from_tilemap(level)) { map_log_load("tilemap", level); return; }
-
-    // 回退：编译期内嵌 ASCII（关卡 .lua 缺失/无出生点时的保底，保证可玩）
-    map_build_ascii_grid(level);
-    map_log_load("ascii", level);
-}
-
-// 用编译期内嵌 ASCII 填充运行时网格（回退路径；主路径见 map_load_from_tilemap）
-static void map_build_ascii_grid(int level)
-{
-    const char* src = LEVEL_SRCS[level - 1];
-    map_grid_clear(64, 64);   // ASCII 回退固定 64×64
-
-    int r = 0, c = 0;
-    for (const char* p = src; *p && r < MAP_H; ++p) {
-        char ch = *p;
-        if (ch == '\n') { r++; c = 0; continue; }
-        if (c >= MAP_W) { c++; continue; }   // 忽略行内多余字符（容错）
-        g_map_grid[r * MAP_W + c] = (ch == '#') ? '#' : '.';
-        if (ch == 'P') {
-            g_map_info.player_cell = r * MAP_W + c;
-        }
-        c++;
-    }
+    map_log_load("missing", level);
 }
 
 // 获取指定格子的地形字符（越界一律视为墙）

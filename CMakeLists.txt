@@ -116,7 +116,6 @@ set(PROJECT_FILES
     systems/input_consume_input_system.h
     systems/input_consume_join_system.h
     systems/input_consume_leave_system.h
-    systems/level_sources.h
     systems/map_def.h
     systems/map_spawn_system.h
     systems/melee_attack_system.h
@@ -229,6 +228,16 @@ else()
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ASSETS_ROOT}/${filename}" "${outname}"
         )
     endmacro()
+
+    # 关卡目录先清空再拷贝：copy_if_different 只增不删，若只靠下面的 foreach 拷贝，
+    # 从 assets 删掉的旧关卡(.lua)会留在运行目录变成"幽灵关卡"——游戏会当它已制作并加载
+    # （level_map_available 查的就是运行路径），导致选关页显示可进、进游戏却用到过期地图。
+    # 这里只清 levels/，不影响其他资产；随后 foreach 会立刻把现行 levelN.lua 拷回来。
+    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E remove_directory
+                "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/joy_topdown_template/levels"
+        COMMENT "Cleaning stale level maps in output dir"
+    )
 
     foreach(asset_file ${ASSET_FILES})
         message(STATUS "Copying asset: ${asset_file}")
