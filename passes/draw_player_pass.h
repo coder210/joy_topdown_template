@@ -19,6 +19,7 @@
 #include "../components/anim_state_component.h"
 #include "../asset_manager.h"
 #include "../protocol.h"
+#include "hpbar.h"
 
 struct Context;
 
@@ -350,91 +351,14 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         }
 }
 
-// ---------------- 玩家血条：水墨朱砂·胶囊细条 ----------------
-// 引擎 shape_draw_polygon 走 SDL_RenderGeometry，在逻辑呈现(LETTERBOX)下不渲染；
-// image_draw_ex 走 SDL_RenderTextureRotated（角色/武器都在用）可靠且支持旋转。
-// 故血条用 CPU 逐像素生成的胶囊纹理（抗锯齿圆角、两端半圆）+ 旋转绘制。
-// 轨道纹理固定（缓存一次）；填充纹理随 HP 换色/换长，每帧更新像素。
+// ---------------- 玩家血条：胶囊细条，填充色=角色贴图主色 ----------------
+// 实现见 passes/hpbar.h（玩家/敌人共用：胶囊纹理生成 + 旋转绘制）。
 static const int HPBAR_W   = 36;   // 内芯长（像素）
 static const int HPBAR_H   = 12;   // 内芯厚（像素）
 static const int HPBAR_PAD = 1;    // 外描边 1px
 
-static image_p s_hpbar_track = NULL;   // 轨道+描边（38×8）
-static image_p s_hpbar_fill  = NULL;   // 填充（36×6，流式，每帧更新）
-
-// 通用胶囊像素：在 buf(W×H, RGBA32) 画一条从 x=0 到 x=fillLen 的胶囊（两端半圆、1px 羽化）。
-static void hpbar_gen_capsule(uint8_t* buf, int W, int H, float fillLen,
-                              uint8_t R, uint8_t G, uint8_t B, uint8_t A)
-{
-        memset(buf, 0, (size_t)W * H * 4);
-        if (fillLen <= 0.0f) return;
-        if (fillLen > (float)W) fillLen = (float)W;
-        float cy = H * 0.5f;
-        float rad = H * 0.5f;
-        float x0 = rad, x1 = fillLen - rad;
-        if (x1 < x0) {                       // 太短：退化为圆帽
-                rad = fillLen * 0.5f;
-                if (rad < 0.5f) rad = 0.5f;
-                x0 = x1 = fillLen * 0.5f;
-        }
-        for (int y = 0; y < H; y++) {
-                for (int x = 0; x < W; x++) {
-                        float px = x + 0.5f, py = y + 0.5f;
-                        float dx = (px < x0) ? (x0 - px) : ((px > x1) ? (px - x1) : 0.0f);
-                        float dy = py - cy;
-                        float cov = rad - sqrtf(dx * dx + dy * dy) + 0.5f;   // 1px 抗锯齿
-                        if (cov <= 0.0f) continue;
-                        if (cov > 1.0f) cov = 1.0f;
-                        uint8_t* p = buf + ((size_t)y * W + x) * 4;
-                        p[0] = R; p[1] = G; p[2] = B;
-                        p[3] = (uint8_t)(A * cov);
-                }
-        }
-}
-
-// 轨道+描边：外 1px 深墨描边、内部半透明墨（同一墨色，靠 alpha 深浅区分）。
-static void hpbar_gen_track(uint8_t* buf, int W, int H)
-{
-        memset(buf, 0, (size_t)W * H * 4);
-        float cy = H * 0.5f;
-        float rOut = H * 0.5f;
-        float rIn  = rOut - (float)HPBAR_PAD;
-        float x0o = rOut, x1o = W - rOut;
-        for (int y = 0; y < H; y++) {
-                for (int x = 0; x < W; x++) {
-                        float px = x + 0.5f, py = y + 0.5f;
-                        float dx = (px < x0o) ? (x0o - px) : ((px > x1o) ? (px - x1o) : 0.0f);
-                        float dy = py - cy;
-                        float covO = rOut - sqrtf(dx * dx + dy * dy) + 0.5f;
-                        if (covO <= 0.0f) continue;
-                        if (covO > 1.0f) covO = 1.0f;
-                        float covI = rIn - sqrtf(dx * dx + dy * dy) + 0.5f;
-                        uint8_t* p = buf + ((size_t)y * W + x) * 4;
-                        p[0] = 40; p[1] = 40; p[2] = 45;
-                        if (covI >= 1.0f) p[3] = 120;                    // 内部：半透明墨
-                        else              p[3] = (uint8_t)(205.0f * covO); // 描边：更实
-                }
-        }
-}
-
-static void ensure_hpbar_textures(jr2d_p r2d)
-{
-        if (!s_hpbar_track) {
-                const int W = HPBAR_W + HPBAR_PAD * 2, H = HPBAR_H + HPBAR_PAD * 2;
-                s_hpbar_track = image_create_empty(r2d, W, H);
-                if (s_hpbar_track) {
-                        uint8_t buf[(HPBAR_W + 2) * (HPBAR_H + 2) * 4];
-                        hpbar_gen_track(buf, W, H);
-                        jrect_t r = { 0, 0, (float)W, (float)H };
-                        image_update(s_hpbar_track, &r, buf, W * 4);
-                        image_set_blend_mode(s_hpbar_track, JR2D_BLEND_BLEND);
-                }
-        }
-        if (!s_hpbar_fill) {
-                s_hpbar_fill = image_create_empty(r2d, HPBAR_W, HPBAR_H);
-                if (s_hpbar_fill) image_set_blend_mode(s_hpbar_fill, JR2D_BLEND_BLEND);
-        }
-}
+static image_p s_hpbar_track = NULL;   // 轨道+描边（38×14）
+static image_p s_hpbar_fill  = NULL;   // 填充（36×12，流式，每帧更新）
 
 static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
 {
@@ -553,7 +477,7 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                         float dx = cosf(rad), dy = sinf(rad);     // 瞄准方向（屏幕 y 向下：0=右,90=下）
                         float nx = -dy, ny = dx;                  // 右手法线侧（绕角色的右侧）
 
-                        // 水墨胶囊血条：内芯 36×6、外 1px 墨描边、间距 3。长轴=瞄准方向。
+                        // 水墨胶囊血条：内芯 36×12、外 1px 墨描边。长轴=瞄准方向。
                         const float barT = (float)HPBAR_H;   // 内芯厚
                         const float halfBody = 25.0f;        // 玩家精灵半高/半宽（显示约 50px）
                         const float gap      = 3.0f;         // 与玩家之间的间隔
@@ -561,36 +485,19 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                         float cx = sx + nx * off;            // 血条中心
                         float cy = sy + ny * off;
 
-                        ensure_hpbar_textures(ctx->r2d);
-
-                        // 填充色 = 角色主色：取自 CharacterDef.color（characters.json 按角色配置，
-                        // 值即该角色贴图的主体色，故血条与角色同色）。任何时候都用角色色，
-                        // 不随血量变色（只靠长度表达剩余血量）。
-                        const CharacterDef& cdef = g_characterCatalog.get(pc.char_id);
-                        uint8_t fr = (uint8_t)((cdef.color >> 16) & 0xFF);
-                        uint8_t fg = (uint8_t)((cdef.color >> 8)  & 0xFF);
-                        uint8_t fb = (uint8_t)( cdef.color        & 0xFF);
-
-                        // 填充纹理每帧按当前 HP 长度/颜色重绘（透明圆角胶囊）
-                        if (s_hpbar_fill) {
-                                uint8_t buf[HPBAR_W * HPBAR_H * 4];
-                                hpbar_gen_capsule(buf, HPBAR_W, HPBAR_H,
-                                                  (float)HPBAR_W * ratio, fr, fg, fb, 235);
-                                jrect_t r = { 0, 0, (float)HPBAR_W, (float)HPBAR_H };
-                                image_update(s_hpbar_fill, &r, buf, HPBAR_W * 4);
+                        if (hpbar_ensure(ctx->r2d, &s_hpbar_track, &s_hpbar_fill,
+                                         HPBAR_W, HPBAR_H, HPBAR_PAD)) {
+                                // 填充色 = 角色主色：取自 CharacterDef.color（characters.json 按角色
+                                // 配置，值即该角色贴图的主体色，故血条与角色同色）；任何时候都用角色色，
+                                // 不随血量变色（只靠长度表达剩余血量）。
+                                const CharacterDef& cdef = g_characterCatalog.get(pc.char_id);
+                                uint8_t fr = (uint8_t)((cdef.color >> 16) & 0xFF);
+                                uint8_t fg = (uint8_t)((cdef.color >> 8)  & 0xFF);
+                                uint8_t fb = (uint8_t)( cdef.color        & 0xFF);
+                                hpbar_draw(ctx->r2d, s_hpbar_track, s_hpbar_fill,
+                                           HPBAR_W, HPBAR_H, HPBAR_PAD, ratio,
+                                           cx, cy, rad, fr, fg, fb);
                         }
-
-                        // 1:1 绘制（纹理已是目标像素尺寸），绕中心旋转 rad（瞄准角）
-                        auto draw_bar = [&](image_p tex, float wpx, float hpx) {
-                                if (!tex) return;
-                                jrect_t src = { 0, 0, wpx, hpx };
-                                vec2_t pos = { cx, cy };
-                                vec2_t scl = { 1.0f, 1.0f };
-                                vec2_t org = { wpx * 0.5f, hpx * 0.5f };
-                                image_draw_ex(tex, &src, pos, rad, scl, org);
-                        };
-                        draw_bar(s_hpbar_track, (float)(HPBAR_W + HPBAR_PAD * 2), (float)(HPBAR_H + HPBAR_PAD * 2));
-                        draw_bar(s_hpbar_fill,  (float)HPBAR_W, (float)HPBAR_H);
                 }
         }
 }

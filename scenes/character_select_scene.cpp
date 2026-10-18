@@ -12,6 +12,8 @@
 
 // 角色卡片尺寸（与 Load 中创建一致）
 static const float CARD_W = 140.0f, CARD_H = 130.0f;
+// 卡片区左右留白
+static const float CARD_PAD = 12.0f;
 
 // 角色卡预览：画出角色站立图（取 idle 精灵表第 0 帧，横向等帧，帧宽 = 帧高 = 图高）。
 // 纯展示用途，不做动画、不参与帧同步。
@@ -36,6 +38,16 @@ static void draw_card_avatar(Context* ctx, const CharacterDef& cd, float cx, flo
     vec2_t scl = { s, s };
     vec2_t org = { ih * 0.5f, ih * 0.5f };
     image_draw_ex(img, &src, pos, 0.0f, scl, org);
+}
+
+// 按 scrollview 的当前偏移刷新所有卡片按钮位置（绘制与命中都基于按钮位置，故一并生效）
+void CharacterSelectScene::apply_card_scroll() {
+    if (!card_view) return;
+    const int n = (int)g_characterCatalog.size();
+    const float ox = scrollview_get_offset_x(card_view);
+    for (int i = 0; i < n && i < MAX_CHARACTERS; i++)
+        if (btn_cards[i])
+            button_set_position(btn_cards[i], card_base_x[i] + ox, card_base_y);
 }
 
 void CharacterSelectScene::draw_card(int i) {
@@ -114,21 +126,42 @@ void CharacterSelectScene::Load() {
     r2d_get_logical_presentation(ctx->r2d, &w, &h, NULL);
 
 
-    // 角色卡片（横向排列）：数量由 characters.json 决定
+    // 角色卡片（横向排列、可左右拖动滚动）：数量由 characters.json 决定。
+    // 总宽超出窗口时不再按窗口居中（cx0 会是负值、卡片溢出到屏幕外看不见），
+    // 改为左对齐 + 交给 scrollview 做横向滚动（视口比卡片区高一点，留给内置滚动条）。
     memset(self->btn_cards, 0, sizeof(self->btn_cards));
     const int n = (int)g_characterCatalog.size();
     const float cw = CARD_W, ch = CARD_H, gap = 14.0f;
-    const float cx0 = (w - (cw * n + gap * (n - 1))) / 2.0f;
-    const float cy = 74.0f;
+    self->card_view = scrollview_create(ctx->r2d,
+            0.0f, 0.0f, 1.0f, 1.0f);                       // 先用整屏占位，下面立刻改像素视口
+    if (self->card_view)
+        scrollview_set_view_px(self->card_view, 0.0f, self->card_base_y - 2.0f,
+                               (float)w, ch + 4.0f + 8.0f);
     for (int i = 0; i < n; i++) {
+        self->card_base_x[i] = CARD_PAD + i * (cw + gap);
         self->btn_cards[i] = button_create(ctx->r2d,
-                (cx0 + i * (cw + gap) + cw * 0.5f) / (float)w,
-                (cy + ch * 0.5f) / (float)h,
+                (self->card_base_x[i] + cw * 0.5f) / (float)w,
+                (self->card_base_y + ch * 0.5f) / (float)h,
                 cw / (float)w, ch / (float)h);
         UIStyle::applyPaperButton(self->btn_cards[i]);
-            }
+    }
+    // 内容总宽 = 卡片 + 间距 + 左右留白；交给 scrollview 夹紧
+    if (self->card_view)
+        scrollview_set_content(self->card_view,
+                cw * n + gap * (n - 1) + CARD_PAD * 2.0f, ch);
+
     self->selected = (ctx->selected_char_id >= 0 && ctx->selected_char_id < n)
         ? ctx->selected_char_id : 0;
+    // 初始滚动：保证当前选中卡完整可见（不在滚动范围外就不动）
+    if (n > 0 && self->card_view) {
+        const float left  = self->card_base_x[self->selected];
+        const float right = left + cw;
+        float ox = 0.0f;
+        if (left + ox < CARD_PAD)                    ox = CARD_PAD - left;
+        else if (right + ox > (float)w - CARD_PAD)   ox = ((float)w - CARD_PAD) - right;
+        scrollview_set_offset(self->card_view, ox, 0.0f);
+    }
+    self->apply_card_scroll();
 
     // 昵称输入框（标题下方、卡片上方）
     self->nickname_input = inputbox_create(ctx->r2d, 0.11458f, 0.11875f, 0.41667f, 0.075f, font24);
@@ -152,11 +185,17 @@ void CharacterSelectScene::Load() {
 
 void CharacterSelectScene::HandleUiEvent(const void* e) {
     auto* self = this;
+    // 先把事件交给滚动层：它返回 true 说明本次手势是"滚动"（拖拽中/滑动刚结束/滚轮），
+    // 此时不再派发给下方控件，避免"滑动一下"误触发选人/开始/返回。
+    if (self->card_view && scrollview_process_event(self->card_view, e)) return;
+
     jevent_callbacks_t cbs = {};
     cbs.on_process_event = [](const void* ev, void* arg) {
         CharacterSelectScene* self = (CharacterSelectScene*)arg;
         if (self->nickname_input) inputbox_process_event(self->nickname_input, ev);
     };
+    // 注：事件坐标是"窗口坐标"（按钮命中内部会转逻辑坐标）。
+    // 拖拽/滚轮判定已由 scrollview 在入口处过滤，这里只处理"点击"。
     cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
         (void)btn;
         CharacterSelectScene* self = (CharacterSelectScene*)arg;
@@ -222,7 +261,12 @@ void CharacterSelectScene::Render() {
     jtext_printx(r2d, font24, "昵称", (int)strlen("昵称"), lc, 15, 44);
     if (self->nickname_input) inputbox_draw(self->nickname_input);
 
+    // 卡片区：交给 scrollview 裁剪 + 画滚动条；卡片位置按当前偏移刷新后绘制。
+    // （保留模式控件存绝对位置，所以每帧按偏移 set_position；绘制与命中都基于它。）
+    self->apply_card_scroll();
+    if (self->card_view) scrollview_begin(self->card_view);
     for (int i = 0; i < (int)g_characterCatalog.size(); i++) draw_card(i);
+    if (self->card_view) scrollview_end(self->card_view);   // 恢复裁剪 + 内置滚动条
 
     if (self->btn_confirm) button_draw(self->btn_confirm);
     if (self->btn_back)    button_draw(self->btn_back);
@@ -232,6 +276,8 @@ void CharacterSelectScene::Destroy() {
     auto* self = this;
     for (int i = 0; i < MAX_CHARACTERS; i++)
         if (self->btn_cards[i]) button_destroy(self->btn_cards[i]);
+    if (self->card_view) scrollview_destroy(self->card_view);
+    self->card_view = NULL;
     if (self->nickname_input) inputbox_destroy(self->nickname_input);
     if (self->btn_confirm) button_destroy(self->btn_confirm);
     if (self->btn_back)    button_destroy(self->btn_back);
