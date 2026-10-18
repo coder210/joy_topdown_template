@@ -63,6 +63,13 @@ private:
         bool ensure() {
                 if (inited_) return dev_ != 0;
                 inited_ = true;                       // 只尝试一次，失败即全程静音
+#ifdef MOBILE_TOUCH
+                /* 安卓/iOS：在事件回调里首次打开"独立音频设备"会直接崩溃，
+                 * 表现为"点任何一个按钮程序就退出"（所有按钮点击都经过 ui_button_hit → play()）。
+                 * 移动端先全程静音，不影响其它功能；桌面行为完全不变。 */
+                log_info("[ui_sfx] disabled on mobile (MOBILE_TOUCH), muted");
+                return false;
+#endif
                 dev_ = audio_open_device();
                 if (!dev_) { log_info("[ui_sfx] audio device unavailable, muted"); return false; }
                 for (int i = 0; i < kCount; i++) {

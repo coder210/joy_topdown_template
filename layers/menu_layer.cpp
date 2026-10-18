@@ -76,10 +76,12 @@ void MenuLayer::HandleEvent(const void* ev)
                 (void)btn;
                 auto* self = (MenuLayer*)arg;
                 auto hit = [&](button_p b) { return ui_button_hit(b, x, y); };
-                if (self->btn_start && hit(self->btn_start))   MenuLayer::sendMenuEvent(MENU_EVENT_START);
-                if (self->btn_online && hit(self->btn_online))  MenuLayer::sendMenuEvent(MENU_EVENT_ONLINE);
-                if (self->btn_settings && hit(self->btn_settings)) MenuLayer::sendMenuEvent(MENU_EVENT_SETTINGS);
-                if (self->btn_exit && hit(self->btn_exit))     MenuLayer::sendMenuEvent(MENU_EVENT_EXIT);
+                // 必须互斥：若一次触摸同时命中多个按钮，连发会造成"点哪个都退出"
+                //（MENU_EVENT_EXIT 是最后一条，一旦也命中就退出程序）。
+                if      (self->btn_start    && hit(self->btn_start))    MenuLayer::sendMenuEvent(MENU_EVENT_START);
+                else if (self->btn_online   && hit(self->btn_online))   MenuLayer::sendMenuEvent(MENU_EVENT_ONLINE);
+                else if (self->btn_settings && hit(self->btn_settings)) MenuLayer::sendMenuEvent(MENU_EVENT_SETTINGS);
+                else if (self->btn_exit     && hit(self->btn_exit))     MenuLayer::sendMenuEvent(MENU_EVENT_EXIT);
         };
         cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
                 (void)x; (void)y; (void)btn;

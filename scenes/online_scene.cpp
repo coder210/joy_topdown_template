@@ -62,14 +62,11 @@ void OnlineScene::HandleUiEvent(const void* e) {
         (void)btn;
         OnlineScene* self = (OnlineScene*)arg;
         auto hit = [&](button_p b) { return ui_button_hit(b, x, y); };
-        if (self->btn_host && hit(self->btn_host))
-            push_user_event(ONLINE_EVENT, ONLINE_EVENT_HOST);
-        if (self->btn_client && hit(self->btn_client))
-            push_user_event(ONLINE_EVENT, ONLINE_EVENT_CLIENT);
-        if (self->btn_server && hit(self->btn_server))
-            push_user_event(ONLINE_EVENT, ONLINE_EVENT_SERVER);
-        if (self->btn_back && hit(self->btn_back))
-            push_user_event(ONLINE_EVENT, ONLINE_EVENT_BACK);
+        // 同 menu_layer：必须互斥，避免一次触摸同时命中多个按钮而连发事件
+        if      (self->btn_host   && hit(self->btn_host))   push_user_event(ONLINE_EVENT, ONLINE_EVENT_HOST);
+        else if (self->btn_client && hit(self->btn_client)) push_user_event(ONLINE_EVENT, ONLINE_EVENT_CLIENT);
+        else if (self->btn_server && hit(self->btn_server)) push_user_event(ONLINE_EVENT, ONLINE_EVENT_SERVER);
+        else if (self->btn_back   && hit(self->btn_back))   push_user_event(ONLINE_EVENT, ONLINE_EVENT_BACK);
     };
     cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
         (void)x; (void)y; (void)btn;
