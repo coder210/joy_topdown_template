@@ -91,14 +91,18 @@ void VictoryScene::Render() {
 
     // 标题（墨绿，水墨风）
     jcolor_t title_c = { 20, 120, 60, 255 };
-    jtext_printx(r2d, font28, "通  关", (int)strlen("通  关"), title_c, 192, 70);
+    // 坐标比例化（192/70 为设计稿 480x320 下的值）
+    jtext_printf(r2d, font28, "通  关", (int)strlen("通  关"), title_c,
+                 192.0f / 480.0f, 70.0f / 320.0f);
 
     char buf[128];
     jcolor_t sub_c = { 60, 60, 70, 255 };
     snprintf(buf, sizeof(buf), "第 %d 关的所有敌人已被肃清", ctx->selected_level);
-    jtext_printx(r2d, font24, buf, (int)strlen(buf), sub_c, 130, 132);
+    jtext_printf(r2d, font24, buf, (int)strlen(buf), sub_c,
+                 130.0f / 480.0f, 132.0f / 320.0f);
     jcolor_t tip_c = { 110, 110, 118, 255 };
-    jtext_printx(r2d, font24, "恭喜通关！", (int)strlen("恭喜通关！"), tip_c, 192, 168);
+    jtext_printf(r2d, font24, "恭喜通关！", (int)strlen("恭喜通关！"), tip_c,
+                 192.0f / 480.0f, 168.0f / 320.0f);
 
     if (self->btn_replay) button_draw(self->btn_replay);
     if (self->btn_menu)   button_draw(self->btn_menu);

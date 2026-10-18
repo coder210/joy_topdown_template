@@ -55,8 +55,11 @@ void SplashScene::Render() {
     // Logo（居中）
     image_p logo = self->logo;
     if (logo) {
-        jrect_t dest = { (w - 100) / 2.0f, 50, 100, 100 };
-        image_draw1(logo, NULL, &dest);
+        // 尺寸/位置比例化：100 与 50 均相对设计稿 480x320；
+        // 宽、高分别除以 480 / 320，保证缩放后仍是正方形
+        const float lw_f = 100.0f / 480.0f, lh_f = 100.0f / 320.0f;
+        image_draw1_f(r2d, logo, NULL,
+                      (1.0f - lw_f) * 0.5f, 50.0f / 320.0f, lw_f, lh_f);
     }
 
     // 游戏标题（Logo 下方，水平居中）。白底下用深色字保证可读。
@@ -64,7 +67,8 @@ void SplashScene::Render() {
     jcolor_t title_c = { 30, 30, 40, 255 };
     int tw = 0, th = 0;
     jtext_measurex(r2d, font, title, (int)strlen(title), title_c, &tw, &th);
-    jtext_printx(r2d, font, title, (int)strlen(title), title_c, (w - tw) / 2.0f, 170);
+    jtext_printf(r2d, font, title, (int)strlen(title), title_c,
+                 ((float)w - (float)tw) * 0.5f / (float)w, 170.0f / 320.0f);
 
     // 版权信息（底部居中）
     font_p font_small = AssetManager::GetInstance()->GetSimheiFont12();
@@ -73,7 +77,8 @@ void SplashScene::Render() {
         const char* dev = "Developed by 大懒虫工作室, 228407354@qq.com";
         int dw = 0, dh = 0;
         jtext_measurex(r2d, font_small, dev, (int)strlen(dev), ver_c, &dw, &dh);
-        jtext_printx(r2d, font_small, dev, (int)strlen(dev), ver_c, (w - dw) / 2.0f, h - 24);
+        jtext_printf(r2d, font_small, dev, (int)strlen(dev), ver_c,
+                     ((float)w - (float)dw) * 0.5f / (float)w, 1.0f - 24.0f / 320.0f);
     }
 }
 

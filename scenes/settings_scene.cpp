@@ -119,22 +119,24 @@ void SettingsScene::Render() {
 
     // 标题
     jcolor_t title_c = { 30, 30, 40, 255 };
-    jtext_printx(r2d, font28, "设置", (int)strlen("设置"), title_c, 216, 12);
+    // 以下坐标全部比例化（原值为设计稿 480x320 下的像素）
+    jtext_printf(r2d, font28, "设置", (int)strlen("设置"), title_c,
+                 216.0f / 480.0f, 12.0f / 320.0f);
 
     // 行标签
     jcolor_t label_c = { 50, 50, 60, 255 };
-    jtext_printx(r2d, font24, "服务器 IP", (int)strlen("服务器 IP"), label_c, 20, 52);
-    jtext_printx(r2d, font24, "端口", (int)strlen("端口"), label_c, 20, 92);
-    jtext_printx(r2d, font24, "音乐", (int)strlen("音乐"), label_c, 20, 132);
-    jtext_printx(r2d, font24, "音效", (int)strlen("音效"), label_c, 20, 172);
+    jtext_printf(r2d, font24, "服务器 IP", (int)strlen("服务器 IP"), label_c, 20.0f / 480.0f, 52.0f / 320.0f);
+    jtext_printf(r2d, font24, "端口", (int)strlen("端口"), label_c,       20.0f / 480.0f, 92.0f / 320.0f);
+    jtext_printf(r2d, font24, "音乐", (int)strlen("音乐"), label_c,       20.0f / 480.0f, 132.0f / 320.0f);
+    jtext_printf(r2d, font24, "音效", (int)strlen("音效"), label_c,       20.0f / 480.0f, 172.0f / 320.0f);
 
     // 音量百分比
     char pct[16];
     jcolor_t pct_c = { 50, 50, 60, 255 };
     snprintf(pct, sizeof(pct), "%d%%", (int)(slider_get_value(self->bgm_slider) * 100.0f));
-    jtext_printx(r2d, font24, pct, (int)strlen(pct), pct_c, 330, 132);
+    jtext_printf(r2d, font24, pct, (int)strlen(pct), pct_c, 330.0f / 480.0f, 132.0f / 320.0f);
     snprintf(pct, sizeof(pct), "%d%%", (int)(slider_get_value(self->sfx_slider) * 100.0f));
-    jtext_printx(r2d, font24, pct, (int)strlen(pct), pct_c, 330, 172);
+    jtext_printf(r2d, font24, pct, (int)strlen(pct), pct_c, 330.0f / 480.0f, 172.0f / 320.0f);
 
     // 控件（先画所有普通控件，下拉列表最后画以保证层级在最上层）
     if (self->ip_input) inputbox_draw(self->ip_input);

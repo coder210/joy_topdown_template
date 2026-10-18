@@ -98,7 +98,9 @@ void OnlineScene::Render() {
     int w, h;
     r2d_get_logical_presentation(r2d, &w, &h, NULL);
     jcolor_t c = { 200, 200, 210, 255 };
-    jtext_printx(r2d, font, text, len, c, (w - w_est) / 2.0f, 30);
+    // 水平居中（动态），垂直位置比例化：30/320
+    jtext_printf(r2d, font, text, len, c,
+                 ((float)w - (float)w_est) * 0.5f / (float)w, 30.0f / 320.0f);
     if (self->btn_host)   button_draw(self->btn_host);
     if (self->btn_client) button_draw(self->btn_client);
     if (self->btn_server) button_draw(self->btn_server);

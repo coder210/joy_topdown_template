@@ -24,5 +24,6 @@ static void draw_fps_pass(jr2d_p r2d, font_p font, float dt)
         }
 
         jcolor_t c = { 60, 60, 70, 235 };   // 深灰，适配白底背景
-        jtext_printx(r2d, font, text, (int)strlen(text), c, 8.0f, 6.0f);
+        jtext_printf(r2d, font, text, (int)strlen(text), c,
+                     8.0f / 480.0f, 6.0f / 320.0f);
 }

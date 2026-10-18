@@ -26,9 +26,9 @@ static void draw_map_pass(Context* ctx)
 
     // 地面底色：先整屏铺纯白（可通行区域）。地图 Background 层的空瓦片(GID=0)处
     // 即为透明，透出的就是这层颜色，故它是玩家看到的"背景"主色。
+    // 用比例接口铺满整屏（0,0,1,1），不写死 480x320 —— 逻辑分辨率改变时自动适配。
     r2d_set_color(ctx->r2d, 255, 255, 255, 255);
-    jrect_t floor = { 0, 0, 480.0f, 320.0f };
-    shape_draw_rectangle(ctx->r2d, "fill", floor);
+    shape_draw_rectangle_f(ctx->r2d, "fill", 0.0f, 0.0f, 1.0f, 1.0f);
 
     // 首选：Tiled 瓦片渲染（关卡 .lua 带 tileset 时按 GID 贴图绘制）
     // 每格画布像素强制为 1 米(=50px)，与实体/相机/碰撞网格精确对齐；相机传画布像素。
@@ -43,19 +43,23 @@ static void draw_map_pass(Context* ctx)
     }
 
     // 地形瓦片：遍历 64×64 网格逐格贴图集；仅绘制落在可视画布内的格子
-    //（屏幕 480×320、每格 50px ⇒ 约 70 次绘制，开销可忽略）
+    //（画布尺寸按逻辑分辨率换算，每格 50px ⇒ 百来次绘制，开销可忽略）
     image_p atlas = AssetManager::GetInstance()
         ? AssetManager::GetInstance()->GetImage(ctx->r2d, kTerrainAtlasPath) : NULL;
     const float cell   = meters_to_pixels(1.0f);
     const float kScale = cell / (float)TILE_ATLAS_BLK;   // 64px 图块 → 每格画布像素
 
+    // 画布尺寸（像素）：由比例 1.0 换算得到，不写死，供下面的屏幕外剔除使用
+    float canvas_w = 0.0f, canvas_h = 0.0f;
+    r2d_fpx(ctx->r2d, 1.0f, 1.0f, 0.0f, 0.0f, &canvas_w, &canvas_h, NULL, NULL);
+
     for (int y = 0; y < MAP_H; y++) {
         for (int x = 0; x < MAP_W; x++) {
             float wx = meters_to_pixels((float)x) - cx;   // 格左上角（画布像素）
             float wy = meters_to_pixels((float)y) - cy;
-            // 屏幕外快速剔除
-            if (wx + cell < 0.0f || wx > 480.0f) continue;
-            if (wy + cell < 0.0f || wy > 320.0f) continue;
+            // 屏幕外快速剔除（边界由逻辑分辨率换算，不写死）
+            if (wx + cell < 0.0f || wx > canvas_w) continue;
+            if (wy + cell < 0.0f || wy > canvas_h) continue;
 
             int type = map_tile_at(x, y);
             if (atlas) {

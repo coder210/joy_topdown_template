@@ -275,7 +275,9 @@ void LevelSelectScene::Render() {
 
     // 标题
     jcolor_t tc = { 60, 60, 70, 255 };
-    jtext_printx(r2d, font24, "选择关卡", (int)strlen("选择关卡"), tc, 190, 20);
+    // 坐标比例化（190/20 为设计稿 480x320 下的值）
+    jtext_printf(r2d, font24, "选择关卡", (int)strlen("选择关卡"), tc,
+                 190.0f / 480.0f, 20.0f / 320.0f);
 
     // 当前角色提示
     char chBuf[64];
@@ -283,7 +285,8 @@ void LevelSelectScene::Render() {
              g_characterCatalog.get(self->ctx()->selected_char_id).name.c_str());
     jcolor_t lc = { 110, 110, 118, 255 };
     font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
-    jtext_printx(r2d, font12, chBuf, (int)strlen(chBuf), lc, 180, 52);
+    jtext_printf(r2d, font12, chBuf, (int)strlen(chBuf), lc,
+                 180.0f / 480.0f, 52.0f / 320.0f);
 
     // 关卡列表：交给 scrollview 裁剪 + 画滚动条；位置按当前偏移刷新后绘制
     self->apply_level_scroll();

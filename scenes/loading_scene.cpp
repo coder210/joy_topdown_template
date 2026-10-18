@@ -58,7 +58,9 @@ void LoadingScene::Render() {
     else if (dot_count == 1) snprintf(text, sizeof(text), "加载中.");
     else if (dot_count == 2) snprintf(text, sizeof(text), "加载中..");
     else snprintf(text, sizeof(text), "加载中...");
-    jtext_printx(r2d, font, text, (int)strlen(text), c, (w - 120) / 2.0f, h / 2.0f - 12);
+    // 水平按 120(设计稿宽度)居中、垂直居中后上移 12 —— 全部比例化
+    jtext_printf(r2d, font, text, (int)strlen(text), c,
+                 (1.0f - 120.0f / 480.0f) * 0.5f, 0.5f - 12.0f / 320.0f);
 }
 
 void LoadingScene::Destroy() {

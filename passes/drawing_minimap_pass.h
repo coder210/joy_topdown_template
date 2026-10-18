@@ -22,12 +22,18 @@ static void drawing_minimap_pass(Context* ctx)
 {
     if (!ctx->r2d) return;
 
+    // 小地图尺寸与边距按比例表达（128px / 8px 是相对 480x320 设计稿的值），
+    // 再由 r2d_fpx 换算成当前逻辑像素 —— 逻辑分辨率改变时自动等比缩放，无需改常量。
+    float mm_size = 0.0f, margin_x = 0.0f, margin_y = 0.0f, canvas_w = 0.0f;
+    r2d_fpx(ctx->r2d, 128.0f / 480.0f, 0.0f,          0.0f, 0.0f, &mm_size,  NULL,      NULL, NULL);
+    r2d_fpx(ctx->r2d, 8.0f / 480.0f,   8.0f / 320.0f, 0.0f, 0.0f, &margin_x, &margin_y, NULL, NULL);
+    r2d_fpx(ctx->r2d, 1.0f,            0.0f,          0.0f, 0.0f, &canvas_w, NULL,      NULL, NULL);
+
     // 视口按地图宽高比适配（MAP_W/MAP_H 已随 tilemap 动态更新），非方形地图不拉伸。
-    const float mm_size = 128.0f;
     float mm_w = mm_size, mm_h = mm_size;
     if (MAP_W > MAP_H)      { mm_w = mm_size; mm_h = mm_size * (float)MAP_H / (float)MAP_W; }
     else if (MAP_H > MAP_W) { mm_h = mm_size; mm_w = mm_size * (float)MAP_W / (float)MAP_H; }
-    const float mm_x = 480.0f - mm_w - 8.0f, mm_y = 8.0f;
+    const float mm_x = canvas_w - mm_w - margin_x, mm_y = margin_y;
 
     // 本地玩家位置与朝向；无本地玩家(服务端/观战)则揭示全图
     float ppx = 0.0f, ppy = 0.0f;

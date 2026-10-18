@@ -80,7 +80,9 @@ void MainScene::Render() {
     jcolor_t tc = { 35, 35, 48, (uint8_t)(pulse * 255.0f) };
     int tw = 0, th = 0;
     jtext_measurex(r2d, font, title, title_len, tc, &tw, &th);
-    jtext_printx(r2d, font, title, title_len, tc, (w - tw) / 2.0f, 22.0f);
+    // 位置比例化：22/320 是相对设计稿 480x320 的顶部留白，逻辑分辨率改变时自动适配
+    jtext_printf(r2d, font, title, title_len, tc,
+                 ((float)w - (float)tw) * 0.5f / (float)w, 22.0f / 320.0f);
 
     // 版本号（底部居中）
     font_p font_small = AssetManager::GetInstance()->GetSimheiFont12();
@@ -89,7 +91,8 @@ void MainScene::Render() {
         jcolor_t vc = { 90, 90, 100, 255 };
         int vw = 0, vh = 0;
         jtext_measurex(r2d, font_small, ver, (int)strlen(ver), vc, &vw, &vh);
-        jtext_printx(r2d, font_small, ver, (int)strlen(ver), vc, (w - vw) / 2.0f, h - 20);
+        jtext_printf(r2d, font_small, ver, (int)strlen(ver), vc,
+                     ((float)w - (float)vw) * 0.5f / (float)w, 1.0f - 20.0f / 320.0f);
     }
     // 渲染菜单层（按钮/标题等）：纯 button 层直接绘制
     if (this->menu) this->menu->Render();

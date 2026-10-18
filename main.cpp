@@ -103,7 +103,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
         AssetManager::Init();
 
-        ctx->window = create_window("Joy Topdown", 480, 320);
+        // 初始窗口放大到 960x640（2 倍，仍保持 3:2）。
+        // 逻辑分辨率保持 480x320 不变 —— letterbox 会把 480x320 的画面等比放大到窗口，
+        // 因此所有像素常量、字号、按钮布局都不受影响（改逻辑分辨率才会导致错位）。
+        ctx->window = create_window("Joy Topdown", 960, 640);
         ctx->r2d = r2d_create(ctx->window);
         // 优化：letterbox 等比适配，避免拉伸变形（对齐 joy_side_template）
         r2d_set_logical_presentation_mode(ctx->r2d, 480, 320, JOY_LOGICAL_PRESENTATION_LETTERBOX);

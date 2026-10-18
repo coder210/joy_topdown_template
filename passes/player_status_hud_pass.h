@@ -65,9 +65,10 @@ static void player_status_hud_pass(entt::registry& ecs, uint32_t local_conv,
         }
 
         jcolor_t c = { 40, 40, 45, 235 };
-        r2d_set_scale(r2d, 0.5f, 0.5f);
-        jtext_printx(r2d, font, buf, (int)strlen(buf), c, 16.0f, 64.0f);
-        r2d_set_scale(r2d, 1.0f, 1.0f);
+        // 原实现：r2d_set_scale(0.5) + 坐标 (16,64) ⇒ 实际落在 (8,32)、字号减半。
+        // 改用 *_scaled 只缩放本次文字，不再改动全局渲染缩放（否则会冲掉外部设置）。
+        jtext_printf_scaled(r2d, font, buf, (int)strlen(buf), c,
+                            8.0f / 480.0f, 32.0f / 320.0f, 0.5f);
 }
 
 #endif

@@ -254,11 +254,14 @@ void CharacterSelectScene::Render() {
 
     // 标题（墨色）
     jcolor_t tc = { 60, 60, 70, 255 };
-    jtext_printx(r2d, font24, "选择角色", (int)strlen("选择角色"), tc, 190, 10);
+    // 坐标比例化（190/10 为设计稿 480x320 下的值）
+    jtext_printf(r2d, font24, "选择角色", (int)strlen("选择角色"), tc,
+                 190.0f / 480.0f, 10.0f / 320.0f);
 
     // 昵称标签
     jcolor_t lc = { 50, 50, 60, 255 };
-    jtext_printx(r2d, font24, "昵称", (int)strlen("昵称"), lc, 15, 44);
+    jtext_printf(r2d, font24, "昵称", (int)strlen("昵称"), lc,
+                 15.0f / 480.0f, 44.0f / 320.0f);
     if (self->nickname_input) inputbox_draw(self->nickname_input);
 
     // 卡片区：交给 scrollview 裁剪 + 画滚动条；卡片位置按当前偏移刷新后绘制。
