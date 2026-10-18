@@ -98,8 +98,11 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
         if (!isDpad && m->label && m->label[0]) {
                 font_p f = AssetManager::GetInstance()->GetSimheiFont24();
                 jcolor_t tc = { 20, 20, 25, 255 };
+                // 偏移按设计稿 480x320 换算（原来是固定 12px，分辨率一改会偏）
+                float ox = 0.0f, oy = 0.0f;
+                r2d_fpx(r2d, 12.0f / 480.0f, 12.0f / 320.0f, 0.0f, 0.0f, &ox, &oy, NULL, NULL);
                 jtext_printx(r2d, f, m->label, (int)strlen(m->label), tc,
-                        cx - 12.0f, cy - 12.0f);
+                        cx - ox, cy - oy);
         }
 
         // 冷却环：比最外轮廓略大一圈（深墨）

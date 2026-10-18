@@ -41,7 +41,11 @@ void LevelSelectScene::draw_level(int i) {
     button_p btn = btn_levels[i];
     if (!btn) return;
     vec2_t p = button_get_position(btn);
-    float x = p.x, y = p.y, w = LEVEL_W, h = LEVEL_H;
+    // 卡片尺寸与文字偏移按设计稿 480x320 换算（LEVEL_W/H 是设计稿像素，直接用会偏小）
+    float lwp = 0.0f;
+    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float s = lwp / 480.0f;
+    float x = p.x, y = p.y, w = LEVEL_W * s, h = LEVEL_H * s;
     bool sel = (i == selected);
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
     font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
@@ -65,11 +69,11 @@ void LevelSelectScene::draw_level(int i) {
                     : sel    ? jcolor_t{ 255, 255, 255, 255 }
                              : jcolor_t{ 40, 40, 45, 255 };
     snprintf(buf, sizeof(buf), "第 %d 关 · %s", i + 1, LEVEL_META[i].name);
-    jtext_printx(r2d, font24, buf, (int)strlen(buf), name_c, x + 14.0f, y + 5.0f);
+    jtext_printx(r2d, font24, buf, (int)strlen(buf), name_c, x + 14.0f * s, y + 5.0f * s);
     jcolor_t desc_c = !ready ? jcolor_t{ 168, 168, 174, 255 }
                     : sel    ? jcolor_t{ 220, 220, 226, 255 }
                              : jcolor_t{ 110, 110, 118, 255 };
-    jtext_printx(r2d, font12, LEVEL_META[i].desc, (int)strlen(LEVEL_META[i].desc), desc_c, x + 14.0f, y + 26.0f);
+    jtext_printx(r2d, font12, LEVEL_META[i].desc, (int)strlen(LEVEL_META[i].desc), desc_c, x + 14.0f * s, y + 26.0f * s);
 
     // 未制作标记：朱砂红"制作中"贴在卡片右侧
     if (!ready) {
@@ -79,7 +83,7 @@ void LevelSelectScene::draw_level(int i) {
             if ((*p & 0xC0) != 0x80) bc++;
         jcolor_t badge_c = { 200, 60, 50, 255 };
         jtext_printx(r2d, font12, badge, (int)strlen(badge), badge_c,
-                     x + w - 12.0f - bc * 12.0f, y + 6.0f);
+                     x + w - 12.0f * s - bc * 12.0f * s, y + 6.0f * s);
     }
 }
 
@@ -87,10 +91,14 @@ void LevelSelectScene::draw_level(int i) {
 void LevelSelectScene::apply_level_scroll() {
     if (!level_view) return;
     const float oy = scrollview_get_offset_y(level_view);
-    const float bx = 40.0f;   // 与 Load 中一致
+    // button_set_position 收逻辑像素：bx / level_base_y 是设计稿坐标，按同一系数换算
+    float lwp = 0.0f;
+    r2d_fpx(this->ctx()->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float s = lwp / 480.0f;
+    const float bx = 40.0f * s;   // 与 Load 中一致
     for (int i = 0; i < LEVEL_META_COUNT && i < LEVEL_SLOT_MAX; i++)
         if (btn_levels[i])
-            button_set_position(btn_levels[i], bx, level_base_y[i] + oy);
+            button_set_position(btn_levels[i], bx, level_base_y[i] * s + oy);
 }
 
 // 画"此关正在制作中"模态提示：半透明遮罩 + 居中的宣纸底提示框
@@ -107,8 +115,11 @@ void LevelSelectScene::draw_tip() {
     r2d_set_color(r2d, 20, 20, 26, 120);
     shape_draw_rectangle(r2d, "fill", jrect_t{ 0, 0, (float)w, (float)h });
 
-    // 提示框
-    const float bw = 230.0f, bh = 86.0f;
+    // 提示框（尺寸按设计稿 480x320 换算）
+    float lwp = 0.0f;
+    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float s = lwp / 480.0f;
+    const float bw = 230.0f * s, bh = 86.0f * s;
     const float bx = ((float)w - bw) * 0.5f;
     const float by = ((float)h - bh) * 0.5f;
     r2d_set_color(r2d, 248, 246, 240, 255);
@@ -123,7 +134,7 @@ void LevelSelectScene::draw_tip() {
         if ((*p & 0xC0) != 0x80) tc_n++;
     jcolor_t title_c = { 200, 60, 50, 255 };
     jtext_printx(r2d, font24, title, (int)strlen(title), title_c,
-                 bx + (bw - tc_n * 24.0f) * 0.5f, by + 22.0f);
+                 bx + (bw - tc_n * 24.0f * s) * 0.5f, by + 22.0f * s);
 
     const char* sub = "请改选其他关卡，或稍后再来";
     int sc_n = 0;
@@ -131,7 +142,7 @@ void LevelSelectScene::draw_tip() {
         if ((*p & 0xC0) != 0x80) sc_n++;
     jcolor_t sub_c = { 110, 110, 118, 255 };
     jtext_printx(r2d, font12, sub, (int)strlen(sub), sub_c,
-                 bx + (bw - sc_n * 12.0f) * 0.5f, by + 56.0f);
+                 bx + (bw - sc_n * 12.0f * s) * 0.5f, by + 56.0f * s);
 }
 
 LevelSelectScene::LevelSelectScene(Context* ctx, GameModeKind mode) : Scene(ctx, "LevelSelect") {
@@ -166,13 +177,18 @@ void LevelSelectScene::Load() {
 
     // 关卡按钮：左侧竖列，确认/返回移右侧竖排，避免纵向重叠。
     // 列表交给 scrollview 做纵向滚动（关卡多到超出视口时可上下拖动；当前 5 关放得下则不滚动）。
-    const float bx = 40.0f;
+    // scrollview 的 *_px 接口收逻辑像素，按设计稿 480x320 换算
+    float lwp = 0.0f;
+    r2d_fpx(ctx->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float s = lwp / 480.0f;
+    const float bx = 40.0f * s;
     self->level_view = scrollview_create(ctx->r2d, 0.0f, 0.0f, 1.0f, 1.0f);  // 先占位，下面改像素视口
     if (self->level_view) {
         // 视口：标题/角色提示之下到屏幕底部；确认/返回在右侧竖排，不占视口宽度
-        scrollview_set_view_px(self->level_view, bx, 68.0f, LEVEL_W, 320.0f - 68.0f - 8.0f);
-        scrollview_set_content(self->level_view, LEVEL_W,
-                LEVEL_META_COUNT * 48.0f - (48.0f - LEVEL_H));
+        scrollview_set_view_px(self->level_view, bx, 68.0f * s, LEVEL_W * s,
+                (320.0f - 68.0f - 8.0f) * s);
+        scrollview_set_content(self->level_view, LEVEL_W * s,
+                (LEVEL_META_COUNT * 48.0f - (48.0f - LEVEL_H)) * s);
     }
     for (int i = 0; i < LEVEL_META_COUNT; i++) {
         self->level_base_y[i] = 74.0f + (float)i * 48.0f;

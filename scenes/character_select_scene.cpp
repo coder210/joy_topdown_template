@@ -33,7 +33,10 @@ static void draw_card_avatar(Context* ctx, const CharacterDef& cd, float cx, flo
     if (!image_get_size(img, &iw, &ih) || ih <= 0.0f) return;
 
     jrect_t src = { 0.0f, 0.0f, ih, ih };        // 第 0 帧
-    const float s = 40.0f / ih;                   // 统一缩放到 40px 高
+    // 统一缩放到"设计稿 40px"高：按逻辑分辨率换算，分辨率变大时预览同步放大
+    float lwp = 0.0f;
+    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float s = (40.0f * (lwp / 480.0f)) / ih;
     vec2_t pos = { cx, cy };
     vec2_t scl = { s, s };
     vec2_t org = { ih * 0.5f, ih * 0.5f };
@@ -45,9 +48,13 @@ void CharacterSelectScene::apply_card_scroll() {
     if (!card_view) return;
     const int n = (int)g_characterCatalog.size();
     const float ox = scrollview_get_offset_x(card_view);
+    // button_set_position 收逻辑像素：card_base_y 是设计稿值，按同一系数换算
+    float lwp = 0.0f;
+    r2d_fpx(this->ctx()->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float s = lwp / 480.0f;
     for (int i = 0; i < n && i < MAX_CHARACTERS; i++)
         if (btn_cards[i])
-            button_set_position(btn_cards[i], card_base_x[i] + ox, card_base_y);
+            button_set_position(btn_cards[i], card_base_x[i] + ox, card_base_y * s);
 }
 
 void CharacterSelectScene::draw_card(int i) {
@@ -57,7 +64,11 @@ void CharacterSelectScene::draw_card(int i) {
     button_p btn = btn_cards[i];
     if (!btn) return;
     vec2_t p = button_get_position(btn);
-    float x = p.x, y = p.y, w = CARD_W, h = CARD_H;
+    // 卡片尺寸与内部偏移按设计稿 480x320 换算（CARD_W/H 是设计稿像素，直接用会偏小）
+    float lwp = 0.0f;
+    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float s = lwp / 480.0f;
+    float x = p.x, y = p.y, w = CARD_W * s, h = CARD_H * s;
     bool sel = (i == selected);
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
     font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
@@ -74,26 +85,26 @@ void CharacterSelectScene::draw_card(int i) {
     shape_draw_rectangle(r2d, "line", b);
 
     // 预览：角色站立图（画在文字之前，文字压在上层保证可读）
-    draw_card_avatar(ctx, cd, x + 103.0f, y + 68.0f);
+    draw_card_avatar(ctx, cd, x + 103.0f * s, y + 68.0f * s);
 
     // 角色名（墨色，选中白字）
     jcolor_t name_c = sel ? jcolor_t{ 255, 255, 255, 255 } : jcolor_t{ 40, 40, 45, 255 };
     int nl = (int)cd.name.size();
-    int nw = nl * 12;
-    jtext_printx(r2d, font24, cd.name.c_str(), nl, name_c, x + (w - nw) / 2.0f, y + 10.0f);
+    float nw = (float)nl * 12.0f * s;
+    jtext_printx(r2d, font24, cd.name.c_str(), nl, name_c, x + (w - nw) / 2.0f, y + 10.0f * s);
 
     // 属性（小号）：字段全部来自 characters.json
     jcolor_t attr_c = sel ? jcolor_t{ 245, 245, 245, 255 } : jcolor_t{ 90, 90, 98, 255 };
     char buf[64];
     snprintf(buf, sizeof(buf), "血量 %d", cd.max_hp);
-    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 44.0f);
+    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f * s, y + 44.0f * s);
     snprintf(buf, sizeof(buf), "移速 %.1f m/s", fp_to_float(cd.move_speed));
-    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 62.0f);
+    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f * s, y + 62.0f * s);
     const WeaponDef* wd = cd.weapon.empty() ? nullptr : g_weaponCatalog.findByName(cd.weapon.c_str());
     snprintf(buf, sizeof(buf), "武器 %s", wd ? wd->name.c_str() : "空手");
-    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 80.0f);
+    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f * s, y + 80.0f * s);
     snprintf(buf, sizeof(buf), "%s", cd.key.c_str());
-    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f, y + 98.0f);
+    jtext_printx(r2d, font12, buf, (int)strlen(buf), attr_c, x + 12.0f * s, y + 98.0f * s);
 }
 
 void CharacterSelectScene::go_to_level() {
@@ -131,24 +142,30 @@ void CharacterSelectScene::Load() {
     // 改为左对齐 + 交给 scrollview 做横向滚动（视口比卡片区高一点，留给内置滚动条）。
     memset(self->btn_cards, 0, sizeof(self->btn_cards));
     const int n = (int)g_characterCatalog.size();
-    const float cw = CARD_W, ch = CARD_H, gap = 14.0f;
+    // 卡片尺寸/间距/留白按设计稿 480x320 换算（scrollview 的 *_px 收的是逻辑像素）
+    float lwp = 0.0f;
+    r2d_fpx(ctx->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
+    const float fs = lwp / 480.0f;
+    const float cw = CARD_W * fs, ch = CARD_H * fs, gap = 14.0f * fs;
+    const float pad = CARD_PAD * fs;
+    const float cby = self->card_base_y * fs;
     self->card_view = scrollview_create(ctx->r2d,
             0.0f, 0.0f, 1.0f, 1.0f);                       // 先用整屏占位，下面立刻改像素视口
     if (self->card_view)
-        scrollview_set_view_px(self->card_view, 0.0f, self->card_base_y - 2.0f,
-                               (float)w, ch + 4.0f + 8.0f);
+        scrollview_set_view_px(self->card_view, 0.0f, cby - 2.0f * fs,
+                               (float)w, ch + 4.0f * fs + 8.0f * fs);
     for (int i = 0; i < n; i++) {
-        self->card_base_x[i] = CARD_PAD + i * (cw + gap);
+        self->card_base_x[i] = pad + i * (cw + gap);
         self->btn_cards[i] = button_create(ctx->r2d,
                 (self->card_base_x[i] + cw * 0.5f) / (float)w,
-                (self->card_base_y + ch * 0.5f) / (float)h,
+                (cby + ch * 0.5f) / (float)h,
                 cw / (float)w, ch / (float)h);
         UIStyle::applyPaperButton(self->btn_cards[i]);
     }
     // 内容总宽 = 卡片 + 间距 + 左右留白；交给 scrollview 夹紧
     if (self->card_view)
         scrollview_set_content(self->card_view,
-                cw * n + gap * (n - 1) + CARD_PAD * 2.0f, ch);
+                cw * n + gap * (n - 1) + pad * 2.0f, ch);
 
     self->selected = (ctx->selected_char_id >= 0 && ctx->selected_char_id < n)
         ? ctx->selected_char_id : 0;
@@ -157,8 +174,8 @@ void CharacterSelectScene::Load() {
         const float left  = self->card_base_x[self->selected];
         const float right = left + cw;
         float ox = 0.0f;
-        if (left + ox < CARD_PAD)                    ox = CARD_PAD - left;
-        else if (right + ox > (float)w - CARD_PAD)   ox = ((float)w - CARD_PAD) - right;
+        if (left + ox < pad)                    ox = pad - left;
+        else if (right + ox > (float)w - pad)   ox = ((float)w - pad) - right;
         scrollview_set_offset(self->card_view, ox, 0.0f);
     }
     self->apply_card_scroll();
