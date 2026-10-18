@@ -22,7 +22,7 @@ constexpr int ENEMY_SPAWN_COUNT = 256;   // 出生表容量上限（C++11 conste
 // 场景内维持的存活敌人数（可配置：想保持几个就改这里）。
 // 初始生成与每 tick 补充都以该值为目标；实际数量受地图 Enemy 层出生点数约束，
 // 出生点不足时以出生点数为上限。
-constexpr int MAINTAIN_ENEMY_COUNT = 2;
+constexpr int MAINTAIN_ENEMY_COUNT = 10;
 
 static inline const SpawnDef* level_enemy_defs(int level, int& count)
 {

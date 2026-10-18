@@ -43,6 +43,9 @@ static void player_death_system(entt::registry& registry, Context* ctx, float /*
                 auto& rect = registry.get<LogicRectComponent>(e);
                 pos.x = fp_sub(sp.x, fp_mul(rect.width, fp_half()));
                 pos.y = fp_sub(sp.y, fp_mul(rect.height, fp_half()));
+                // 重置上一帧位置 = 当前（出生点），避免插值把"墓地 → 出生点"当成一段移动滑过去
+                pos.prev_x = pos.x;
+                pos.prev_y = pos.y;
                 // 清重生前残留输入/动作状态：
                 // 防"死亡时按着方向键/出招中，重生瞬间自动冲出或摆出攻击姿势"
                 if (registry.all_of<PlayerStateInput>(e))

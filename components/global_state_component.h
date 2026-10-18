@@ -12,6 +12,11 @@ struct GlobalState {
     // 实际逻辑帧率（每秒统计一次，仅用于调试显示）
     int logic_fps = 0;
 
+    // 渲染插值系数（0..1）：渲染帧距"上一逻辑帧结束"的时间占一个固定步长的比例。
+    // 由 GameScene::Update 在累加器更新后写入；interpolate_pass 用它做 上一帧→当前帧 的线性插值，
+    // 把 20Hz 逻辑步进补成 60Hz 平滑移动（玩家/敌人/相机一并受益）。
+    float render_alpha = 0.0f;
+
     // 摄像机
     vec2_t camera_position = { 0.0f, 0.0f };
     int camera_follow_conv = -1;  // 要跟随的玩家 conv，-1 表示不跟随
