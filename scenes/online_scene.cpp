@@ -14,9 +14,12 @@ void OnlineScene::Load() {
     r2d_get_logical_presentation(ctx->r2d, &w, &h, NULL);
     font_p font = AssetManager::GetInstance()->GetSimheiFont24();
 
-    int btn_w = 120, btn_h = 50, gap = 20;
-    int btn_x = (w - btn_w) / 2;
-    int start_y = (h - btn_h * 4 - gap * 3) / 2;
+    // 按钮尺寸/间距按设计稿 480x320 换算：原来是直接用 120/50/20 这些设计稿像素，
+    // 再除以"当前" w/h —— 逻辑分辨率提高后分数被稀释，按钮会变小且偏移。
+    const float sx = (float)w / 480.0f, sy = (float)h / 320.0f;
+    float btn_w = 120.0f * sx, btn_h = 50.0f * sy, gap = 20.0f * sy;
+    float btn_x = ((float)w - btn_w) * 0.5f;
+    float start_y = ((float)h - btn_h * 4.0f - gap * 3.0f) * 0.5f;
 
     // 四个按钮：直接创建并设置位置（不再依赖 joy 的 scene_node 树；渲染在 Render() 中手动完成）
     self->btn_host = button_create(ctx->r2d,
@@ -24,7 +27,7 @@ void OnlineScene::Load() {
                 ((float)start_y + (float)btn_h * 0.5f) / (float)h,
                 (float)btn_w / (float)w, (float)btn_h / (float)h);
     UIStyle::applyOnlineButton(self->btn_host);
-    button_set_text_offset(self->btn_host, 0, 3.0f);
+    button_set_text_offset(self->btn_host, 0, 3.0f * sy);
     button_set_textx(self->btn_host, font, "房主", (int)strlen("房主"), { 0, 0, 0, 255 });
     
     self->btn_client = button_create(ctx->r2d,
@@ -32,7 +35,7 @@ void OnlineScene::Load() {
                 ((float)(start_y + (btn_h + gap)) + (float)btn_h * 0.5f) / (float)h,
                 (float)btn_w / (float)w, (float)btn_h / (float)h);
     UIStyle::applyOnlineButton(self->btn_client);
-    button_set_text_offset(self->btn_client, 0, 3.0f);
+    button_set_text_offset(self->btn_client, 0, 3.0f * sy);
     button_set_textx(self->btn_client, font, "客户端", (int)strlen("客户端"), { 0, 0, 0, 255 });
     
     self->btn_server = button_create(ctx->r2d,
@@ -40,7 +43,7 @@ void OnlineScene::Load() {
                 ((float)(start_y + (btn_h + gap) * 2) + (float)btn_h * 0.5f) / (float)h,
                 (float)btn_w / (float)w, (float)btn_h / (float)h);
     UIStyle::applyOnlineButton(self->btn_server);
-    button_set_text_offset(self->btn_server, 0, 3.0f);
+    button_set_text_offset(self->btn_server, 0, 3.0f * sy);
     button_set_textx(self->btn_server, font, "服务端", (int)strlen("服务端"), { 0, 0, 0, 255 });
     
     self->btn_back = button_create(ctx->r2d,
@@ -48,7 +51,7 @@ void OnlineScene::Load() {
                 ((float)(start_y + (btn_h + gap) * 3) + (float)btn_h * 0.5f) / (float)h,
                 (float)btn_w / (float)w, (float)btn_h / (float)h);
     UIStyle::applyOnlineButton(self->btn_back);
-    button_set_text_offset(self->btn_back, 0, 3.0f);
+    button_set_text_offset(self->btn_back, 0, 3.0f * sy);
     button_set_textx(self->btn_back, font, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
     }
 

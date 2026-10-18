@@ -32,9 +32,11 @@ AssetManager::AssetManager()
 
 	// 字体：按 ID 查表取路径（路径不再硬编码在本文件）
 	const char* font_path = GetResourcePath(kCatFonts, "simhei");
-	simhei_font24_ = font_create(font_path, 24);
-	simhei_font12_ = font_create(font_path, 14);
-	simhei_font28_ = font_create(font_path, 28);
+	// 字号随逻辑分辨率同步：逻辑分辨率 480x320 → 960x640（2 倍），
+	// 烘焙字号也翻倍，文字相对屏幕的观感才不变（且是原生 2 倍栅格化，更锐利）。
+	simhei_font24_ = font_create(font_path, 48);   // 原 24
+	simhei_font12_ = font_create(font_path, 28);   // 原 14（注意基准不是 12）
+	simhei_font28_ = font_create(font_path, 56);   // 原 28（超采样那档）
 }
 
 AssetManager::~AssetManager()

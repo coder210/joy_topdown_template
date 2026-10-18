@@ -17,14 +17,17 @@ struct Context;
 // 剪影为"圆角团 + 双角 + 双眼"，主色用品红 #F04C9E（与 绿/紫/红/黄 四个玩家色区分）。
 // 加载失败时自动回退到墨色占位方块（见下）。
 static const char* kEnemyImpPath  = "joy_topdown_template/sprites/enemies/imp.png";
-static const float  kEnemyDrawH   = 50.0f;   // 绘制高度（像素），与玩家一致，便于比例统一
+// 绘制高度 = 1 米（原来是写死 50px，即 PPM=50 时的 1 米）。
+// 用 PIXELS_PER_METER 表达，逻辑分辨率/PPM 提高后自动等比放大，观感不变。
+static const float  kEnemyDrawH   = (float)PIXELS_PER_METER;
 
 // 敌人血条：与玩家同款胶囊细条（实现见 passes/hpbar.h），悬浮于精灵正上方。
 // 尺寸比玩家小一号（敌人数量多、体型小）：内芯 28×8、外 1px 墨描边。
 // 填充用朱砂红 {200,60,50}——与朝向指示线同色，一眼标识"敌方"。
-static const int   EHBAR_W   = 28;
-static const int   EHBAR_H   = 8;
-static const int   EHBAR_PAD = 1;
+// 尺寸以"米"表达（28/8/1 是 PPM=50 时的像素值），随 PPM 换算，观感不变。
+static const int   EHBAR_W   = (int)((float)PIXELS_PER_METER * 0.56f);   // 0.56 米
+static const int   EHBAR_H   = (int)((float)PIXELS_PER_METER * 0.16f);   // 0.16 米
+static const int   EHBAR_PAD = (int)((float)PIXELS_PER_METER * 0.02f);   // 0.02 米（外描边）
 static image_p s_ehpbar_track = NULL;
 static image_p s_ehpbar_fill  = NULL;
 
@@ -87,7 +90,8 @@ static void draw_enemy_pass(Context* ctx)
                                 ? ((float)ehc.hp / (float)ehc.max_hp) : 0.0f;
                         // 精灵按 kEnemyDrawH 等高绘制 → 顶边在 c.y - kEnemyDrawH/2，
                         // 血条中心再上移 间距 + (半厚+描边)。
-                        float ecy = c.y - kEnemyDrawH * 0.5f - 3.0f
+                        // 3.0f 是 PPM=50 时的 3px 间距 → 按 PPM 等比换算
+                        float ecy = c.y - kEnemyDrawH * 0.5f - (float)PIXELS_PER_METER * 0.06f
                                   - ((float)EHBAR_H * 0.5f + (float)EHBAR_PAD);
                         hpbar_draw(ctx->r2d, s_ehpbar_track, s_ehpbar_fill,
                                    EHBAR_W, EHBAR_H, EHBAR_PAD, eratio,

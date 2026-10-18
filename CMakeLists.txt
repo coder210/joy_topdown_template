@@ -15,6 +15,12 @@ else()
     add_executable(${EXECUTABLE_NAME})
 endif()
 
+# 逻辑分辨率 960x640（480x320 的 2 倍）：PPM 同步翻倍 50 → 100。
+# 目的：渲染/文字更精细（字号按 2 倍烘焙），但"可视世界范围 + 角色显示大小"与原来完全一致。
+# 若不改 PPM，可视范围会变成 2 倍(19.2x12.8 米)、角色看起来小一半。
+# 见 joy/joy.h 中 PIXELS_PER_METER 的覆盖说明；默认 50，仅本项目覆盖。
+target_compile_definitions(${EXECUTABLE_NAME} PRIVATE PIXELS_PER_METER=100)
+
 # 源文件与头文件显式列出（不依赖 GLOB）：重命名/删除某文件时若漏改此列表，
 # configure 阶段即报错，不会出现"忘了重新 cmake 导致 vcxproj 仍指向已删文件"的静默失败；
 # 头文件列入后也会出现在 IDE 工程树中（systems 等纯头文件实现亦可浏览）。

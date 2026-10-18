@@ -43,8 +43,8 @@ static void draw_bullet_pass(Context* ctx)
                         ? 0.0f
                         : velAngle + GD_PI * 0.5f;
 
-        // 绘制高度 50px（与玩家 sprite 同基准），贴图 64px → scale 50/64
-        float scale = 50.0f / 64.0f;
+        // 绘制高度 = 1 米（原写死 50px 即 PPM=50 时的 1 米），贴图 64px → scale = 1米像素/64
+        float scale = (float)PIXELS_PER_METER / 64.0f;
         vec2_t scl    = { scale, scale };
         vec2_t origin = { cell.w * 0.5f, cell.h * 0.5f };
         image_draw_ex(img, &cell, pos, ang, scl, origin);

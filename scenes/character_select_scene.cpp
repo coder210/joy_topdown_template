@@ -185,18 +185,20 @@ void CharacterSelectScene::Load() {
     inputbox_set_text(self->nickname_input, ctx->selected_nickname);
 
     // 确认 / 返回
+    // 分子是设计稿 480x320 下的像素，分母必须用设计稿尺寸（不能用当前 w/h，
+    // 否则逻辑分辨率提高后分数被稀释，按钮会变小且错位）。
     self->btn_confirm = button_create(ctx->r2d,
-            (180.0f + 60.0f) / (float)w, (244.0f + 20.0f) / (float)h,
-            120.0f / (float)w, 40.0f / (float)h);
+            (180.0f + 60.0f) / 480.0f, (244.0f + 20.0f) / 320.0f,
+            120.0f / 480.0f, 40.0f / 320.0f);
     UIStyle::applyPaperButton(self->btn_confirm);
-    button_set_text_offset(self->btn_confirm, 0, 3.0f);
+    button_set_text_offset(self->btn_confirm, 0, 3.0f * fs);
     button_set_textx(self->btn_confirm, font24, "开始游戏", (int)strlen("开始游戏"), { 0, 0, 0, 255 });
     
     self->btn_back = button_create(ctx->r2d,
-            (15.0f + 40.0f) / (float)w, (244.0f + 20.0f) / (float)h,
-            80.0f / (float)w, 40.0f / (float)h);
+            (15.0f + 40.0f) / 480.0f, (244.0f + 20.0f) / 320.0f,
+            80.0f / 480.0f, 40.0f / 320.0f);
     UIStyle::applyPaperButton(self->btn_back);
-    button_set_text_offset(self->btn_back, 0, 3.0f);
+    button_set_text_offset(self->btn_back, 0, 3.0f * fs);
     button_set_textx(self->btn_back, font24, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
     }
 

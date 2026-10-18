@@ -353,9 +353,10 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
 
 // ---------------- 玩家血条：胶囊细条，填充色=角色贴图主色 ----------------
 // 实现见 passes/hpbar.h（玩家/敌人共用：胶囊纹理生成 + 旋转绘制）。
-static const int HPBAR_W   = 36;   // 内芯长（像素）
-static const int HPBAR_H   = 12;   // 内芯厚（像素）
-static const int HPBAR_PAD = 1;    // 外描边 1px
+// 尺寸以"米"表达（36/12/1 是 PPM=50 时的像素值），随 PPM 换算，观感不变。
+static const int HPBAR_W   = (int)((float)PIXELS_PER_METER * 0.72f);   // 0.72 米
+static const int HPBAR_H   = (int)((float)PIXELS_PER_METER * 0.24f);   // 0.24 米
+static const int HPBAR_PAD = (int)((float)PIXELS_PER_METER * 0.02f);   // 0.02 米（外描边）
 
 static image_p s_hpbar_track = NULL;   // 轨道+描边（38×14）
 static image_p s_hpbar_fill  = NULL;   // 填充（36×12，流式，每帧更新）
@@ -417,9 +418,10 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                 float sx = meters_to_pixels(t.position.x - cam.x);
                 float sy = meters_to_pixels(t.position.y - cam.y);
 
-                // Scribble 素材为 64x64 单帧；统一按"绘制高度 50px"缩放（武器同用此基准）
+                // Scribble 素材为 64x64 单帧；统一按"绘制高度 = 1 米"缩放（武器同用此基准）。
+                // 原来是写死 50px（PPM=50 时的 1 米），改用 PPM 表达以随分辨率同步放大。
                 const float scale = (clip.src_rect.h > 0.0f)
-                        ? (50.0f / clip.src_rect.h) : 1.0f;
+                        ? ((float)PIXELS_PER_METER / clip.src_rect.h) : 1.0f;
                 vec2_t pos = { sx, sy };
                 // image_draw_ex 会把负 scale 转为 SDL_FLIP_HORIZONTAL（见 jr2d.c），
                 // 因此朝右时传负的 x 缩放即可实现镜像，无需引擎新增 flip 参数。
@@ -479,8 +481,9 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
 
                         // 水墨胶囊血条：内芯 36×12、外 1px 墨描边。长轴=瞄准方向。
                         const float barT = (float)HPBAR_H;   // 内芯厚
-                        const float halfBody = 25.0f;        // 玩家精灵半高/半宽（显示约 50px）
-                        const float gap      = 3.0f;         // 与玩家之间的间隔
+                        // 半体 = 0.5 米、间隔 = 0.06 米（原值 25/3 是 PPM=50 时的像素）
+                        const float halfBody = (float)PIXELS_PER_METER * 0.5f;
+                        const float gap      = (float)PIXELS_PER_METER * 0.06f;
                         float off = halfBody + gap + barT * 0.5f + (float)HPBAR_PAD;  // 沿法线侧外移
                         float cx = sx + nx * off;            // 血条中心
                         float cy = sy + ny * off;
