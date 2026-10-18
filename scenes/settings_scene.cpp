@@ -5,6 +5,19 @@
 #include "../ui_sfx.h"
 #include "../asset_manager.h"
 
+// 大小写不敏感的字符串相等判断（跨平台）。
+// 不用 MSVC 专有的 _stricmp，也不用 POSIX 的 strcasecmp（三端头文件/可用性不一致），
+// 自行实现只处理 ASCII 大小写，足以用于比较文件扩展名。
+static bool str_ieq(const char* a, const char* b) {
+    if (!a || !b) return false;
+    for (; *a && *b; ++a, ++b) {
+        char ca = (*a >= 'A' && *a <= 'Z') ? (char)(*a - 'A' + 'a') : *a;
+        char cb = (*b >= 'A' && *b <= 'Z') ? (char)(*b - 'A' + 'a') : *b;
+        if (ca != cb) return false;
+    }
+    return *a == '\0' && *b == '\0';
+}
+
 static void apply_fullscreen(Context* ctx) {
     window_set_fullscreen(ctx->window, ctx->settings.fullscreen);
 }
@@ -182,9 +195,9 @@ void SettingsScene::Load() {
                 // 按扩展名分派解码器：bgm.wav 是 WAV，必须走 audio_bgm_create(SDL_LoadWAV)；
                 // 直接喂 audio_bgm_create_ogg 会因 OGG 解码器把 WAV 头当 OGG 读取而越界崩溃。
                 const char* dot = strrchr(bgm_path, '.');
-                if      (dot && _stricmp(dot, ".ogg")  == 0) preview_bgm = audio_bgm_create_ogg(bgm_path, preview_dev);
-                else if (dot && _stricmp(dot, ".mp3")  == 0) preview_bgm = audio_bgm_create_mp3(bgm_path, preview_dev);
-                else if (dot && _stricmp(dot, ".flac") == 0) preview_bgm = audio_bgm_create_flac(bgm_path, preview_dev);
+                if      (dot && str_ieq(dot, ".ogg"))  preview_bgm = audio_bgm_create_ogg(bgm_path, preview_dev);
+                else if (dot && str_ieq(dot, ".mp3"))  preview_bgm = audio_bgm_create_mp3(bgm_path, preview_dev);
+                else if (dot && str_ieq(dot, ".flac")) preview_bgm = audio_bgm_create_flac(bgm_path, preview_dev);
                 else                                        preview_bgm = audio_bgm_create(bgm_path, preview_dev);
                 if (preview_bgm) audio_bgm_set_gain(preview_bgm, ctx->settings.bgm_volume);
                 else { audio_close_device(preview_dev); preview_dev = 0; }
