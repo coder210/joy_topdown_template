@@ -35,7 +35,6 @@
 
 #include "../systems/player_death_system.h"
 #include "../systems/pathfinding_system.h"
-#include "../systems/capture_prev_position_system.h"
 
 #include "../passes/drawing_map_pass.h"
 #include "../passes/drawing_collision_debug_pass.h"
@@ -76,9 +75,6 @@ void GameScene::Load()
 
     // 注册公共系统
     add_system(ctx, OnStart, "map_spawn", map_spawn_system);
-    // 捕获上一帧位置必须放在 PreUpdate 最前（早于一切移动/AI），供 interpolate_pass 插值；
-    // 这样 prev = 本帧移动前的位置，curr = 本帧移动后的位置，插值才正确。
-    add_system(ctx, PreUpdate, "capture_prev_position", capture_prev_position_system);
     add_system(ctx, PreUpdate, "input_consume_join", input_consume_join_system);
     add_system(ctx, PreUpdate, "input_consume_leave", input_consume_leave_system);
     add_system(ctx, PreUpdate, "input_consume_input", input_consume_input_system);
@@ -186,14 +182,11 @@ void GameScene::Update(float dt)
         }
     }
 
-    // 写入渲染插值系数：渲染帧距"上一逻辑帧结束"的时间占一个固定步长的比例（0..1）。
-    // interpolate_pass 用它把 20Hz 逻辑步进补成 60Hz 平滑移动。
+    // 把逻辑步长写入 GlobalState，供 interpolate_pass 当作渲染平滑时间常数
+    //（指数平滑：既把 20Hz 逻辑步进补成 60Hz 平滑移动，又把敌人拐弯直角磨圆）。
     if (ctx->ecs.ctx().contains<GlobalState>()) {
         auto& gs = ctx->ecs.ctx().get<GlobalState>();
-        const float ts = game_runtime(ctx).FIXED_TIMESTEP;
-        float a = (ts > 0.0f) ? (this->accumulator / ts) : 0.0f;
-        if (a < 0.0f) a = 0.0f; else if (a > 1.0f) a = 1.0f;
-        gs.render_alpha = a;
+        gs.fixed_timestep = game_runtime(ctx).FIXED_TIMESTEP;
     }
 
     // 逻辑帧率测量

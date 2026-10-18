@@ -95,17 +95,9 @@ static void draw_enemy_pass(Context* ctx)
                 }
         }
 
-        // 朝向（由 ActionStateComponent.dir 推导）
-        float dir_rad = -GD_PI * 0.5f;
-        if (ctx->ecs.all_of<ActionStateComponent>(e)) {
-                int dir_val = ctx->ecs.get<ActionStateComponent>(e).dir;
-                switch (dir_val) {
-                case 0: dir_rad =  GD_PI * 0.5f; break;
-                case 1: dir_rad =  GD_PI;        break;
-                case 2: dir_rad =  0.0f;         break;
-                case 3: dir_rad = -GD_PI * 0.5f; break;
-                }
-        }
+        // 朝向：直接读 interpolate_pass 平滑后的连续旋转角（t.rotation），
+        // 不再是 4 向离散跳变——拐弯时朝向线随移动方向平滑转动。
+        float dir_rad = t.rotation;
 
         // 朝向指示：淡朱砂红（敌人贴图对称，靠这条线读朝向）
         r2d_set_color(ctx->r2d, 200, 60, 50, 220);

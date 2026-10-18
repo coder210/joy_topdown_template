@@ -12,10 +12,11 @@ struct GlobalState {
     // 实际逻辑帧率（每秒统计一次，仅用于调试显示）
     int logic_fps = 0;
 
-    // 渲染插值系数（0..1）：渲染帧距"上一逻辑帧结束"的时间占一个固定步长的比例。
-    // 由 GameScene::Update 在累加器更新后写入；interpolate_pass 用它做 上一帧→当前帧 的线性插值，
-    // 把 20Hz 逻辑步进补成 60Hz 平滑移动（玩家/敌人/相机一并受益）。
-    float render_alpha = 0.0f;
+    // 逻辑步长（秒）：等于 game_runtime(ctx).FIXED_TIMESTEP（当前 1/20）。
+    // 由 GameScene::Update 写入；interpolate_pass 把它当作渲染 transform 指数平滑的时间常数，
+    // 既把 20Hz 逻辑步进补成 60Hz 平滑移动，又把敌人拐弯的直角磨圆（只动 TransformComponent，
+    // 不参与帧同步 checksum，双端安全）。
+    float fixed_timestep = 1.0f / 20.0f;
 
     // 摄像机
     vec2_t camera_position = { 0.0f, 0.0f };
