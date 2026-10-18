@@ -35,16 +35,15 @@ void CharacterCatalog::setBuiltinDefault()
 
 static bool read_file_text(const char* path, std::string& out)
 {
-    std::FILE* f = std::fopen(path, "rb");
-    if (!f) return false;
-    std::fseek(f, 0, SEEK_END);
-    long len = std::ftell(f);
-    std::fseek(f, 0, SEEK_SET);
-    if (len <= 0) { std::fclose(f); return false; }
-    out.assign((size_t)len, '\0');
-    size_t got = std::fread(&out[0], 1, (size_t)len, f);
-    std::fclose(f);
-    return got == (size_t)len;
+    // 走 joy 的 utils_read_file（内部用 SDL_LoadFile）——
+    // 安卓资源打包在 APK 内，不是文件系统路径，std::fopen 读不到，
+    // 结果就是 characters.json 读失败、只能回落到内置默认（1 个角色）。
+    size_t sz = 0;
+    char* data = utils_read_file(path, &sz);
+    if (!data) return false;
+    out.assign(data, sz);
+    SDL_free(data);
+    return true;
 }
 
 void CharacterCatalog::load()

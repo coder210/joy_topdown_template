@@ -102,9 +102,9 @@ static jtilemap_object_layer_p map_find_collision_layer(jtilemap_p tm)
 // 探测给定路径的关卡 .lua 是否可读（单点路径；候选前缀遍历已由资源索引取代）
 static bool map_tm_probe_path(const char* path)
 {
-        FILE* f = std::fopen(path, "rb");
-        if (f) { std::fclose(f); return true; }
-        return false;
+        // 走 joy 的 utils_check_file（SDL IO）：安卓下关卡 lua 在 APK 里，
+        // fopen 探测不到会误判为"未制作"，进而关卡内容为空。
+        return utils_check_file(path);
 }
 
 // 本关是否"已制作"：resources.json 的 maps 段指向的 levelN.lua 是否存在。

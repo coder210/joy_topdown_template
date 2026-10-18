@@ -62,16 +62,14 @@ void WeaponCatalog::setBuiltinDefault()
 
 static bool weapon_read_file_text(const char* path, std::string& out)
 {
-    std::FILE* f = std::fopen(path, "rb");
-    if (!f) return false;
-    std::fseek(f, 0, SEEK_END);
-    long len = std::ftell(f);
-    std::fseek(f, 0, SEEK_SET);
-    if (len <= 0) { std::fclose(f); return false; }
-    out.assign((size_t)len, '\0');
-    size_t got = std::fread(&out[0], 1, (size_t)len, f);
-    std::fclose(f);
-    return got == (size_t)len;
+    // 同 character_catalog：走 joy 的 utils_read_file（SDL_LoadFile），
+    // 安卓下才能从 APK 里读到资源。
+    size_t sz = 0;
+    char* data = utils_read_file(path, &sz);
+    if (!data) return false;
+    out.assign(data, sz);
+    SDL_free(data);
+    return true;
 }
 
 void WeaponCatalog::load()

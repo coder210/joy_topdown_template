@@ -52,20 +52,15 @@ AssetManager::~AssetManager()
 
 void AssetManager::load_resources_json()
 {
-	std::FILE* f = std::fopen(RESOURCES_JSON_PATH, "rb");
-	if (!f) {
+	// 走 joy 的 utils_read_file（SDL_LoadFile）：安卓资源在 APK 内，fopen 读不到
+	size_t file_sz = 0;
+	char* file_data = utils_read_file(RESOURCES_JSON_PATH, &file_sz);
+	if (!file_data) {
 		log_info("[asset] %s not found, using built-in defaults", RESOURCES_JSON_PATH);
 		return;
 	}
-	std::fseek(f, 0, SEEK_END);
-	long len = std::ftell(f);
-	std::fseek(f, 0, SEEK_SET);
-	if (len <= 0) { std::fclose(f); return; }
-
-	std::string text((size_t)len, '\0');
-	size_t got = std::fread(&text[0], 1, (size_t)len, f);
-	std::fclose(f);
-	if (got != (size_t)len) return;
+	std::string text(file_data, file_sz);
+	SDL_free(file_data);
 
 	cJSON* root = cJSON_Parse(text.c_str());
 	if (!root) {
