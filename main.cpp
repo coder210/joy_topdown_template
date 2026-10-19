@@ -8,6 +8,7 @@
 #include "asset_manager.h"
 #include "scenes/scene.h"
 #include "scenes/scene_manager.h"
+#include "logical_presentation.h"
 #include "scenes/main_scene.h"
 #include "scenes/splash_scene.h"
 #include "scenes/loading_scene.h"
@@ -27,27 +28,16 @@
 static Context* ctx;
 static SceneManager* g_mgr = nullptr;
 
-// 自适应逻辑分辨率（修复手机横屏左右黑边）：
-//   设计高度固定 640（PPM=100 → 垂直可视 6.4 米，角色大小观感不变），
-//   逻辑宽度按窗口宽高比动态计算：lw = 640 * 输出宽 / 输出高，再用 LETTERBOX。
-//   当逻辑宽高比与窗口完全一致时，letterbox 正好铺满，左右不再有黑边；
-//   宽屏（手机横屏/带鱼屏）相当于横向多看一些地图，而不是留黑边。
-//   必须在窗口尺寸/像素尺寸变化后重新调用（桌面拖拽、全屏切换、安卓旋转）。
-static void apply_adaptive_logical_presentation()
+// 窗口尺寸变化后按“当前场景”选择逻辑分辨率：
+//   - 游戏场景：自适应宽度（保持高度 640，宽度跟随窗口宽高比），铺满窗口、左右无黑边；
+//   - 其它场景：固定 960x640（3:2）。菜单/设置/选角/结算的 UI 全部按 480x320 的比例
+//     坐标布局，逻辑宽度一变宽 x 比例就会被横向拉伸 → 位置错位，所以必须保持 3:2。
+static void apply_presentation_for_current_scene()
 {
         if (!ctx || !ctx->r2d) return;
-
-        int ow = 0, oh = 0;
-        r2d_get_size(ctx->r2d, &ow, &oh);
-        if (ow <= 0 || oh <= 0) { ow = 960; oh = 640; }   // 初始化/切后台瞬间兜底
-
-        const int design_h = 640;
-        int lw = (int)((float)design_h * (float)ow / (float)oh + 0.5f);
-        if (lw < 480)  lw = 480;    // 极端竖长窗口兜底
-        if (lw > 2400) lw = 2400;   // 极端超宽窗口兜底，避免逻辑宽度失控
-
-        r2d_set_logical_presentation_mode(ctx->r2d, lw, design_h,
-                                          JOY_LOGICAL_PRESENTATION_LETTERBOX);
+        const bool in_game = (g_mgr && strcmp(g_mgr->currentName(), "game") == 0);
+        if (in_game) presentation_set_adaptive(ctx->r2d);
+        else         presentation_set_design(ctx->r2d);
 }
 
 // 解析 --mode=single|host|client|server（默认 single）
@@ -149,8 +139,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         //   文字按 48px 原生烘焙更锐利。UI 全部为比例坐标，自动适配。
         ctx->window = create_window("Joy Topdown", 960, 640);
         ctx->r2d = r2d_create(ctx->window);
-        // 自适应逻辑分辨率：宽度随窗口宽高比变化，letterbox 下不再左右留黑边
-        apply_adaptive_logical_presentation();
+        // 初始场景（闪屏/菜单）按设计分辨率 960x640；进入游戏场景时再切自适应宽度
+        presentation_set_design(ctx->r2d);
 
         // 设置窗口图标（logo.png 位于 textures 目录下）
         window_set_icon(ctx->window, "joy_topdown_template/branding/logo.png");
@@ -189,7 +179,7 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
         if (e->type == SDL_EVENT_WINDOW_RESIZED ||
             e->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
             e->type == SDL_EVENT_DISPLAY_ORIENTATION) {
-                apply_adaptive_logical_presentation();
+                apply_presentation_for_current_scene();
         }
 
         // 独立服务端：只响应退出（不处理菜单/场景切换按键），但允许 ESC 返回主场景，

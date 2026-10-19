@@ -45,6 +45,7 @@
 #include "../passes/drawing_minimap_pass.h"
 #include "victory_scene.h"
 #include "scene.h"
+#include "../logical_presentation.h"
 
 // 运行模式由 cfg_（kModeConfigs 中按 ctx->mode 取的能力配置）驱动，见 game_scene_common.h
 
@@ -52,6 +53,10 @@ void GameScene::Load()
 {
     Context* ctx = this->ctx();
     log_info("[game scene] start... mode=%d", (int)ctx->mode);
+
+    // 游戏场景用自适应逻辑宽度：铺满窗口、左右无黑边（宽屏横向多看地图）。
+    // 其它场景在 GameScene::Destroy 里恢复设计分辨率（3:2），避免 UI 比例被拉伸。
+    presentation_set_adaptive(ctx->r2d);
 
     this->debug_layer = new DebugLayer(ctx);
 
@@ -342,6 +347,10 @@ void GameScene::Destroy()
     if (this->pause_layer) { delete this->pause_layer; this->pause_layer = NULL; }
     if (this->debug_layer) { delete this->debug_layer; this->debug_layer = NULL; }
     if (this->gcl) { delete this->gcl; this->gcl = NULL; }
+
+    // 恢复设计分辨率（3:2）：后续菜单/设置/选角/结算场景的 UI
+    // 都按 480x320 的比例坐标布局，宽高比一变就会错位。
+    presentation_set_design(ctx->r2d);
 }
 
 GameScene::GameScene(Context* ctx)

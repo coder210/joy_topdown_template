@@ -33,6 +33,7 @@ set(PROJECT_FILES
     asset_manager.h
     context.h
     events.h
+    logical_presentation.h
     profiler.h
     protocol.h
     settings.h
