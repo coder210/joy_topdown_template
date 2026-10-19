@@ -205,7 +205,7 @@ void GameScene::Update(float dt)
         this->fps_measure_frame = cur_logic_frame;
     }
 
-    // 视觉相关 pass 用实时 dt 每帧更新
+    // 视觉相关 pass 用实时 dt 每帧更新（子弹已不参与插值，由 draw_bullet_pass 直接按逻辑位置绘制）
     interpolate_pass(ctx->ecs, ctx, dt);
     camera_follow_pass(ctx->ecs, ctx, dt);
     // 玩家动画推进已并入 Render 阶段的 player_render_pass（纯渲染、不参与帧同步），

@@ -3,7 +3,8 @@
 #include <math.h>
 #include <joy/joy.h>
 #include "../components/global_state_component.h"
-#include "../components/transform_component.h"
+#include "../components/logic_position_component.h"
+#include "../components/logic_rect_component.h"
 #include "../components/bullet_component.h"
 #include "../asset_manager.h"
 #include "render_math.h"
@@ -26,15 +27,20 @@ static void draw_bullet_pass(Context* ctx)
     // 箭贴图：row9 col7，64×64
     jrect_t cell = { 448.0f, 576.0f, 64.0f, 64.0f };
 
-    auto view = ctx->ecs.view<BulletComponent, TransformComponent>();
+    // 子弹渲染与玩家渲染分开：直接读逻辑位置(LogicPosition + LogicRect 中心)，
+    // 不经过 interpolate_pass 的平滑/外推——既不会"滞后提前消失"，也不会"外推越过墙"。
+    auto view = ctx->ecs.view<BulletComponent, LogicPositionComponent, LogicRectComponent>();
     for (auto e : view) {
         if (!ctx->ecs.valid(e)) continue;
-        auto& t = view.get<TransformComponent>(e);
-        auto& b = view.get<BulletComponent>(e);
+        auto& lp   = view.get<LogicPositionComponent>(e);
+        auto& rect = view.get<LogicRectComponent>(e);
+        auto& b    = view.get<BulletComponent>(e);
 
+        float cx = fp_to_float(lp.x) + fp_to_float(rect.width)  * 0.5f;
+        float cy = fp_to_float(lp.y) + fp_to_float(rect.height) * 0.5f;
         vec2_t pos;
-        pos.x = meters_to_pixels(t.position.x - cam.x);
-        pos.y = meters_to_pixels(t.position.y - cam.y);
+        pos.x = meters_to_pixels(cx - cam.x);
+        pos.y = meters_to_pixels(cy - cam.y);
 
         // 朝向 = 速度方向（屏幕坐标 y 向下）；贴图原生箭尖朝上(-90°)，
         // 旋转角 = velAngle - (-90°) = velAngle + 90°。速度为 0 时兜底朝上(旋转 0)。

@@ -32,6 +32,10 @@ public:
                 if (shots_[k]) audio_shot_play(shots_[k]);
         }
 
+        // 预热：应用启动时调用一次。提前打开音频设备 + 解码三条音效，
+        // 避免“首次点击才懒开设备/解码”导致第一声延迟数秒（Android AAudio/HAL 冷启动）。
+        void prewarm() { ensure(); }
+
         // 释放三条 shot 与设备（AppQuit 时调用；析构也兜底调一次）
         void shutdown() {
                 for (int i = 0; i < kCount; i++) {

@@ -9,6 +9,7 @@
 #include "../components/global_state_component.h"
 #include "../components/enemy_component.h"
 #include "../components/action_state_component.h"
+#include "../components/bullet_component.h"
 #include "render_math.h"   // GD_PI 渲染数学常量（与 draw_enemy_pass 共用，保证朝向角一致）
 
 struct Context;
@@ -23,6 +24,9 @@ struct Context;
 //
 // 平滑目标 = 当前逻辑帧碰撞盒中心；时间常数 = fixed_timestep（= 1 个逻辑步长，约 50ms）。
 // 首帧（interp_init=false）直接对齐，避免从 (0,0) 滑入；之后每帧 dt 缩放的 exp 平滑。
+//
+// 例外：箭/子弹（BulletComponent）不参与渲染平滑——平滑会给匀速弹道带来 速度×tau 的滞后
+// （提前消失），外推又易越过墙。子弹改由 draw_bullet_pass 直接按 LogicPosition 渲染（与玩家分开）。
 static void interpolate_pass(entt::registry& registry, Context* ctx, float dt)
 {
     float tau = 1.0f / 20.0f;   // 逻辑步长（与 game_runtime(ctx).FIXED_TIMESTEP 对齐）
@@ -36,6 +40,9 @@ static void interpolate_pass(entt::registry& registry, Context* ctx, float dt)
 
     auto view = registry.view<IdComponent, LogicPositionComponent, LogicRectComponent, TransformComponent>();
     for (auto e : view) {
+        // 子弹不参与平滑（与玩家渲染分开），由 draw_bullet_pass 直接按逻辑位置绘制
+        if (registry.all_of<BulletComponent>(e)) continue;
+
         auto& lp   = view.get<LogicPositionComponent>(e);
         auto& rect = view.get<LogicRectComponent>(e);
         auto& t    = view.get<TransformComponent>(e);

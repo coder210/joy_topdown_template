@@ -1,6 +1,7 @@
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_video.h>
+#include <SDL3/SDL_hints.h>   // SDL_HINT_ORIENTATIONS / SDL_SetHint（移动端横屏）
 #include <joy/joy.h>
 #include <cstring>
 #include "context.h"
@@ -102,6 +103,19 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         game_timer_set_target_fps(&ctx->game_timer, 60);
 
         AssetManager::Init();
+
+        // 预热 UI 音效：启动即打开音频设备并解码，避免首次点击音效延迟数秒
+        // （Android 首次打开 AAudio 输出流时 HAL 冷启动较慢，会把第一声积压到几秒后才播出）。
+        UiSfx::Get().prewarm();
+
+        // 移动端固定横屏：必须在创建窗口前设置。
+        // SDL 在创建窗口时会用 SDL_HINT_ORIENTATIONS 调 Android 的 setRequestedOrientation()；
+        //   若不设，且窗口带 RESIZABLE 标志，Java 侧会按 "FULL_USER"(跟随系统/用户锁定) 处理，
+        //   从而覆盖 AndroidManifest 里的 screenOrientation，导致手机端仍可能竖屏。
+        // 指定两个横屏方向 → Java 侧取 USER_LANDSCAPE（仅横屏、可左右翻转）。
+#if defined(__ANDROID__)
+        SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
 
         // 窗口与逻辑分辨率同为 960x640（480x320 的 2 倍，仍保持 3:2）。
         // 配套 PIXELS_PER_METER=100（见 CMakeLists）：PPM 同步翻倍，
