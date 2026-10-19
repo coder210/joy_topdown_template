@@ -17,7 +17,8 @@
         "bgm": "joy_topdown_template/audio/bgm.wav",
         "click": "joy_topdown_template/audio/click-a.ogg",
         "switch": "joy_topdown_template/audio/switch-a.ogg",
-        "tap": "joy_topdown_template/audio/tap-a.ogg"
+        "tap": "joy_topdown_template/audio/tap-a.ogg",
+        "bow": "joy_topdown_template/audio/bow.wav"
     },
     "config": {
         "characters": "joy_topdown_template/data/characters.json",

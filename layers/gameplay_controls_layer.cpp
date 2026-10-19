@@ -166,18 +166,70 @@ void GameplayControlsLayer::load_controls()
                 "joy_topdown_template/sprites/ui/joystick_circle_nub_b.png");
         joystick_set_dir_mode(move_stick, JOYSTICK_DIR_8WAY);   // 八向（含四个斜角），支持斜向移动
 
-        // 右下攻击键：通用圆钮 + 圆心墨黑「攻」字 + 冷却环（保持原样）。
+        // 右下攻击键：通用圆钮 + 圆心墨黑「攻」字 + 冷却环。
         add_button(&btn_attack, &attack_meta, 0.92500f, 0.89375f, 0.13333f, 0.20000f, "攻", 1);
+
+        // 立即按当前逻辑分辨率做一次边锚定布局（右：攻击键；左：摇杆）
+        layout_lw = 0; layout_lh = 0;
+        syncLayout();
+}
+
+// 操作层布局与分辨率解耦：
+//   控件在 create 时把"比例坐标"换算成像素并缓存，且尺寸按"宽度"缩放。自适应逻辑宽度后，
+//   宽屏会把按钮拉成椭圆、摇杆放大，且逻辑尺寸变化后位置不更新（按钮看起来不在右边）。
+//   这里改为：尺寸/边距统一按设计高度 320 缩放（s = 逻辑高/320），攻击键锚定右下、摇杆锚定左下。
+//   仅在逻辑分辨率变化时重算（首次、旋转、全屏切换）。
+void GameplayControlsLayer::syncLayout()
+{
+        if (!ctx_ || !ctx_->r2d) return;
+        int lw = 0, lh = 0;
+        r2d_get_logical_presentation(ctx_->r2d, &lw, &lh, NULL);
+        if (lw <= 0 || lh <= 0) return;
+        if (lw == layout_lw && lh == layout_lh) return;
+        layout_lw = lw;
+        layout_lh = lh;
+
+        const float s = (float)lh / 320.0f;   // 设计稿 480x320
+
+        // 攻击键：64x64 设计尺寸，锚定右下角（右留边尽量小 → 贴右）
+        if (btn_attack) {
+                const float size = 64.0f * s;
+                const float mr   = 4.0f * s;    // 右留边
+                const float mb   = 6.0f * s;    // 下留边
+                float x = (float)lw - size - mr;
+                float y = (float)lh - size - mb;
+                if (x < 0.0f) x = 0.0f;
+                if (y < 0.0f) y = 0.0f;
+                button_set_position(btn_attack, x, y);
+                button_set_size(btn_attack, size, size);
+                attack_meta.x = x; attack_meta.y = y;
+                attack_meta.w = size; attack_meta.h = size;
+        }
+
+        // 左摇杆：半径 72 设计尺寸，锚定左下角（宽屏下不再随宽度放大/右移）
+        if (move_stick) {
+                float radius = 72.0f * s;
+                float cx = radius + 9.6f * s;
+                float cy = (float)lh - radius - 24.0f * s;
+                joystick_set_position(move_stick, cx, cy);
+                joystick_set_radius(move_stick, radius);
+        }
 }
 
 void GameplayControlsLayer::HandleEvent(const void* ev)
 {
+        // 命中判定前先确保控件几何与当前逻辑分辨率一致（否则旋转/全屏后点不中）
+        syncLayout();
+
         jevent_callbacks_t cbs = {};
         cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
                 (void)btn;
                 auto* self = (GameplayControlsLayer*)arg;
                 // 攻击键优先（右下圆钮）
-                if (self->btn_attack && ui_button_hit(self->btn_attack, x, y, UiSfx::kTap)) {
+                // 注意：这里刻意不用 ui_button_hit（它会播点击音）。
+                // 攻击有冷却，快速连点时音效会响但箭并不会真的发射，听感很怪，
+                // 所以攻击键只做命中判定，不播放音效。
+                if (self->btn_attack && button_is_pressed(self->btn_attack, x, y)) {
                         self->pressed_btn = self->btn_attack;
                         self->pressed_code = GAMEPLAY_CONTROL_ATTACK;
                         // 与空格完全一致：按下即置 INPUT_ATTACK 位，每帧上报，
@@ -280,6 +332,9 @@ void GameplayControlsLayer::updateStick()
 void GameplayControlsLayer::Render()
 {
         if (!ctx_) return;
+
+        // 绘制前同步布局（分辨率变化后按钮/摇杆的像素几何需要重算）
+        syncLayout();
 
         // 键盘输入同步到虚拟控件：物理键盘按下时，屏幕上的摇杆/攻击键给出对应反馈。
         // 只同步显示，不改任何逻辑；触摸操作时跳过键盘同步，避免两者打架。

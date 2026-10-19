@@ -44,11 +44,14 @@ private:
     int      last_rel_ev = 0;
     button_p pressed_btn = NULL;      // 当前按住中的按钮（仅攻击键）
     int      pressed_code = 0;
+    int      layout_lw = 0;           // 上次同步布局时的逻辑分辨率（变化才重算）
+    int      layout_lh = 0;
 
     void add_button(button_p* slot, gc_button_meta* meta,
                     float cx, float cy, float wf, float hf,
                     const char* label, int coolType);
     void load_controls();             // 创建左摇杆 + 攻击键
+    void syncLayout();                // 按当前逻辑分辨率锚定右下/左下布局
     void updateStick();               // 摇杆向量 → 移动位 + 锁存瞄准角
 
     // ---- 实现辅助 ----

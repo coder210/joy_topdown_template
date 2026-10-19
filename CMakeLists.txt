@@ -65,10 +65,12 @@ set(PROJECT_FILES
     layers/debug_layer.cpp
     layers/gameplay_controls_layer.cpp
     layers/menu_layer.cpp
+    layers/pause_menu_layer.cpp
     layers/debug_layer.h
     layers/gameplay_controls_layer.h
     layers/layer.h
     layers/menu_layer.h
+    layers/pause_menu_layer.h
     # ---- network ----
     network/network_manager.cpp
     network/network_manager.h
@@ -128,6 +130,7 @@ set(PROJECT_FILES
     systems/player_shoot_system.h
     systems/bullet_system.h
     systems/movement_system.h
+    systems/separation_system.h
     systems/pathfinding_system.h
     systems/player_death_system.h
     systems/snapshot_system.h

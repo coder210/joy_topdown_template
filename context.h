@@ -49,6 +49,7 @@ struct Context {
         // ---- 音频 ----
         uint32_t            audio_dev = 0;
         audio_shot_p        step_sound = NULL;
+        audio_shot_p        bow_sound = NULL;   // 射箭音效（真正发射时播放）
         audio_bgm_p         bgm = NULL;
         // 远程玩家方向追踪
         //std::map<entt::entity, int>  remote_dirs;

@@ -8,6 +8,7 @@
 #include "game_scene_common.h"
 #include "../network/network_manager.h"
 #include "../layers/gameplay_controls_layer.h"
+#include "../layers/pause_menu_layer.h"
 #include "../layers/debug_layer.h"
 
 // 游戏场景：继承 Scene，单一类承载全部运行模式。
@@ -30,6 +31,7 @@ public:
 
     // ---- 原 game_scene struct 字段（集中到 GameScene，供 this->xxx 访问）----
     GameplayControlsLayer* gcl = NULL;       // 操作层（纯 button，不依赖 joy scene_node）
+    PauseMenuLayer* pause_layer = NULL;      // 暂停菜单（继续/设置/返回主菜单/退出）
     DebugLayer* debug_layer = NULL;          // 调试 overlay（纯绘制，不依赖 joy scene_node）
     float step_timer = 0;
     uint32_t fps_measure_time = 0;

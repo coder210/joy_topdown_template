@@ -21,6 +21,7 @@
 #include "../systems/input_consume_leave_system.h"
 #include "../systems/input_consume_input_system.h"
 #include "../systems/movement_system.h"
+#include "../systems/separation_system.h"   // 敌人间分离（防止叠在一起）
 #include "../systems/cleanup_system.h"
 #include "../systems/collision_system.h"
 #include "../layers/debug_layer.h"
@@ -86,6 +87,9 @@ void GameScene::Load()
     add_system(ctx, OnUpdate, "player_death", player_death_system);
     add_system(ctx, OnUpdate, "pathfinding", pathfinding_system);
     add_system(ctx, OnUpdate, "movement", movement_system);
+    // 敌人间分离：必须在 pathfinding/movement 之后、collision（墙）之前，
+    // 这样被推开后万一进入墙格，collision_system 会再把它推出墙体。
+    add_system(ctx, OnUpdate, "separation", separation_system);
     add_system(ctx, OnUpdate, "collision", collision_system);
     add_system(ctx, OnUpdate, "bullet", bullet_system);
     add_system(ctx, OnUpdate, "cleanup", cleanup_system);
@@ -101,6 +105,10 @@ void GameScene::Load()
 
 void GameScene::HandleEvent(const void* ev)
 {
+    // 暂停菜单优先：菜单打开时模态吞掉所有输入（ESC/返回键、按钮点击都在这里处理）；
+    // 菜单关闭时只拦截右上角暂停按钮，其余事件继续传给游戏。
+    if (this->pause_layer && this->pause_layer->handle_event(ev)) return;
+
     handleEvent(ev);
     // 转发事件给操作层（纯 button），模拟原 joy scene 的 node 事件分发
     if (this->gcl) this->gcl->HandleEvent(ev);
@@ -154,8 +162,11 @@ void GameScene::Update(float dt)
     // 网络层更新（模式特有）
     networkUpdate();
 
-    // 固定步长逻辑 Tick（20Hz）
-    this->accumulator += dt;
+    // 单机暂停：跳过固定步模拟；联机不暂停（本地暂停会让双端帧同步发散）。
+    // 暂停期间不累积时间，恢复后也不会补跑一串 tick。
+    const bool sim_paused = (this->pause_layer && this->pause_layer->should_pause_sim());
+    if (sim_paused) this->accumulator = 0.0f;
+    else            this->accumulator += dt;
     auto& gs = ctx->ecs.ctx().get<GlobalState>();
     // ---- 临时诊断：每秒打点 dt 累计 / 渲染帧数 / 实际逻辑 tick 数 ----
     if (get_ticks() - s_diag_t0 >= 1000) {
@@ -235,7 +246,7 @@ void GameScene::Update(float dt)
         }
         if (cleared) {
             gsv.level_cleared = true;
-            this->victory_delay += dt;
+            if (!sim_paused) this->victory_delay += dt;
             if (this->victory_delay >= 1.2f) {
                 this->victory_started = true;
                 ctx->scene_mgr->setPending(new VictoryScene(ctx));
@@ -292,6 +303,7 @@ void GameScene::Render()
     // 渲染模式子类挂载的 layer（控制层/调试层），纯 button 直接绘制
     if (this->debug_layer) this->debug_layer->Render();
     if (this->gcl) this->gcl->Render();
+    if (this->pause_layer) this->pause_layer->Render();   // 暂停菜单在最上层
 }
 
 void GameScene::Destroy()
@@ -327,6 +339,7 @@ void GameScene::Destroy()
             fclose(fp);
         }
     }
+    if (this->pause_layer) { delete this->pause_layer; this->pause_layer = NULL; }
     if (this->debug_layer) { delete this->debug_layer; this->debug_layer = NULL; }
     if (this->gcl) { delete this->gcl; this->gcl = NULL; }
 }
@@ -357,6 +370,9 @@ void GameScene::init()
         // 只有权威端才自己注入本地玩家；客户端的玩家由服务端下发的 join 命令产生
         if (cfg_.authoritative) GameSceneCommon::injectCommonPlayer(this);
         GameSceneCommon::initControlsAndAudio(this);
+
+        // 暂停菜单（右上角按钮 + 菜单/确认/设置），仅本地玩家场景需要
+        this->pause_layer = new PauseMenuLayer(ctx);
     }
 }
 

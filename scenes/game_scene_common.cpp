@@ -174,11 +174,19 @@ void GameSceneCommon::initControlsAndAudio(GameScene* self)
         ? AssetManager::GetInstance()->GetResourcePath(AssetManager::kCatAudio, "footstep") : nullptr;
     const char* bgm_path = AssetManager::GetInstance()
         ? AssetManager::GetInstance()->GetResourcePath(AssetManager::kCatAudio, "bgm") : nullptr;
+    const char* bow_path = AssetManager::GetInstance()
+        ? AssetManager::GetInstance()->GetResourcePath(AssetManager::kCatAudio, "bow") : nullptr;
 
     ctx->step_sound = shot_create_by_ext(footstep, ctx->audio_dev);
     if (!ctx->step_sound)
         log_info("[audio] footstep unavailable (path=%s), muted", footstep ? footstep : "(none)");
     audio_shot_set_gain(ctx->step_sound, ctx->settings.sfx_volume);
+
+    // 射箭音效：缺文件时 create 返回 NULL，play 对 NULL 安全 → 静音继续运行
+    ctx->bow_sound = shot_create_by_ext(bow_path, ctx->audio_dev);
+    if (!ctx->bow_sound)
+        log_info("[audio] bow unavailable (path=%s), muted", bow_path ? bow_path : "(none)");
+    audio_shot_set_gain(ctx->bow_sound, ctx->settings.sfx_volume);
 
     ctx->bgm = bgm_create_by_ext(bgm_path, ctx->audio_dev);
     if (!ctx->bgm)
@@ -200,6 +208,7 @@ void GameSceneCommon::injectCommonPlayer(GameScene* self)
 void GameSceneCommon::destroyPlayerAudio(Context* ctx)
 {
     if (ctx->step_sound) { audio_shot_destroy(ctx->step_sound); ctx->step_sound = NULL; }
+    if (ctx->bow_sound) { audio_shot_destroy(ctx->bow_sound); ctx->bow_sound = NULL; }
     if (ctx->bgm) { audio_bgm_destroy(ctx->bgm); ctx->bgm = NULL; }
     if (ctx->audio_dev) { audio_close_device(ctx->audio_dev); ctx->audio_dev = 0; }
 }

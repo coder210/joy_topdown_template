@@ -154,6 +154,11 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
         act.arrow_gone_timer  = ActionStateComponent::ARROW_GONE_TICKS;   // 空弦一小段→再搭箭
         spawn_player_bullet(registry, ctx, lpos, lrec, act.aim_yaw);
 
+        // 音效与"真正发射"严格同步：只有通过冷却/瞄准检查、确实生成了箭才播放，
+        // 快速连点被冷却吞掉的输入不会再响（这正是之前点攻击键音效的违和点）。
+        // 独立服务端无本机音频（bow_sound == NULL），audio_shot_play 对 NULL 安全。
+        if (ctx->bow_sound) audio_shot_play(ctx->bow_sound);
+
         remove_melee_events(events.pending_actions);
     }
 }

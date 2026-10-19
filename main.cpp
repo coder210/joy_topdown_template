@@ -27,6 +27,29 @@
 static Context* ctx;
 static SceneManager* g_mgr = nullptr;
 
+// 自适应逻辑分辨率（修复手机横屏左右黑边）：
+//   设计高度固定 640（PPM=100 → 垂直可视 6.4 米，角色大小观感不变），
+//   逻辑宽度按窗口宽高比动态计算：lw = 640 * 输出宽 / 输出高，再用 LETTERBOX。
+//   当逻辑宽高比与窗口完全一致时，letterbox 正好铺满，左右不再有黑边；
+//   宽屏（手机横屏/带鱼屏）相当于横向多看一些地图，而不是留黑边。
+//   必须在窗口尺寸/像素尺寸变化后重新调用（桌面拖拽、全屏切换、安卓旋转）。
+static void apply_adaptive_logical_presentation()
+{
+        if (!ctx || !ctx->r2d) return;
+
+        int ow = 0, oh = 0;
+        r2d_get_size(ctx->r2d, &ow, &oh);
+        if (ow <= 0 || oh <= 0) { ow = 960; oh = 640; }   // 初始化/切后台瞬间兜底
+
+        const int design_h = 640;
+        int lw = (int)((float)design_h * (float)ow / (float)oh + 0.5f);
+        if (lw < 480)  lw = 480;    // 极端竖长窗口兜底
+        if (lw > 2400) lw = 2400;   // 极端超宽窗口兜底，避免逻辑宽度失控
+
+        r2d_set_logical_presentation_mode(ctx->r2d, lw, design_h,
+                                          JOY_LOGICAL_PRESENTATION_LETTERBOX);
+}
+
 // 解析 --mode=single|host|client|server（默认 single）
 static GameModeKind parse_mode(int argc, char* argv[])
 {
@@ -115,6 +138,9 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         // 指定两个横屏方向 → Java 侧取 USER_LANDSCAPE（仅横屏、可左右翻转）。
 #if defined(__ANDROID__)
         SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+        // 让返回键以 SDL_SCANCODE_AC_BACK 的按键事件送达（暂停菜单用它打开/关闭），
+        // 而不是直接交给系统关闭 Activity。
+        SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 #endif
 
         // 窗口与逻辑分辨率同为 960x640（480x320 的 2 倍，仍保持 3:2）。
@@ -123,8 +149,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         //   文字按 48px 原生烘焙更锐利。UI 全部为比例坐标，自动适配。
         ctx->window = create_window("Joy Topdown", 960, 640);
         ctx->r2d = r2d_create(ctx->window);
-        // 优化：letterbox 等比适配，避免拉伸变形（对齐 joy_side_template）
-        r2d_set_logical_presentation_mode(ctx->r2d, 960, 640, JOY_LOGICAL_PRESENTATION_LETTERBOX);
+        // 自适应逻辑分辨率：宽度随窗口宽高比变化，letterbox 下不再左右留黑边
+        apply_adaptive_logical_presentation();
 
         // 设置窗口图标（logo.png 位于 textures 目录下）
         window_set_icon(ctx->window, "joy_topdown_template/branding/logo.png");
@@ -157,6 +183,14 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
 {
         if (should_close(e)) return SDL_APP_SUCCESS;
+
+        // 窗口尺寸/像素尺寸/显示变化（桌面拖拽、全屏切换、安卓旋转）：重算逻辑分辨率，
+        // 否则新宽高比与逻辑宽高比不一致时，letterbox 会重新出现左右黑边。
+        if (e->type == SDL_EVENT_WINDOW_RESIZED ||
+            e->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+            e->type == SDL_EVENT_DISPLAY_ORIENTATION) {
+                apply_adaptive_logical_presentation();
+        }
 
         // 独立服务端：只响应退出（不处理菜单/场景切换按键），但允许 ESC 返回主场景，
         // 且仍处理主场景的模式按钮事件（ESC 返回后 mode 仍为 SERVER，需能再切换）
@@ -209,7 +243,17 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                         }
                         break;
                 case SDL_SCANCODE_ESCAPE:
-                        g_mgr->change(new MainScene(ctx));
+                case SDL_SCANCODE_AC_BACK:
+                        // 游戏场景的 ESC/返回键已由 PauseMenuLayer 处理（打开/关闭暂停菜单），
+                        // 这里只处理其它场景；主菜单按安卓返回键则退出 App。
+                        if (strcmp(g_mgr->currentName(), "game") != 0) {
+                                if (e->key.scancode == SDL_SCANCODE_AC_BACK &&
+                                    strcmp(g_mgr->currentName(), "Main") == 0) {
+                                        push_quit_event();
+                                } else {
+                                        g_mgr->change(new MainScene(ctx));
+                                }
+                        }
                         break;
                 case SDL_SCANCODE_R:
                         g_mgr->reset();
