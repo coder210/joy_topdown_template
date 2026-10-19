@@ -89,6 +89,25 @@ void SettingsScene::HandleUiEvent(const void* e) {
     cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
         (void)btn;
         SettingsScene* self = (SettingsScene*)arg;
+        // 输入框焦点切换必须在这里先处理（dispatch_event 先调 on_mousepressed，再统一调
+        // on_process_event）。若交给 inputbox_process_event 处理：未命中的框会走
+        // inputbox_defocus -> SDL_StopTextInput，同一帧紧接着命中框 inputbox_focus ->
+        // SDL_StartTextInput；Android 的 IME hide/show 异步竞态会吞掉 show，出现
+        // "从 A 直接点 B 唤不起输入法，必须先点框外让 A 失焦"的问题。
+        // 这里：命中框聚焦并定位光标，另一个框仅 inputbox_blur（不动 SDL，键盘保持不收起）；
+        // 只有点到两个框之外，才 inputbox_defocus 真正收起键盘。
+        bool hit_ip   = self->ip_input   && inputbox_is_hovered(self->ip_input, x, y);
+        bool hit_port = self->port_input && inputbox_is_hovered(self->port_input, x, y);
+        if (hit_ip) {
+            if (self->port_input) inputbox_blur(self->port_input);
+            inputbox_is_pressed(self->ip_input, x, y);      // 聚焦 + 定位光标
+        } else if (hit_port) {
+            if (self->ip_input) inputbox_blur(self->ip_input);
+            inputbox_is_pressed(self->port_input, x, y);    // 聚焦 + 定位光标
+        } else {
+            if (self->ip_input)   inputbox_defocus(self->ip_input);
+            if (self->port_input) inputbox_defocus(self->port_input);
+        }
         if (self->btn_back && ui_button_hit(self->btn_back, x, y))
             push_user_event(SETTINGS_EVENT, SETTINGS_EVENT_BACK);
     };
