@@ -246,7 +246,10 @@ void GameScene::Update(float dt)
             cleared = true;
             auto ev2 = ctx->ecs.view<EnemyComponent, HealthComponent>();
             for (auto e : ev2) {
-                if (!ev2.get<HealthComponent>(e).dead) { cleared = false; break; }
+                // hp<=0 即视为已死（尸体可能下一 tick 才被 player_death 销毁，
+                // 不能只依赖 dead 标记，否则最后一只击杀后会多等一 tick）。
+                const auto& h = ev2.get<HealthComponent>(e);
+                if (!h.dead && h.hp > 0) { cleared = false; break; }
             }
         }
         if (cleared) {

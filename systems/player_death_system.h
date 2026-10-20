@@ -69,7 +69,8 @@ static void player_death_system(entt::registry& registry, Context* ctx, float /*
 
     // 敌人死亡：HP 归零即销毁实体（不保留尸体）。
     // 该销毁在两端同 tick 发生（死亡判定确定性一致 → 帧同步两端一致）；
-    // "补满到目标数"由权威端 enemy_maintain_system 负责（生成新敌人并经快照下发）。
+    // "死一个补一个"由权威端 enemy_maintain_system 负责（消耗本关配额，
+    // 生成新敌人并经快照下发）；配额刷完后不再补兵，清空剩余敌人即通关。
     {
         std::vector<entt::entity> dead_enemies;
         auto eview = registry.view<EnemyComponent, HealthComponent>();

@@ -19,10 +19,20 @@ struct SpawnDef {
 // ============================================================
 constexpr int ENEMY_SPAWN_COUNT = 256;   // 出生表容量上限（C++11 constexpr 常量）
 
-// 场景内维持的存活敌人数（可配置：想保持几个就改这里）。
-// 初始生成与每 tick 补充都以该值为目标；实际数量受地图 Enemy 层出生点数约束，
-// 出生点不足时以出生点数为上限。
+// 场上同时存活的敌人上限（死一个补一个，直到本关总配额刷完）。
+// 出生点数量不足时轮转复用（同一出生点可以先后/同时刷出多个敌人）。
 constexpr int MAINTAIN_ENEMY_COUNT = 10;
+
+// 每关预设敌人总数（击杀配额）。场上同时存活 MAINTAIN_ENEMY_COUNT 个，
+// 死一个补一个，但累计只刷这么多；配额刷完后不再补兵，清空剩余敌人即通关。
+// 索引 = 关卡号 - 1；超出数组用默认值。想按关卡调难度就改这里。
+constexpr int LEVEL_ENEMY_TOTAL_DEFAULT = 100;
+constexpr int LEVEL_ENEMY_TOTALS[] = { 100, 100, 100, 100, 100, 100, 100, 100 };
+static inline int level_enemy_total(int level) {
+    const int n = (int)(sizeof(LEVEL_ENEMY_TOTALS) / sizeof(LEVEL_ENEMY_TOTALS[0]));
+    const int idx = level - 1;
+    return (idx >= 0 && idx < n) ? LEVEL_ENEMY_TOTALS[idx] : LEVEL_ENEMY_TOTAL_DEFAULT;
+}
 
 static inline const SpawnDef* level_enemy_defs(int level, int& count)
 {

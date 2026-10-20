@@ -234,9 +234,11 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                         break;
                 case SDL_SCANCODE_ESCAPE:
                 case SDL_SCANCODE_AC_BACK:
-                        // 游戏场景的 ESC/返回键已由 PauseMenuLayer 处理（打开/关闭暂停菜单），
-                        // 这里只处理其它场景；主菜单按安卓返回键则退出 App。
-                        if (strcmp(g_mgr->currentName(), "game") != 0) {
+                        // 游戏场景的 ESC/返回键由 PauseMenuLayer 处理；
+                        // 选关场景自己处理 ESC（返回选角），这里不要覆盖。
+                        // 其它场景仍走全局：回主菜单；主菜单按安卓返回键则退出 App。
+                        if (strcmp(g_mgr->currentName(), "game") != 0 &&
+                            strcmp(g_mgr->currentName(), "LevelSelect") != 0) {
                                 if (e->key.scancode == SDL_SCANCODE_AC_BACK &&
                                     strcmp(g_mgr->currentName(), "Main") == 0) {
                                         push_quit_event();

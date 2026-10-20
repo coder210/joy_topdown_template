@@ -43,6 +43,11 @@ struct GlobalState {
     // 由快照接收新敌人，故该值无需跨端同步）。初始 0。
     int next_enemy_spawn_idx = 0;
 
+    // 本关还可刷新的敌人数量（击杀配额剩余）。仅权威端维护：
+    // 初始 = level_enemy_total(level)，每生成一个敌人减 1；减到 0 后停止补兵，
+    // 清空场上剩余敌人即通关。客户端不参与刷怪，该值无需跨端同步、也不进 checksum。
+    int enemy_quota_remaining = 0;
+
     // A* 寻路工作区（存放 pathfind_astar 搜索过程的临时缓冲，含地图可通行性缓存）。
     // 仅作临时计算缓冲，不是帧同步状态、不参与 checksum，不随网络序列化。
     // 放 GlobalState 全局单例（随 ECS ctx 一起 emplace/get），避免函数内 static 数组的
