@@ -83,6 +83,7 @@ set(PROJECT_FILES
     passes/draw_enemy_pass.h
     passes/draw_fps_pass.h
     passes/draw_player_pass.h
+    passes/enemy_counter_hud_pass.h
     passes/fog_pass_2d.h
     passes/frame_display_pass.h
     passes/interpolate_pass.h

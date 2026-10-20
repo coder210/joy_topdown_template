@@ -17,6 +17,7 @@
 
 #include "../systems/input_consume_join_system.h"
 #include "../passes/player_status_hud_pass.h"
+#include "../passes/enemy_counter_hud_pass.h"
 #include "../passes/frame_display_pass.h"
 #include "../systems/input_consume_leave_system.h"
 #include "../systems/input_consume_input_system.h"
@@ -293,6 +294,10 @@ void GameScene::Render()
     if (ctx->mode != MODE_SERVER) {
         player_status_hud_pass(ctx->ecs, net_session(ctx).local_conv, ctx->r2d,
             AssetManager::GetInstance()->GetSimheiFont28());
+
+        // 顶部居中：剩余敌人 / 本关总数（清空即通关）
+        enemy_counter_hud_pass(ctx->ecs, ctx->r2d,
+            AssetManager::GetInstance()->GetSimheiFont24());
     }
 
     // 当前逻辑帧号 + 实测逻辑帧率 + 敌人数量 + 全局实体 id
