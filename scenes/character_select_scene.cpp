@@ -310,9 +310,17 @@ void CharacterSelectScene::HandleUiEvent(const void* e) {
     cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
         (void)btn;
         CharacterSelectScene* self = (CharacterSelectScene*)arg;
-        for (int i = 0; i < (int)g_characterCatalog.size() && i < MAX_CHARACTERS; i++)
-            if (self->btn_cards[i] && ui_button_hit(self->btn_cards[i], x, y))
-                self->selected = i;
+        // 按下只记录行，不立即选中：滑动列表时 scrollview 会消费后续事件，
+        // 松手若仍在这一行上才当作点击，避免“滑动误选角色”。
+        self->press_row_ = -1;
+        self->press_x_ = x;
+        self->press_y_ = y;
+        for (int i = 0; i < (int)g_characterCatalog.size() && i < MAX_CHARACTERS; i++) {
+            if (self->btn_cards[i] && button_is_hovered(self->btn_cards[i], x, y)) {
+                self->press_row_ = i;
+                break;
+            }
+        }
         if (self->btn_confirm && ui_button_hit(self->btn_confirm, x, y)) {
             const char* nick = self->nickname_input
                 ? inputbox_get_text(self->nickname_input) : "";
@@ -331,8 +339,18 @@ void CharacterSelectScene::HandleUiEvent(const void* e) {
             self->go_back();
     };
     cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
-        (void)x; (void)y; (void)btn;
+        (void)btn;
         CharacterSelectScene* self = (CharacterSelectScene*)arg;
+        // 拖动列表时 scrollview 已把松手事件消费掉，这里不会执行；
+        // 能走到这里说明是点击，且松手仍在按下的那一行上才选中。
+        if (self->press_row_ >= 0) {
+            button_p b = self->btn_cards[self->press_row_];
+            if (b && button_is_hovered(b, x, y)) {
+                UiSfx::Get().play(UiSfx::kClick);
+                self->selected = self->press_row_;
+            }
+        }
+        self->press_row_ = -1;
         for (int i = 0; i < (int)g_characterCatalog.size() && i < MAX_CHARACTERS; i++)
             if (self->btn_cards[i]) button_set_pressed(self->btn_cards[i], false);
         if (self->btn_confirm) button_set_pressed(self->btn_confirm, false);

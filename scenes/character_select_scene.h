@@ -20,6 +20,9 @@ private:
     inputbox_p nickname_input = NULL;
     int selected = 0;
     int hovered_ = -1;                    // 鼠标悬停的角色行
+    // 区分“点击行”与“滑动列表”：按下只记录，松手且仍在同一行才算点击
+    int   press_row_ = -1;
+    float press_x_ = 0.0f, press_y_ = 0.0f;
 
     // 左侧角色列表的纵向滚动
     scrollview_p card_view = NULL;

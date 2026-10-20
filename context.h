@@ -59,6 +59,11 @@ struct Context {
         int  selected_level    = 1;                    // 选中关卡（默认第 1 关）
         char selected_nickname[32] = "玩家";            // 玩家昵称
 
+        // ========== HUD ==========
+        // 调试 HUD（FPS / Frame / LogicFPS / POS / ST / EID）开关：默认关闭，F1 切换。
+        // 玩家常驻 HUD 只保留右上角“剩余敌人 / 总数”，避免遮挡视野。
+        bool show_debug_hud = false;
+
         // ========== 鼠标（仅渲染层瞄准用，不参与帧同步）==========
         // 鼠标事件给的是窗口像素，统一经 r2d_coordinates_from_window 换算到逻辑坐标(480x320)。
         // 由 GameplayControlsLayer 的 on_mousemoved 写入；无鼠标(服务端/未移动过)时 mouse_valid=false。

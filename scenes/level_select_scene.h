@@ -21,6 +21,9 @@ private:
     button_p btn_confirm = NULL, btn_back = NULL;
     int selected = 0;
     int hovered_ = -1;                 // 鼠标悬停的卡片（自行跟踪，避免依赖按钮内部态）
+    // 区分“点击行”与“滑动列表”：按下只记录，松手且仍在同一行才算点击
+    int   press_row_ = -1;
+    float press_x_ = 0.0f, press_y_ = 0.0f;
     // 各关地图是否已制作（Tiled 导出的 levelN.lua 是否存在）；缺图的关卡标"制作中"且不可进入
     bool level_ready[LEVEL_SLOT_MAX] = { false };
     // "此关正在制作中" 提示（模态：显示期间消费所有事件，点击任意处关闭）
@@ -33,7 +36,6 @@ private:
     int   preview_w_[LEVEL_SLOT_MAX] = {0};
     int   preview_h_[LEVEL_SLOT_MAX] = {0};
     int   preview_player_[LEVEL_SLOT_MAX] = {-1};
-    int   preview_enemy_[LEVEL_SLOT_MAX] = {0};
     bool  preview_has_[LEVEL_SLOT_MAX] = {false};
     void apply_level_scroll();    // 按 scrollview 偏移刷新关卡行按钮位置
     void draw_level(int i);       // 画左侧列表中的一行

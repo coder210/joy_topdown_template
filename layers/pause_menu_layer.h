@@ -63,8 +63,11 @@ private:
     button_p btn_ok_ = nullptr;
 
     button_p btn_settings_back_ = nullptr;
+    button_p btn_debug_ = nullptr;      // 设置页：显示/隐藏调试 HUD（手机端没有 F1）
     slider_p bgm_slider_ = nullptr;
     slider_p sfx_slider_ = nullptr;
+
+    void updateDebugButtonText();       // 同步“调试信息：开/关”文案
 };
 
 #endif // PAUSE_MENU_LAYER_H

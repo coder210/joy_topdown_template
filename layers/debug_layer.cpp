@@ -7,7 +7,9 @@ DebugLayer::~DebugLayer() = default;
 
 void DebugLayer::Render()
 {
-        drawDebug();
+        // 旧版左上角 60x60 红块调试可视化会遮挡 F1 调试文字，已停用。
+        // 保留 DebugLayer 以便以后放真正的调试可视化；需要时再单独接开关。
+        (void)ctx_;
 }
 
 void DebugLayer::Destroy() {}

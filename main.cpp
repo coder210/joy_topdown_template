@@ -139,6 +139,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         //   文字按 48px 原生烘焙更锐利。UI 全部为比例坐标，自动适配。
         ctx->window = create_window("Joy Topdown", 960, 640);
         ctx->r2d = r2d_create(ctx->window);
+        // 2D 形状（矩形/线段）的 alpha 由“绘制混合模式”控制；引擎默认是 NONE，
+        // 导致半透明 HUD 底色被画成不透明。这里全局开启 BLEND：
+        // - 不透明颜色（alpha=255）结果不变；
+        // - 半透明颜色（如剩余敌人纸片 alpha=150）才会真正透出背景。
+        r2d_set_blend_mode(ctx->r2d, JR2D_BLEND_BLEND);
         // 初始场景（闪屏/菜单）按设计分辨率 960x640；进入游戏场景时再切自适应宽度
         presentation_set_design(ctx->r2d);
 
@@ -247,6 +252,10 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                                 }
                         }
                         break;
+                case SDL_SCANCODE_F1:
+                        // 调试 HUD（FPS / Frame / POS / ST / EID）开关，默认关闭
+                        ctx->show_debug_hud = !ctx->show_debug_hud;
+                        break;
                 case SDL_SCANCODE_R:
                         g_mgr->reset();
                         g_mgr->push(new MainScene(ctx));
@@ -306,7 +315,8 @@ SDL_AppResult SDL_AppIterate(void*)
         r2d_set_color(ctx->r2d, 255, 255, 255, 255);
         r2d_begin(ctx->r2d);
         g_mgr->Render(ctx->r2d);
-        draw_fps_pass(ctx->r2d, AssetManager::GetInstance()->GetSimheiFont24(), dt);
+        if (ctx->show_debug_hud)
+                draw_fps_pass(ctx->r2d, AssetManager::GetInstance()->GetSimheiFont12(), dt);
         r2d_end(ctx->r2d);
         return SDL_APP_CONTINUE;
 }

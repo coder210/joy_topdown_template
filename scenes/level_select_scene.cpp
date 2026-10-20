@@ -8,6 +8,7 @@
 #include "../asset_manager.h"
 #include "../systems/character_catalog.h"
 #include "../systems/map_def.h"   // level_map_available / map_load_level / g_map_grid
+#include "../systems/spawn_def.h" // level_enemy_total（本关敌人总数配额）
 
 // 关卡元信息 —— 条数须与 map_def.h 的 LEVEL_COUNT、resources.json 的 maps 段一致。
 // 地图数据本体在 assets/.../levels/levelN.lua（Tiled 导出），缺图的关卡标记为"制作中"。
@@ -231,7 +232,9 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
     if (ready) {
         draw_difficulty(ctx, index, metaX, 246.0f * s, s);
         char meta[64];
-        snprintf(meta, sizeof(meta), "敌人 %d", preview_enemy_[index]);
+        // 显示本关真正要击杀的敌人总数（LEVEL_ENEMY_TOTALS，默认 100）。
+        // 地图 Enemy 层出生点数只是刷怪位置数量，对玩家没有意义，不再展示。
+        snprintf(meta, sizeof(meta), "敌人 %d", level_enemy_total(index + 1));
         jtext_printx(r2d, font12, meta, (int)strlen(meta), { 110, 110, 118, 255 },
                      metaX + 70.0f * s, 244.0f * s);
     } else {
@@ -339,7 +342,6 @@ void LevelSelectScene::Load() {
         self->preview_has_[i] = false;
         self->preview_w_[i] = self->preview_h_[i] = 0;
         self->preview_player_[i] = -1;
-        self->preview_enemy_[i] = 0;
         if (self->level_ready[i]) {
             map_load_level(i + 1);
             int mw = MAP_W, mh = MAP_H;
@@ -349,7 +351,6 @@ void LevelSelectScene::Load() {
             self->preview_w_[i] = mw;
             self->preview_h_[i] = mh;
             self->preview_player_[i] = g_map_info.player_cell;
-            self->preview_enemy_[i] = g_map_info.enemy_n;
             self->preview_has_[i] = true;
         }
     }
@@ -446,9 +447,17 @@ void LevelSelectScene::HandleUiEvent(const void* e) {
     cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
         (void)btn;
         LevelSelectScene* self = (LevelSelectScene*)arg;
-        for (int i = 0; i < LEVEL_META_COUNT; i++)
-            if (self->btn_levels[i] && ui_button_hit(self->btn_levels[i], x, y))
-                self->selected = i;
+        // 按下只记录行，不立即选中：滑动列表时 scrollview 会消费后续事件，
+        // 松手若仍在这一行上才当作点击，避免“滑动误选关卡”。
+        self->press_row_ = -1;
+        self->press_x_ = x;
+        self->press_y_ = y;
+        for (int i = 0; i < LEVEL_META_COUNT; i++) {
+            if (self->btn_levels[i] && button_is_hovered(self->btn_levels[i], x, y)) {
+                self->press_row_ = i;
+                break;
+            }
+        }
         if (self->btn_confirm && ui_button_hit(self->btn_confirm, x, y)) {
             if (self->selected < 0 || self->selected >= 6 || !self->level_ready[self->selected]) {
                 self->tip_active = true;
@@ -462,8 +471,18 @@ void LevelSelectScene::HandleUiEvent(const void* e) {
             request_scene(self->ctx(), new CharacterSelectScene(self->ctx(), self->target_mode));
     };
     cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
-        (void)x; (void)y; (void)btn;
+        (void)btn;
         LevelSelectScene* self = (LevelSelectScene*)arg;
+        // 拖动列表时 scrollview 已把松手事件消费掉，这里不会执行；
+        // 能走到这里说明是点击，且松手仍在按下的那一行上才选中。
+        if (self->press_row_ >= 0) {
+            button_p b = self->btn_levels[self->press_row_];
+            if (b && button_is_hovered(b, x, y)) {
+                UiSfx::Get().play(UiSfx::kClick);
+                self->selected = self->press_row_;
+            }
+        }
+        self->press_row_ = -1;
         for (int i = 0; i < LEVEL_META_COUNT; i++)
             if (self->btn_levels[i]) button_set_pressed(self->btn_levels[i], false);
         if (self->btn_confirm) button_set_pressed(self->btn_confirm, false);

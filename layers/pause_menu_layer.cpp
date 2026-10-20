@@ -33,7 +33,7 @@ static jrect_t confirm_panel_rect(int lw, int lh)
 static jrect_t settings_panel_rect(int lw, int lh)
 {
         const float s = pause_scale(lh);
-        const float w = 300.0f * s, h = 200.0f * s;
+        const float w = 300.0f * s, h = 230.0f * s;   // 加高一点，容纳“调试信息”开关
         return { ((float)lw - w) * 0.5f, ((float)lh - h) * 0.5f, w, h };
 }
 
@@ -91,6 +91,7 @@ void PauseMenuLayer::setupButtons()
         mk(&btn_cancel_,      "取消",       black);
         mk(&btn_ok_,          "确定",       black);
         mk(&btn_settings_back_,"返回",      black);
+        mk(&btn_debug_, (ctx_ && ctx_->show_debug_hud) ? "调试信息：开" : "调试信息：关", black);
 
         bgm_slider_ = slider_create(ctx_->r2d, 0.3f, 0.4f, 0.4f, 0.05f,
                                     0.0f, 1.0f, ctx_->settings.bgm_volume);
@@ -108,6 +109,15 @@ void PauseMenuLayer::setupButtons()
         syncLayout();
 }
 
+// 让“调试信息：开/关”与 ctx_->show_debug_hud 保持一致（F1 或本按钮都可能改动它）
+void PauseMenuLayer::updateDebugButtonText()
+{
+        if (!btn_debug_ || !ctx_) return;
+        font_p f = AssetManager::GetInstance() ? AssetManager::GetInstance()->GetSimheiFont24() : NULL;
+        const char* txt = ctx_->show_debug_hud ? "调试信息：开" : "调试信息：关";
+        button_set_textx(btn_debug_, f, txt, (int)strlen(txt), { 0, 0, 0, 255 });
+}
+
 void PauseMenuLayer::Destroy()
 {
         auto d = [](button_p& b) { if (b) { button_destroy(b); b = NULL; } };
@@ -119,6 +129,7 @@ void PauseMenuLayer::Destroy()
         d(btn_cancel_);
         d(btn_ok_);
         d(btn_settings_back_);
+        d(btn_debug_);
         if (bgm_slider_) { slider_destroy(bgm_slider_); bgm_slider_ = NULL; }
         if (sfx_slider_) { slider_destroy(sfx_slider_); sfx_slider_ = NULL; }
         page_ = PAGE_NONE;
@@ -179,10 +190,14 @@ void PauseMenuLayer::syncLayout()
                 }
         }
 
-        // 设置页「返回」
+        // 设置页「调试信息」开关 + 「返回」
         {
                 jrect_t st = settings_panel_rect(lw, lh);
                 const float bw = 100.0f * s, bh = 34.0f * s;
+                if (btn_debug_) {
+                        button_set_position(btn_debug_, st.x + 24.0f * s, st.y + 146.0f * s);
+                        button_set_size(btn_debug_, st.w - 48.0f * s, 28.0f * s);
+                }
                 if (btn_settings_back_) {
                         button_set_position(btn_settings_back_,
                                 st.x + (st.w - bw) * 0.5f, st.y + st.h - bh - 16.0f * s);
@@ -234,6 +249,7 @@ void PauseMenuLayer::openSettings()
                 if (bgm_slider_) slider_set_value(bgm_slider_, ctx_->settings.bgm_volume);
                 if (sfx_slider_) slider_set_value(sfx_slider_, ctx_->settings.sfx_volume);
         }
+        updateDebugButtonText();   // F1 可能已经改过状态，进入设置页时同步一下
         layoutSliders();
 }
 
@@ -299,6 +315,7 @@ void PauseMenuLayer::updateHover(float x, float y)
                 if (btn_ok_)     button_is_hovered(btn_ok_, x, y);
         } else if (page_ == PAGE_SETTINGS) {
                 if (btn_settings_back_) button_is_hovered(btn_settings_back_, x, y);
+                if (btn_debug_)         button_is_hovered(btn_debug_, x, y);
                 if (bgm_slider_) slider_is_hovered(bgm_slider_, x, y);
                 if (sfx_slider_) slider_is_hovered(sfx_slider_, x, y);
         }
@@ -315,6 +332,7 @@ void PauseMenuLayer::releasePressed()
         r(btn_cancel_);
         r(btn_ok_);
         r(btn_settings_back_);
+        r(btn_debug_);
 }
 
 bool PauseMenuLayer::handle_event(const void* ev)
@@ -402,6 +420,11 @@ bool PauseMenuLayer::handle_event(const void* ev)
                                         settings_dirty_ = false;
                                 }
                                 page_ = PAGE_MENU;
+                        } else if (btn_debug_ && button_is_pressed(btn_debug_, x, y)) {
+                                // 手机端没有 F1：在这里切换调试 HUD
+                                UiSfx::Get().play(UiSfx::kClick);
+                                if (ctx_) ctx_->show_debug_hud = !ctx_->show_debug_hud;
+                                updateDebugButtonText();
                         } else {
                                 if (bgm_slider_) slider_process_event(bgm_slider_, ev);
                                 if (sfx_slider_) slider_process_event(sfx_slider_, ev);
@@ -488,6 +511,7 @@ void PauseMenuLayer::Render()
 
                 if (bgm_slider_) slider_draw(bgm_slider_);
                 if (sfx_slider_) slider_draw(sfx_slider_);
+                if (btn_debug_) button_draw(btn_debug_);
                 if (btn_settings_back_) button_draw(btn_settings_back_);
         }
 }

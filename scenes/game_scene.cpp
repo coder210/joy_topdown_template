@@ -290,25 +290,30 @@ void GameScene::Render()
     // 模式特有渲染（碰撞调试、HUD 等）
     render();
 
-    // 玩家状态 HUD（本地有玩家的模式显示）：血量文字 + 绿色胶囊血条
+    // 常驻 HUD（本地有玩家的模式）：右上角“剩余敌人 / 总数”，避开视野中心
     if (ctx->mode != MODE_SERVER) {
-        player_status_hud_pass(ctx->ecs, net_session(ctx).local_conv, ctx->r2d,
-            AssetManager::GetInstance()->GetSimheiFont28());
-
-        // 顶部居中：剩余敌人 / 本关总数（清空即通关）
         enemy_counter_hud_pass(ctx->ecs, ctx->r2d,
-            AssetManager::GetInstance()->GetSimheiFont24());
+            AssetManager::GetInstance()->GetSimheiFont12());
     }
 
-    // 当前逻辑帧号 + 实测逻辑帧率 + 敌人数量 + 全局实体 id
-    int frame_id = (ctx->mode == MODE_SERVER || ctx->mode == MODE_HOST)
-        ? ctx->ecs.ctx().get<GlobalState>().next_frame_id - 1
-        : ctx->ecs.ctx().get<NetComponent>().frame_id;
-    int logic_fps = ctx->ecs.ctx().get<GlobalState>().logic_fps;
-    int enemy_count = (int)ctx->ecs.view<EnemyComponent>().size();
-    int entity_id = ctx->ecs.ctx().get<GlobalState>().next_entity_id;
-    frame_display_pass(ctx->r2d, AssetManager::GetInstance()->GetSimheiFont28(),
-        frame_id, logic_fps, 8.0f, 60.0f, enemy_count, entity_id);
+    // 调试 HUD（FPS / Frame / POS / ST / EID）：默认关闭，F1 或暂停菜单里的
+    // “调试信息”开关切换。不铺底色（透明），只用小号字 + 白色描边保证可读。
+    if (ctx->show_debug_hud) {
+        if (ctx->mode != MODE_SERVER) {
+            player_status_hud_pass(ctx->ecs, net_session(ctx).local_conv, ctx->r2d,
+                AssetManager::GetInstance()->GetSimheiFont12());
+        }
+
+        // 当前逻辑帧号 + 实测逻辑帧率 + 敌人数量 + 全局实体 id
+        int frame_id = (ctx->mode == MODE_SERVER || ctx->mode == MODE_HOST)
+            ? ctx->ecs.ctx().get<GlobalState>().next_frame_id - 1
+            : ctx->ecs.ctx().get<NetComponent>().frame_id;
+        int logic_fps = ctx->ecs.ctx().get<GlobalState>().logic_fps;
+        int enemy_count = (int)ctx->ecs.view<EnemyComponent>().size();
+        int entity_id = ctx->ecs.ctx().get<GlobalState>().next_entity_id;
+        frame_display_pass(ctx->r2d, AssetManager::GetInstance()->GetSimheiFont12(),
+            frame_id, logic_fps, 8.0f, 36.0f, enemy_count, entity_id);
+    }
 
     // 水墨风小地图（右上角宣纸底）
     //drawing_minimap_pass(ctx);
