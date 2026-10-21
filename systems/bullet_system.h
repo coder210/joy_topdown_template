@@ -8,6 +8,7 @@
 #include "../components/id_component.h"
 #include "../components/enemy_component.h"
 #include "../components/health_component.h"
+#include "../components/knockback_component.h"
 #include "../systems/collision_system.h"   // collision_fp_floor_to_int
 #include "../systems/map_def.h"            // MAP_W/H, map_tile_at, map_is_collidable
 #include <joy/jmath.h>
@@ -70,6 +71,15 @@ static void bullet_system(entt::registry& registry, Context* ctx, float dt)
             if (overlap) {
                 hp.hp -= b.damage;
                 if (hp.hp < 0) hp.hp = 0;
+                // 击退：仅对敌人施加（避免玩家被推导致联机不同步），沿子弹速度方向
+                fp_t len = fp_sqrt(fp_add(fp_mul(b.vx, b.vx), fp_mul(b.vy, b.vy)));
+                if (len > 0) {
+                    fp_t ks = fp_from_float(KNOCKBACK_SPEED);
+                    auto& kb = registry.emplace_or_replace<KnockbackComponent>(ee);
+                    kb.vx = fp_div(fp_mul(b.vx, ks), len);
+                    kb.vy = fp_div(fp_mul(b.vy, ks), len);
+                    kb.ticks = KNOCKBACK_TICKS;
+                }
                 to_destroy.push_back(e);
                 break;  // 命中一个目标即可，跳出敌人循环
             }

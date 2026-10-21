@@ -9,6 +9,7 @@
 #include "../components/enemy_component.h"
 #include "../components/ai_component.h"
 #include "../components/health_component.h"
+#include "../components/knockback_component.h"
 #include <algorithm>
 
 struct Context;
@@ -114,6 +115,17 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
                 if (hx < fp_add(tx, tw) && fp_add(hx, hw) > tx &&
                     hy < fp_add(ty, th) && fp_add(hy, hh) > ty) {
                     h.hp -= damage; if (h.hp < 0) h.hp = 0;
+                    {
+                        // 击退：沿攻击方向把敌人推开（独立衰减通道，不被 AI/寻路覆盖）
+                        fp_t kbx = 0, kby = 0;
+                        if (atk_dir == 2)      kbx = fp_from_float(1.0f);
+                        else if (atk_dir == 1) kbx = fp_from_float(-1.0f);
+                        else if (atk_dir == 0) kby = fp_from_float(1.0f);
+                        else if (atk_dir == 3) kby = fp_from_float(-1.0f);
+                        fp_t ks = fp_from_float(KNOCKBACK_SPEED);
+                        auto& kb = registry.emplace_or_replace<KnockbackComponent>(target);
+                        kb.vx = fp_mul(kbx, ks); kb.vy = fp_mul(kby, ks); kb.ticks = KNOCKBACK_TICKS;
+                    }
                     break;
                 }
             }

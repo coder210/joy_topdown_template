@@ -16,6 +16,7 @@
 #include "../passes/draw_bullet_pass.h"
 
 #include "../systems/input_consume_join_system.h"
+#include "../systems/knockback_system.h"
 #include "../passes/player_status_hud_pass.h"
 #include "../passes/enemy_counter_hud_pass.h"
 #include "../passes/frame_display_pass.h"
@@ -98,6 +99,7 @@ void GameScene::Load()
     add_system(ctx, OnUpdate, "separation", separation_system);
     add_system(ctx, OnUpdate, "collision", collision_system);
     add_system(ctx, OnUpdate, "bullet", bullet_system);
+    add_system(ctx, OnUpdate, "knockback", knockback_system);
     add_system(ctx, OnUpdate, "cleanup", cleanup_system);
 
     // 模式特有初始化（多态分派到子类）：注册 spawn_enemy/snapshot，并建链、注入本地玩家
