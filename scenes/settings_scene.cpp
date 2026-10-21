@@ -27,7 +27,8 @@ void SettingsScene::sync_settings() {
     Context* ctx = this->ctx();
     bool changed = false;
 
-    const char* ip = inputbox_get_text(ip_input);
+    const char* ip = combobox_input_get_text(ip_combo);
+    if (!ip) ip = "";
     if (strcmp(ip, ctx->settings.server_ip) != 0) {
         snprintf(ctx->settings.server_ip, sizeof(ctx->settings.server_ip), "%s", ip);
         changed = true;
@@ -72,7 +73,23 @@ void SettingsScene::HandleUiEvent(const void* e) {
     jevent_callbacks_t cbs = {};
     cbs.on_process_event = [](const void* ev, void* arg) {
         SettingsScene* self = (SettingsScene*)arg;
-        if (self->ip_input)    inputbox_process_event(self->ip_input, ev);
+        // 下拉项的鼠标点选：combobox_input_process_event 内部只处理键盘
+        // （Enter / 上下键）选中，点项需调用方用 hit_item 处理；而且必须先截获，
+        // 否则 item 区域在框外，会被当成"点击外部"直接把列表收起。
+        if (self->ip_combo) {
+                const SDL_Event* e = (const SDL_Event*)ev;
+                if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                        int idx = combobox_input_hit_item(self->ip_combo,
+                                (float)e->button.x, (float)e->button.y);
+                        if (idx >= 0 && idx < self->ip_item_count) {
+                                combobox_input_set_text(self->ip_combo, self->ip_items[idx]);
+                                combobox_input_set_open(self->ip_combo, false);
+                                self->sync_settings();
+                                return;
+                        }
+                }
+                combobox_input_process_event(self->ip_combo, ev);
+        }
         if (self->port_input)  inputbox_process_event(self->port_input, ev);
         if (self->bgm_slider)  slider_process_event(self->bgm_slider, ev);
         if (self->sfx_slider)  slider_process_event(self->sfx_slider, ev);
@@ -96,16 +113,11 @@ void SettingsScene::HandleUiEvent(const void* e) {
         // "从 A 直接点 B 唤不起输入法，必须先点框外让 A 失焦"的问题。
         // 这里：命中框聚焦并定位光标，另一个框仅 inputbox_blur（不动 SDL，键盘保持不收起）；
         // 只有点到两个框之外，才 inputbox_defocus 真正收起键盘。
-        bool hit_ip   = self->ip_input   && inputbox_is_hovered(self->ip_input, x, y);
+        // IP 已改为下拉框，焦点/展开由 combobox_input_process_event 自己处理，这里只管端口框
         bool hit_port = self->port_input && inputbox_is_hovered(self->port_input, x, y);
-        if (hit_ip) {
-            if (self->port_input) inputbox_blur(self->port_input);
-            inputbox_is_pressed(self->ip_input, x, y);      // 聚焦 + 定位光标
-        } else if (hit_port) {
-            if (self->ip_input) inputbox_blur(self->ip_input);
+        if (hit_port) {
             inputbox_is_pressed(self->port_input, x, y);    // 聚焦 + 定位光标
         } else {
-            if (self->ip_input)   inputbox_defocus(self->ip_input);
             if (self->port_input) inputbox_defocus(self->port_input);
         }
         if (self->btn_back && ui_button_hit(self->btn_back, x, y))
@@ -144,7 +156,7 @@ void SettingsScene::Render() {
 
     // 行标签
     jcolor_t label_c = { 50, 50, 60, 255 };
-    jtext_printf(r2d, font24, "服务器 IP", (int)strlen("服务器 IP"), label_c, 20.0f / 480.0f, 52.0f / 320.0f);
+    jtext_printf(r2d, font24, "服务器IP", (int)strlen("服务器IP"), label_c, 20.0f / 480.0f, 52.0f / 320.0f);
     jtext_printf(r2d, font24, "端口", (int)strlen("端口"), label_c,       20.0f / 480.0f, 92.0f / 320.0f);
     jtext_printf(r2d, font24, "音乐", (int)strlen("音乐"), label_c,       20.0f / 480.0f, 132.0f / 320.0f);
     jtext_printf(r2d, font24, "音效", (int)strlen("音效"), label_c,       20.0f / 480.0f, 172.0f / 320.0f);
@@ -158,13 +170,16 @@ void SettingsScene::Render() {
     jtext_printf(r2d, font24, pct, (int)strlen(pct), pct_c, 330.0f / 480.0f, 172.0f / 320.0f);
 
     // 控件（先画所有普通控件，下拉列表最后画以保证层级在最上层）
-    if (self->ip_input) inputbox_draw(self->ip_input);
+    if (self->ip_combo) combobox_input_draw(self->ip_combo);
     if (self->port_input) inputbox_draw(self->port_input);
     if (self->bgm_slider) slider_draw(self->bgm_slider);
     if (self->sfx_slider) slider_draw(self->sfx_slider);
     if (self->fullscreen_cb) checkbox_draw(self->fullscreen_cb, r2d, font24);
     if (self->collision_cb) checkbox_draw(self->collision_cb, r2d, font24);
     if (self->btn_back) button_draw(self->btn_back);
+
+    // 下拉列表最后画，保证层级在最上层
+    if (self->ip_combo) combobox_input_draw_dropdown(self->ip_combo);
 }
 
 void SettingsScene::Destroy() {
@@ -172,7 +187,7 @@ void SettingsScene::Destroy() {
     // 停止并释放 BGM 试听（独立设备），避免回到菜单后仍响
     if (preview_bgm) { audio_bgm_destroy(preview_bgm); preview_bgm = NULL; }
     if (preview_dev) { audio_close_device(preview_dev); preview_dev = 0; }
-    if (self->ip_input) inputbox_destroy(self->ip_input);
+    if (self->ip_combo) combobox_input_destroy(self->ip_combo);
     if (self->port_input) inputbox_destroy(self->port_input);
     if (self->bgm_slider) slider_destroy(self->bgm_slider);
     if (self->sfx_slider) slider_destroy(self->sfx_slider);
@@ -188,9 +203,30 @@ void SettingsScene::Load() {
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
 
 
-    // 服务器 IP 输入框（自由文本输入，彻底脱离 scene_node 弹层）
-    self->ip_input = inputbox_create(ctx->r2d, 0.22917f, 0.15f, 0.52083f, 0.075f, font24);
-    inputbox_set_text(self->ip_input, ctx->settings.server_ip);
+    // 服务器 IP：可输入下拉框（彻底脱离 scene_node 弹层，直接画）。
+    // 下拉项 = 本机 IPv4（get_local_ips），手机上免手动输入；仍可手输任意 IP。
+    // 标签"服务器IP"较长：字号随逻辑分辨率翻倍后，标签会顶到控件左边被盖住
+    //（原来就差一点，2 倍后明显）。这里按实测标签宽度把控件左边界往右推，
+    // 右边界保持 0.22917+0.52083 不变，所以只是变窄一点、不会整体移位。
+    int lgw = 0, lgh = 0;
+    r2d_get_logical_presentation(ctx->r2d, &lgw, &lgh, NULL);
+    const float ls = (lgw > 0) ? ((float)lgw / 480.0f) : 1.0f;
+    int lab_w = 0, lab_h = 0;
+    jcolor_t lab_c = { 60, 60, 70, 255 };   // 仅用于测量（尺寸与颜色无关）
+    jtext_measurex(ctx->r2d, font24, "服务器IP", (int)strlen("服务器IP"),
+                   lab_c, &lab_w, &lab_h);
+    float ip_fx   = (20.0f * ls + (float)lab_w + 8.0f * ls) / (float)lgw;
+    if (ip_fx < 0.22917f) ip_fx = 0.22917f;               // 标签短时保持原有对齐
+    float ip_fw   = (0.22917f + 0.52083f) - ip_fx;        // 右边界不变
+    if (ip_fw < 0.20f) ip_fw = 0.20f;                     // 兜底：别被压没了
+
+    self->ip_combo = combobox_input_create(ctx->r2d, ip_fx, 0.15f, ip_fw, 0.075f,
+                                           font24, JOY_MAX_IP);
+    combobox_input_set_text(self->ip_combo, ctx->settings.server_ip);
+    self->ip_item_count = get_local_ips(self->ip_items, 8);
+    for (int i = 0; i < self->ip_item_count; i++)
+        combobox_input_add_item(self->ip_combo, self->ip_items[i],
+                                (int)strlen(self->ip_items[i]));
 
     // 端口输入框
     self->port_input = inputbox_create(ctx->r2d, 0.22917f, 0.275f, 0.20833f, 0.075f, font24);

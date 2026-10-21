@@ -22,7 +22,11 @@ public:
     void Destroy() override;
     void HandleUiEvent(const void* e) override;
 private:
-    inputbox_p ip_input = NULL;
+    // 服务器 IP：可输入下拉框（列表 = 本机 IPv4，免去手机上手动输入 IP；
+    // 仍可手输，所以照样能连列表之外的服务器）
+    combobox_input_p ip_combo = NULL;
+    char ip_items[8][JOY_MAX_IP] = {};   // 与下拉项一一对应：hit_item 只回索引，按索引取回文本
+    int  ip_item_count = 0;
     inputbox_p port_input = NULL;
     slider_p bgm_slider = NULL, sfx_slider = NULL;
     checkbox_p fullscreen_cb = NULL, collision_cb = NULL;
