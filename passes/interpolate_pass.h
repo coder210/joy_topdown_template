@@ -10,6 +10,7 @@
 #include "../components/enemy_component.h"
 #include "../components/action_state_component.h"
 #include "../components/bullet_component.h"
+#include "../components/knockback_component.h"
 #include "render_math.h"   // GD_PI 渲染数学常量（与 draw_enemy_pass 共用，保证朝向角一致）
 
 struct Context;
@@ -53,7 +54,10 @@ static void interpolate_pass(entt::registry& registry, Context* ctx, float dt)
         const float tx = fp_to_float(lp.x) + hw;
         const float ty = fp_to_float(lp.y) + hh;
 
-        if (!t.interp_init) {
+        // 击退期间不做平滑：精灵必须紧跟逻辑真值，否则被击退的敌人"真碰撞盒"会跑到
+        // 精灵前面，表现为箭还没到（或已越过）精灵就已判命中。击退是短促冲量，直接贴合可接受。
+        const bool kb_snap = registry.all_of<KnockbackComponent>(e);
+        if (kb_snap || !t.interp_init) {
             t.position.x = tx; t.position.y = ty;
         } else {
             t.position.x += (tx - t.position.x) * f;
