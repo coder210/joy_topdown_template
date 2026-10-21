@@ -154,20 +154,42 @@ void SettingsScene::Render() {
     jtext_printf(r2d, font28, "设置", (int)strlen("设置"), title_c,
                  216.0f / 480.0f, 12.0f / 320.0f);
 
-    // 行标签
+    // 用栅格逐行绘制左列标签；右列控件由 Load 按同一栅格创建，这里仅补标签与音量百分比
+    int rlw = 0, rlh = 0;
+    r2d_get_logical_presentation(r2d, &rlw, &rlh, NULL);
+    const float s  = (rlh > 0) ? ((float)rlh / 320.0f) : 1.0f;
+    const float LW = (float)((rlw > 0) ? rlw : 960);
+    const float LH = (float)((rlh > 0) ? rlh : 640);
+    float cols[2] = { 0.30f, 0.70f };
+    jlayout_grid_t* g = jlayout_grid_create(24.0f * s, 52.0f * s,
+            LW - 48.0f * s, 40.0f * s, 2, cols, 8.0f * s);
     jcolor_t label_c = { 50, 50, 60, 255 };
-    jtext_printf(r2d, font24, "服务器IP", (int)strlen("服务器IP"), label_c, 20.0f / 480.0f, 52.0f / 320.0f);
-    jtext_printf(r2d, font24, "端口", (int)strlen("端口"), label_c,       20.0f / 480.0f, 92.0f / 320.0f);
-    jtext_printf(r2d, font24, "音乐", (int)strlen("音乐"), label_c,       20.0f / 480.0f, 132.0f / 320.0f);
-    jtext_printf(r2d, font24, "音效", (int)strlen("音效"), label_c,       20.0f / 480.0f, 172.0f / 320.0f);
+    float cx, cy, cw, ch;
 
-    // 音量百分比
-    char pct[16];
-    jcolor_t pct_c = { 50, 50, 60, 255 };
-    snprintf(pct, sizeof(pct), "%d%%", (int)(slider_get_value(self->bgm_slider) * 100.0f));
-    jtext_printf(r2d, font24, pct, (int)strlen(pct), pct_c, 330.0f / 480.0f, 132.0f / 320.0f);
-    snprintf(pct, sizeof(pct), "%d%%", (int)(slider_get_value(self->sfx_slider) * 100.0f));
-    jtext_printf(r2d, font24, pct, (int)strlen(pct), pct_c, 330.0f / 480.0f, 172.0f / 320.0f);
+    jlayout_grid_label(g, r2d, font24, "服务器IP", (int)strlen("服务器IP"), label_c, 0, &cx, &cy, &cw, &ch);
+    jlayout_grid_next_row(g);
+    jlayout_grid_label(g, r2d, font24, "端口", (int)strlen("端口"), label_c, 0, &cx, &cy, &cw, &ch);
+    jlayout_grid_next_row(g);
+    jlayout_grid_label(g, r2d, font24, "音乐", (int)strlen("音乐"), label_c, 0, &cx, &cy, &cw, &ch);
+    {
+        char pct[16];
+        snprintf(pct, sizeof(pct), "%d%%", (int)(slider_get_value(self->bgm_slider) * 100.0f));
+        int tw = 0, th = 0;
+        jtext_measurex(r2d, font24, pct, (int)strlen(pct), label_c, &tw, &th);
+        jtext_printf(r2d, font24, pct, (int)strlen(pct), label_c,
+                     (self->bgm_pct_rx - (float)tw) / LW, (self->bgm_pct_cy - (float)th * 0.5f) / LH);
+    }
+    jlayout_grid_next_row(g);
+    jlayout_grid_label(g, r2d, font24, "音效", (int)strlen("音效"), label_c, 0, &cx, &cy, &cw, &ch);
+    {
+        char pct[16];
+        snprintf(pct, sizeof(pct), "%d%%", (int)(slider_get_value(self->sfx_slider) * 100.0f));
+        int tw = 0, th = 0;
+        jtext_measurex(r2d, font24, pct, (int)strlen(pct), label_c, &tw, &th);
+        jtext_printf(r2d, font24, pct, (int)strlen(pct), label_c,
+                     (self->sfx_pct_rx - (float)tw) / LW, (self->sfx_pct_cy - (float)th * 0.5f) / LH);
+    }
+    jlayout_grid_destroy(g);
 
     // 控件（先画所有普通控件，下拉列表最后画以保证层级在最上层）
     if (self->ip_combo) combobox_input_draw(self->ip_combo);
@@ -203,42 +225,52 @@ void SettingsScene::Load() {
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
 
 
-    // 服务器 IP：可输入下拉框（彻底脱离 scene_node 弹层，直接画）。
-    // 下拉项 = 本机 IPv4（get_local_ips），手机上免手动输入；仍可手输任意 IP。
-    // 标签"服务器IP"较长：字号随逻辑分辨率翻倍后，标签会顶到控件左边被盖住
-    //（原来就差一点，2 倍后明显）。这里按实测标签宽度把控件左边界往右推，
-    // 右边界保持 0.22917+0.52083 不变，所以只是变窄一点、不会整体移位。
-    int lgw = 0, lgh = 0;
-    r2d_get_logical_presentation(ctx->r2d, &lgw, &lgh, NULL);
-    const float ls = (lgw > 0) ? ((float)lgw / 480.0f) : 1.0f;
-    int lab_w = 0, lab_h = 0;
-    jcolor_t lab_c = { 60, 60, 70, 255 };   // 仅用于测量（尺寸与颜色无关）
-    jtext_measurex(ctx->r2d, font24, "服务器IP", (int)strlen("服务器IP"),
-                   lab_c, &lab_w, &lab_h);
-    float ip_fx   = (20.0f * ls + (float)lab_w + 8.0f * ls) / (float)lgw;
-    if (ip_fx < 0.22917f) ip_fx = 0.22917f;               // 标签短时保持原有对齐
-    float ip_fw   = (0.22917f + 0.52083f) - ip_fx;        // 右边界不变
-    if (ip_fw < 0.20f) ip_fw = 0.20f;                     // 兜底：别被压没了
+    // 两列栅格：左标签 / 右控件，按逻辑像素铺满宽度（左右各留 24*s）。
+    // 宽屏下表单拉伸到右边界，右侧不再有大块留白；列宽比固定，标签长短不影响控件位置。
+    int rlw = 0, rlh = 0;
+    r2d_get_logical_presentation(ctx->r2d, &rlw, &rlh, NULL);
+    const float s  = (rlh > 0) ? ((float)rlh / 320.0f) : 1.0f;
+    const float LW = (float)((rlw > 0) ? rlw : 960);
+    const float LH = (float)((rlh > 0) ? rlh : 640);
+    float cols[2] = { 0.30f, 0.70f };
+    jlayout_grid_t* g = jlayout_grid_create(24.0f * s, 52.0f * s,
+            LW - 48.0f * s, 40.0f * s, 2, cols, 8.0f * s);
+    jcolor_t lab_c = { 50, 50, 60, 255 };
+    float cx, cy, cw, ch;
 
-    self->ip_combo = combobox_input_create(ctx->r2d, ip_fx, 0.15f, ip_fw, 0.075f,
-                                           font24, JOY_MAX_IP);
+    // 服务器 IP
+    jlayout_grid_cell(g, 1, &cx, &cy, &cw, &ch);
+    self->ip_combo = combobox_input_create(ctx->r2d, cx / LW, cy / LH, cw / LW, ch / LH, font24, JOY_MAX_IP);
     combobox_input_set_text(self->ip_combo, ctx->settings.server_ip);
     self->ip_item_count = get_local_ips(self->ip_items, 8);
     for (int i = 0; i < self->ip_item_count; i++)
         combobox_input_add_item(self->ip_combo, self->ip_items[i],
                                 (int)strlen(self->ip_items[i]));
+    jlayout_grid_next_row(g);
 
-    // 端口输入框
-    self->port_input = inputbox_create(ctx->r2d, 0.22917f, 0.275f, 0.20833f, 0.075f, font24);
-    char port_str[16];
-    snprintf(port_str, sizeof(port_str), "%d", ctx->settings.server_port);
-    inputbox_set_text(self->port_input, port_str);
+    // 端口
+    jlayout_grid_cell(g, 1, &cx, &cy, &cw, &ch);
+    self->port_input = inputbox_create(ctx->r2d, cx / LW, cy / LH, cw / LW, ch / LH, font24);
+    {
+        char port_str[16];
+        snprintf(port_str, sizeof(port_str), "%d", ctx->settings.server_port);
+        inputbox_set_text(self->port_input, port_str);
+    }
+    jlayout_grid_next_row(g);
 
-    // 音量滑块
-    self->bgm_slider = slider_create(ctx->r2d, 0.22917f, 0.42813f, 0.41667f, 0.04375f, 0.0f, 1.0f, ctx->settings.bgm_volume);
-    self->sfx_slider = slider_create(ctx->r2d, 0.22917f, 0.55313f, 0.41667f, 0.04375f, 0.0f, 1.0f, ctx->settings.sfx_volume);
+    // 音乐
+    jlayout_grid_cell(g, 1, &cx, &cy, &cw, &ch);
+    self->bgm_slider = slider_create(ctx->r2d, cx / LW, cy / LH, cw / LW, ch / LH, 0.0f, 1.0f, ctx->settings.bgm_volume);
     slider_set_colors(self->bgm_slider, {200,200,200,255}, {50,50,60,255}, {80,80,80,255}, {100,100,100,255});
+    self->bgm_pct_rx = cx + cw - 4.0f * s; self->bgm_pct_cy = cy + ch * 0.5f;
+    jlayout_grid_next_row(g);
+
+    // 音效
+    jlayout_grid_cell(g, 1, &cx, &cy, &cw, &ch);
+    self->sfx_slider = slider_create(ctx->r2d, cx / LW, cy / LH, cw / LW, ch / LH, 0.0f, 1.0f, ctx->settings.sfx_volume);
     slider_set_colors(self->sfx_slider, {200,200,200,255}, {50,50,60,255}, {80,80,80,255}, {100,100,100,255});
+    self->sfx_pct_rx = cx + cw - 4.0f * s; self->sfx_pct_cy = cy + ch * 0.5f;
+    jlayout_grid_next_row(g);
 
     // 设置页 BGM 试听：自建独立音频设备播放 bgm（与游戏场景的 BGM 设备互不干扰），
     // 进设置页即开始循环播放，使"音乐"滑块在此即可实时听到音量变化。返回时 Destroy 停止。
@@ -262,21 +294,27 @@ void SettingsScene::Load() {
         }
     }
 
-    // 全屏复选框
-    self->fullscreen_cb = checkbox_create(0.22917f, 0.66250f, 0.04167f, "全屏");
+    // 全屏复选框（标签由 checkbox 自带，置于第 1 列）
+    jlayout_grid_cell(g, 1, &cx, &cy, &cw, &ch);
+    self->fullscreen_cb = checkbox_create(cx / LW, cy / LH, (20.0f * s) / LW, "全屏");
     checkbox_set_r2d(self->fullscreen_cb, ctx->r2d);
     checkbox_set_colors(self->fullscreen_cb, {200,200,200,255}, {50,50,60,255}, {180,180,180,255});
     checkbox_set_state(self->fullscreen_cb,
             ctx->settings.fullscreen ? JOY_CHECKBOX_CHECKED : JOY_CHECKBOX_UNCHECKED);
+    jlayout_grid_next_row(g);
 
-    // 显示测试碰撞框复选框
-    self->collision_cb = checkbox_create(0.22917f, 0.72500f, 0.04167f, "显示碰撞框");
+    // 显示测试碰撞框
+    jlayout_grid_cell(g, 1, &cx, &cy, &cw, &ch);
+    self->collision_cb = checkbox_create(cx / LW, cy / LH, (20.0f * s) / LW, "显示碰撞框");
     checkbox_set_r2d(self->collision_cb, ctx->r2d);
     checkbox_set_colors(self->collision_cb, {200,200,200,255}, {50,50,60,255}, {180,180,180,255});
     checkbox_set_state(self->collision_cb,
             ctx->settings.show_collision ? JOY_CHECKBOX_CHECKED : JOY_CHECKBOX_UNCHECKED);
+    jlayout_grid_next_row(g);
 
-    // 返回按钮
+    jlayout_grid_destroy(g);
+
+    // 返回按钮（底部居中，固定比例坐标）
     self->btn_back = button_create(ctx->r2d,
             (190.0f + 50.0f) / 480.0f, (270.0f + 18.0f) / 320.0f,
             100.0f / 480.0f, 36.0f / 320.0f);
