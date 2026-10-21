@@ -21,53 +21,42 @@ MenuLayer::~MenuLayer() = default;
 
 void MenuLayer::load_menu_buttons()
 {
-        int logical_width, logical_height;
-        r2d_get_logical_presentation(ctx_->r2d, &logical_width, &logical_height, NULL);
+        int lw, lh;
+        r2d_get_logical_presentation(ctx_->r2d, &lw, &lh, NULL);
+        const float LW = (lw > 0) ? (float)lw : 960.0f;
+        const float LH = (lh > 0) ? (float)lh : 640.0f;
+        const float s  = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
         font_p simhei_font = AssetManager::GetInstance()->GetSimheiFont24();
 
-        // 按钮尺寸/间距按设计稿 480x320 换算：逻辑分辨率改变时观感不变。
-        //（原来是直接用 120 / 44 / 12 / 20 这些设计稿像素，分辨率一改按钮就会变小并偏移）
-        // 宽度也用高度基准，宽屏下按钮不会被横向拉宽
-        const float sy = (float)logical_height / 320.0f;
-        float btn_width = 120.0f * sy, btn_height = 44.0f * sy;
-        float btn_x = ((float)logical_width - btn_width) * 0.5f;
-        float gap = 12.0f * sy;
-        // 整体下沉：空出顶部标题区域、底部给版本号留白，使四枚按钮垂直均衡。
-        float block = btn_height * 4 + gap * 3;
-        float start_y = ((float)logical_height - block) * 0.5f + 20.0f * sy;
+        // 按钮尺寸/间距按设计稿 480x320 换算（高度基准），分辨率改变观感不变。
+        const float btn_w = 120.0f * s, btn_h = 44.0f * s, gap = 12.0f * s;
+        const float block = btn_h * 4 + gap * 3;
+        const float start_y = (LH - block) * 0.5f + 20.0f * s;
 
-        btn_start = button_create(ctx_->r2d,
-                ((float)btn_x + (float)btn_width * 0.5f) / (float)logical_width,
-                ((float)start_y + (float)btn_height * 0.5f) / (float)logical_height,
-                (float)btn_width / (float)logical_width, (float)btn_height / (float)logical_height);
-        UIStyle::applyPaperButton(btn_start);
-        button_set_text_offset(btn_start, 0, 3.0f * sy);
-        button_set_textx(btn_start, simhei_font, "单人游戏", (int)strlen("单人游戏"), { 0, 0, 0, 255 });
-        
-        btn_online = button_create(ctx_->r2d,
-                ((float)btn_x + (float)btn_width * 0.5f) / (float)logical_width,
-                ((float)(start_y + (btn_height + gap)) + (float)btn_height * 0.5f) / (float)logical_height,
-                (float)btn_width / (float)logical_width, (float)btn_height / (float)logical_height);
-        UIStyle::applyPaperButton(btn_online);
-        button_set_text_offset(btn_online, 0, 3.0f * sy);
-        button_set_textx(btn_online, simhei_font, "联机游戏", (int)strlen("联机游戏"), { 0, 0, 0, 255 });
-        
-        btn_settings = button_create(ctx_->r2d,
-                ((float)btn_x + (float)btn_width * 0.5f) / (float)logical_width,
-                ((float)(start_y + (btn_height + gap) * 2) + (float)btn_height * 0.5f) / (float)logical_height,
-                (float)btn_width / (float)logical_width, (float)btn_height / (float)logical_height);
-        UIStyle::applyPaperButton(btn_settings);
-        button_set_text_offset(btn_settings, 0, 3.0f * sy);
-        button_set_textx(btn_settings, simhei_font, "设置", (int)strlen("设置"), { 0, 0, 0, 255 });
-        
-        btn_exit = button_create(ctx_->r2d,
-                ((float)btn_x + (float)btn_width * 0.5f) / (float)logical_width,
-                ((float)(start_y + (btn_height + gap) * 3) + (float)btn_height * 0.5f) / (float)logical_height,
-                (float)btn_width / (float)logical_width, (float)btn_height / (float)logical_height);
-        UIStyle::applyPaperButton(btn_exit);
-        button_set_text_offset(btn_exit, 0, 3.0f * sy);
-        button_set_textx(btn_exit, simhei_font, "退出", (int)strlen("退出"), { 0, 0, 0, 255 });
-        }
+        // 1 列栅格：四枚按钮垂直居中堆叠（与原来手动坐标结果一致）。
+        // pad=0 时单元格顶边即行顶，按钮在单元格内顶部对齐 → 与原先逐行偏移等价。
+        float cols[1] = { 1.0f };
+        jlayout_grid_t* g = jlayout_grid_create((LW - btn_w) * 0.5f, start_y, btn_w, btn_h + gap, 1, cols, 0.0f);
+        float cx, cy, cw, ch;
+
+        auto make_btn = [&](const char* label, int len) -> button_p {
+                jlayout_grid_cell(g, 0, &cx, &cy, &cw, &ch);
+                button_p b = button_create(ctx_->r2d,
+                        (cx + cw * 0.5f) / LW, (cy + btn_h * 0.5f) / LH,
+                        cw / LW, btn_h / LH);
+                UIStyle::applyPaperButton(b);
+                button_set_text_offset(b, 0, 3.0f * s);
+                button_set_textx(b, simhei_font, label, len, { 0, 0, 0, 255 });
+                jlayout_grid_next_row(g);
+                return b;
+        };
+
+        btn_start    = make_btn("单人游戏", (int)strlen("单人游戏"));
+        btn_online   = make_btn("联机游戏", (int)strlen("联机游戏"));
+        btn_settings = make_btn("设置",     (int)strlen("设置"));
+        btn_exit     = make_btn("退出",     (int)strlen("退出"));
+        jlayout_grid_destroy(g);
+}
 
 void MenuLayer::HandleEvent(const void* ev)
 {
