@@ -260,6 +260,8 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                         g_mgr->reset();
                         g_mgr->push(new MainScene(ctx));
                         break;
+                default:
+                        break;
                 }
         }
         else if (is_user_event(e, MENU_EVENT)) {

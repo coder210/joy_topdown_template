@@ -18,12 +18,12 @@ void MainScene::Load() {
     for (int i = 0; i < MAX_PARTICLES; i++) {
         self->particles[i].x = (float)(rand() % logical_w);
         self->particles[i].y = (float)(rand() % logical_h);
-        self->particles[i].vx = ((float)rand() / RAND_MAX - 0.5f) * 6.0f;
-        self->particles[i].vy = ((float)rand() / RAND_MAX - 0.5f) * 6.0f;
-        self->particles[i].alpha = 0.08f + (float)rand() / RAND_MAX * 0.15f;
-        self->particles[i].size = 1.5f + (float)rand() / RAND_MAX * 1.5f;
-        self->particles[i].phase = (float)rand() / RAND_MAX * 6.2832f;
-        self->particles[i].twinkle_speed = 0.8f + (float)rand() / RAND_MAX * 1.5f;
+        self->particles[i].vx = ((float)rand() / (float)RAND_MAX - 0.5f) * 6.0f;
+        self->particles[i].vy = ((float)rand() / (float)RAND_MAX - 0.5f) * 6.0f;
+        self->particles[i].alpha = 0.08f + (float)rand() / (float)RAND_MAX * 0.15f;
+        self->particles[i].size = 1.5f + (float)rand() / (float)RAND_MAX * 1.5f;
+        self->particles[i].phase = (float)rand() / (float)RAND_MAX * 6.2832f;
+        self->particles[i].twinkle_speed = 0.8f + (float)rand() / (float)RAND_MAX * 1.5f;
     }
 
     self->menu = new MenuLayer(self->ctx());   // 纯 button 菜单层，由 Render/HandleUiEvent 桥接
