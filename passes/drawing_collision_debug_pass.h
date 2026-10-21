@@ -6,6 +6,8 @@
 #include "../components/player_component.h"
 #include "../components/local_only_component.h"
 #include "../components/global_state_component.h"
+#include "../components/enemy_component.h"
+#include "../components/bullet_component.h"
 #include "../protocol.h"
 #include "../context.h"
 
@@ -43,6 +45,40 @@ static void drawing_collision_debug_pass(Context* ctx)
     for (auto e : wview) {
         auto& pos  = wview.get<LogicPositionComponent>(e);
         auto& rect = wview.get<LogicRectComponent>(e);
+        float w = fp_to_float(rect.width);
+        float h = fp_to_float(rect.height);
+        if (w <= 0.0f || h <= 0.0f) continue;
+        jrect_t r;
+        r.x = meters_to_pixels(fp_to_float(pos.x) - cam.x);
+        r.y = meters_to_pixels(fp_to_float(pos.y) - cam.y);
+        r.w = meters_to_pixels(w);
+        r.h = meters_to_pixels(h);
+        shape_draw_rectangle(ctx->r2d, "line", r);
+    }
+
+    // 敌人碰撞盒：蓝色线框（诊断用——和 1m 贴图对比，看真实判定范围）
+    auto eview = ctx->ecs.view<EnemyComponent, LogicRectComponent, LogicPositionComponent>();
+    r2d_set_color(ctx->r2d, 60, 90, 230, 220);
+    for (auto e : eview) {
+        auto& pos  = eview.get<LogicPositionComponent>(e);
+        auto& rect = eview.get<LogicRectComponent>(e);
+        float w = fp_to_float(rect.width);
+        float h = fp_to_float(rect.height);
+        if (w <= 0.0f || h <= 0.0f) continue;
+        jrect_t r;
+        r.x = meters_to_pixels(fp_to_float(pos.x) - cam.x);
+        r.y = meters_to_pixels(fp_to_float(pos.y) - cam.y);
+        r.w = meters_to_pixels(w);
+        r.h = meters_to_pixels(h);
+        shape_draw_rectangle(ctx->r2d, "line", r);
+    }
+
+    // 子弹/箭碰撞盒：橙色线框（诊断用——0.15m 小盒 vs 1m 贴图，看命中判定到底在哪）
+    auto bview = ctx->ecs.view<BulletComponent, LogicRectComponent, LogicPositionComponent>();
+    r2d_set_color(ctx->r2d, 240, 150, 30, 230);
+    for (auto e : bview) {
+        auto& pos  = bview.get<LogicPositionComponent>(e);
+        auto& rect = bview.get<LogicRectComponent>(e);
         float w = fp_to_float(rect.width);
         float h = fp_to_float(rect.height);
         if (w <= 0.0f || h <= 0.0f) continue;
