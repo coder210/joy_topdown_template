@@ -162,7 +162,7 @@ void SettingsScene::Render() {
     const float LH = (float)((rlh > 0) ? rlh : 640);
     float cols[2] = { 0.30f, 0.70f };
     jlayout_grid_t* g = jlayout_grid_create(24.0f * s, 52.0f * s,
-            LW - 48.0f * s, 40.0f * s, 2, cols, 8.0f * s);
+            LW - 48.0f * s, 34.0f * s, 2, cols, 8.0f * s);
     jcolor_t label_c = { 50, 50, 60, 255 };
     float cx, cy, cw, ch;
 
@@ -234,7 +234,7 @@ void SettingsScene::Load() {
     const float LH = (float)((rlh > 0) ? rlh : 640);
     float cols[2] = { 0.30f, 0.70f };
     jlayout_grid_t* g = jlayout_grid_create(24.0f * s, 52.0f * s,
-            LW - 48.0f * s, 40.0f * s, 2, cols, 8.0f * s);
+            LW - 48.0f * s, 34.0f * s, 2, cols, 8.0f * s);
     jcolor_t lab_c = { 50, 50, 60, 255 };
     float cx, cy, cw, ch;
 
