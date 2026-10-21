@@ -3,9 +3,8 @@
 
 #include <joy/joy.h>
 
-// 设计分辨率 960x640（480x320 的 2 倍，3:2）。
-// 菜单/设置/选角/结算等场景的 UI 全部按 480x320 的比例坐标（px/480、px/320）布局，
-// 逻辑宽高比必须保持 3:2，否则 x 比例会被横向拉伸，导致内容错位。
+// 固定 3:2 设计分辨率（960x640）。当前所有场景已统一使用自适应宽度
+// （见 presentation_set_adaptive），此函数保留，供确需固定比例布局时使用。
 static inline void presentation_set_design(jr2d_p r2d)
 {
         if (!r2d) return;

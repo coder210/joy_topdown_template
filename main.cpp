@@ -28,16 +28,13 @@
 static Context* ctx;
 static SceneManager* g_mgr = nullptr;
 
-// 窗口尺寸变化后按“当前场景”选择逻辑分辨率：
-//   - 游戏场景：自适应宽度（保持高度 640，宽度跟随窗口宽高比），铺满窗口、左右无黑边；
-//   - 其它场景：固定 960x640（3:2）。菜单/设置/选角/结算的 UI 全部按 480x320 的比例
-//     坐标布局，逻辑宽度一变宽 x 比例就会被横向拉伸 → 位置错位，所以必须保持 3:2。
+// 所有场景统一使用自适应逻辑宽度（高度固定 640、宽度跟随窗口宽高比），
+// 与游戏场景一致：逻辑宽高比 = 窗口宽高比 → 铺满、左右无黑边。
+// 场景内元素尺寸按高度基准（h/320）换算、位置居中，宽屏下不会被横向拉宽。
 static void apply_presentation_for_current_scene()
 {
         if (!ctx || !ctx->r2d) return;
-        const bool in_game = (g_mgr && strcmp(g_mgr->currentName(), "game") == 0);
-        if (in_game) presentation_set_adaptive(ctx->r2d);
-        else         presentation_set_design(ctx->r2d);
+        presentation_set_adaptive(ctx->r2d);
 }
 
 // 解析 --mode=single|host|client|server（默认 single）
@@ -144,8 +141,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         // - 不透明颜色（alpha=255）结果不变；
         // - 半透明颜色（如剩余敌人纸片 alpha=150）才会真正透出背景。
         r2d_set_blend_mode(ctx->r2d, JR2D_BLEND_BLEND);
-        // 初始场景（闪屏/菜单）按设计分辨率 960x640；进入游戏场景时再切自适应宽度
-        presentation_set_design(ctx->r2d);
+        // 全局自适应宽度：所有场景铺满窗口、无左右黑边（与游戏场景一致）
+        presentation_set_adaptive(ctx->r2d);
 
         // 设置窗口图标（logo.png 位于 textures 目录下）
         window_set_icon(ctx->window, "joy_topdown_template/branding/logo.png");

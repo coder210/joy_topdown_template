@@ -16,8 +16,9 @@ void OnlineScene::Load() {
 
     // 按钮尺寸/间距按设计稿 480x320 换算：原来是直接用 120/50/20 这些设计稿像素，
     // 再除以"当前" w/h —— 逻辑分辨率提高后分数被稀释，按钮会变小且偏移。
-    const float sx = (float)w / 480.0f, sy = (float)h / 320.0f;
-    float btn_w = 120.0f * sx, btn_h = 50.0f * sy, gap = 20.0f * sy;
+    // 宽度也用高度基准，宽屏下按钮不会被横向拉宽
+    const float sy = (float)h / 320.0f;
+    float btn_w = 120.0f * sy, btn_h = 50.0f * sy, gap = 20.0f * sy;
     float btn_x = ((float)w - btn_w) * 0.5f;
     float start_y = ((float)h - btn_h * 4.0f - gap * 3.0f) * 0.5f;
 
@@ -94,13 +95,14 @@ void OnlineScene::Render() {
     font_p font = AssetManager::GetInstance()->GetSimheiFont24();
     const char* text = "选择联机模式";
     int len = (int)strlen(text);
-    int w_est = len * 14;
     int w, h;
     r2d_get_logical_presentation(r2d, &w, &h, NULL);
     jcolor_t c = { 200, 200, 210, 255 };
-    // 水平居中（动态），垂直位置比例化：30/320
+    // 水平按实际文字宽度居中，垂直比例化：30/320
+    int tw = 0, th = 0;
+    jtext_measurex(r2d, font, text, len, c, &tw, &th);
     jtext_printf(r2d, font, text, len, c,
-                 ((float)w - (float)w_est) * 0.5f / (float)w, 30.0f / 320.0f);
+                 ((float)w - (float)tw) * 0.5f / (float)w, 30.0f / 320.0f);
     if (self->btn_host)   button_draw(self->btn_host);
     if (self->btn_client) button_draw(self->btn_client);
     if (self->btn_server) button_draw(self->btn_server);

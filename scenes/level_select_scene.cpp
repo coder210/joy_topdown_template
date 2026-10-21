@@ -9,6 +9,7 @@
 #include "../systems/character_catalog.h"
 #include "../systems/map_def.h"   // level_map_available / map_load_level / g_map_grid
 #include "../systems/spawn_def.h" // level_enemy_total（本关敌人总数配额）
+#include "../logical_presentation.h" // 选关页用自适应宽度（铺满、无左右黑边）
 
 // 关卡元信息 —— 条数须与 map_def.h 的 LEVEL_COUNT、resources.json 的 maps 段一致。
 // 地图数据本体在 assets/.../levels/levelN.lua（Tiled 导出），缺图的关卡标记为"制作中"。
@@ -119,9 +120,10 @@ void LevelSelectScene::draw_level(int i) {
     button_p btn = btn_levels[i];
     if (!btn) return;
     vec2_t p = button_get_position(btn);
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
+    (void)lw;
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     float x = p.x, y = p.y, w = LIST_W * s, h = ROW_H * s;
     bool sel = (i == selected);
     bool hov = (hovered_ == i);
@@ -176,9 +178,9 @@ void LevelSelectScene::draw_level(int i) {
 // 右侧面板：大缩略图 + 名称/简介/难度/敌人数
 void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
     jr2d_p r2d = ctx->r2d;
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
 
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
     font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
@@ -186,7 +188,11 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
     bool valid = (index >= 0 && index < LEVEL_META_COUNT);
     bool ready = (valid && index < LEVEL_SLOT_MAX) ? level_ready[index] : false;
 
-    float px = PANEL_X * s, py = PANEL_Y * s, pw = PANEL_W * s, ph = PANEL_H * s;
+    // 面板按剩余宽度拉伸：设计稿(960x640)下与 PANEL_W 一致，宽屏时铺满右侧
+    float px = PANEL_X * s, py = PANEL_Y * s;
+    float pw = (float)lw - px - 12.0f * s;
+    if (pw < PANEL_W * s) pw = PANEL_W * s;   // 极窄兜底
+    float ph = PANEL_H * s;
 
     // 面板底 + 阴影 + 描边
     r2d_set_color(r2d, 0, 0, 0, 26);
@@ -197,7 +203,11 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
     shape_draw_rectangle(r2d, "line", { px, py, pw, ph });
 
     // 预览框
-    float vx = PREVIEW_X * s, vy = PREVIEW_Y * s, vw = PREVIEW_W * s, vh = PREVIEW_H * s;
+    // 预览框跟随面板宽度拉伸，左右各留 8*s
+    float vx = PREVIEW_X * s, vy = PREVIEW_Y * s;
+    float vw = px + pw - 8.0f * s - vx;
+    if (vw < PREVIEW_W * s) vw = PREVIEW_W * s;
+    float vh = PREVIEW_H * s;
     if (ready) {
         draw_mini_map(ctx, index, vx, vy, vw, vh, s, true);
     } else {
@@ -247,9 +257,10 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
 void LevelSelectScene::apply_level_scroll() {
     if (!level_view) return;
     const float oy = scrollview_get_offset_y(level_view);
-    float lwp = 0.0f;
-    r2d_fpx(this->ctx()->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
+    (void)lw;
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     for (int i = 0; i < LEVEL_META_COUNT && i < LEVEL_SLOT_MAX; i++)
         if (btn_levels[i])
             button_set_position(btn_levels[i], LIST_X * s, level_base_y[i] * s + oy);
@@ -258,9 +269,10 @@ void LevelSelectScene::apply_level_scroll() {
 // 键盘上下换关时，把选中行滚进左侧列表视口
 void LevelSelectScene::ensure_selected_visible() {
     if (!level_view || selected < 0 || selected >= LEVEL_META_COUNT) return;
-    float lwp = 0.0f;
-    r2d_fpx(this->ctx()->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
+    (void)lw;
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     float off = scrollview_get_offset_y(level_view);
     const float view_top = LIST_Y * s;
     const float view_bot = (LIST_Y + LIST_H) * s;
@@ -285,9 +297,7 @@ void LevelSelectScene::draw_tip() {
     r2d_set_color(r2d, 20, 20, 26, 120);
     shape_draw_rectangle(r2d, "fill", jrect_t{ 0, 0, (float)w, (float)h });
 
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    const float s = (h > 0) ? ((float)h / 320.0f) : 1.0f;
     const float bw = 230.0f * s, bh = 86.0f * s;
     const float bx = ((float)w - bw) * 0.5f;
     const float by = ((float)h - bh) * 0.5f;
@@ -355,12 +365,17 @@ void LevelSelectScene::Load() {
         }
     }
 
-    // 左侧列表 + 右侧面板的像素换算
-    float lwp = 0.0f;
-    r2d_fpx(ctx->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    // 选关页改用自适应逻辑宽度：高度固定 640，宽度跟随窗口宽高比，
+    // 背景铺满整屏、没有左右黑边（与游戏场景一致）。
+    presentation_set_adaptive(ctx->r2d);
 
-    // 左侧列表：scrollview 纵向滚动
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
+    const float LW = (float)((lw > 0) ? lw : 960);
+    const float LH = (float)((lh > 0) ? lh : 640);
+
+    // 左侧列表：scrollview 纵向滚动（定宽靠左）
     self->level_view = scrollview_create(ctx->r2d, 0.0f, 0.0f, 1.0f, 1.0f);
     if (self->level_view) {
         scrollview_set_view_px(self->level_view, LIST_X * s, LIST_Y * s, LIST_W * s, LIST_H * s);
@@ -368,32 +383,42 @@ void LevelSelectScene::Load() {
                 (LIST_Y + 4.0f + (float)LEVEL_META_COUNT * ROW_SPACING + 8.0f) * s);
     }
 
-    // 列表行按钮（透明命中区；外观由 draw_level 自绘）
+    // 列表行按钮（透明命中区；外观由 draw_level 自绘）。按像素换算成比例创建，
+    // 这样在自适应宽度下仍精确落在 LIST_X 起的位置，而不是按 480 宽比例漂移。
     for (int i = 0; i < LEVEL_META_COUNT && i < LEVEL_SLOT_MAX; i++) {
         self->level_base_y[i] = LIST_Y + 4.0f + (float)i * ROW_SPACING;
+        const float cx_px = (LIST_X + LIST_W * 0.5f) * s;
+        const float cy_px = (self->level_base_y[i] + ROW_H * 0.5f) * s;
         self->btn_levels[i] = button_create(ctx->r2d,
-                (LIST_X + LIST_W * 0.5f) / 480.0f,
-                (self->level_base_y[i] + ROW_H * 0.5f) / 320.0f,
-                LIST_W / 480.0f, ROW_H / 320.0f);
+                cx_px / LW, cy_px / LH,
+                (LIST_W * s) / LW, (ROW_H * s) / LH);
         UIStyle::applyPaperButton(self->btn_levels[i]);
     }
     self->apply_level_scroll();
 
-    // 右下「开始」
-    self->btn_confirm = button_create(ctx->r2d,
-            (340.0f + 58.0f) / 480.0f, (270.0f + 16.0f) / 320.0f,
-            116.0f / 480.0f, 32.0f / 320.0f);
-    UIStyle::applyPaperButton(self->btn_confirm);
-    button_set_text_offset(self->btn_confirm, 0, 2.0f);
-    button_set_textx(self->btn_confirm, font24, "开始", (int)strlen("开始"), { 0, 0, 0, 255 });
+    // 右下「开始」：锚定右边缘（宽屏时跟着面板右边界走；设计稿下等于 398*2）
+    {
+        const float cx_px = LW - 82.0f * s;
+        const float cy_px = 286.0f * s;
+        self->btn_confirm = button_create(ctx->r2d,
+                cx_px / LW, cy_px / LH,
+                (116.0f * s) / LW, (32.0f * s) / LH);
+        UIStyle::applyPaperButton(self->btn_confirm);
+        button_set_text_offset(self->btn_confirm, 0, 2.0f);
+        button_set_textx(self->btn_confirm, font24, "开始", (int)strlen("开始"), { 0, 0, 0, 255 });
+    }
 
-    // 左下「返回」
-    self->btn_back = button_create(ctx->r2d,
-            (232.0f + 48.0f) / 480.0f, (270.0f + 16.0f) / 320.0f,
-            96.0f / 480.0f, 32.0f / 320.0f);
-    UIStyle::applyPaperButton(self->btn_back);
-    button_set_text_offset(self->btn_back, 0, 2.0f);
-    button_set_textx(self->btn_back, font24, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
+    // 左下「返回」：锚定面板左边界（宽屏不变；设计稿下等于 232+48）
+    {
+        const float cx_px = 280.0f * s;
+        const float cy_px = 286.0f * s;
+        self->btn_back = button_create(ctx->r2d,
+                cx_px / LW, cy_px / LH,
+                (96.0f * s) / LW, (32.0f * s) / LH);
+        UIStyle::applyPaperButton(self->btn_back);
+        button_set_text_offset(self->btn_back, 0, 2.0f);
+        button_set_textx(self->btn_back, font24, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
+    }
 }
 
 void LevelSelectScene::HandleUiEvent(const void* e) {
@@ -515,9 +540,7 @@ void LevelSelectScene::Render() {
     r2d_set_color(r2d, 238, 234, 226, 255);
     shape_draw_rectangle(r2d, "fill", { 0, 0, (float)w, (float)h });
 
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    const float s = (h > 0) ? ((float)h / 320.0f) : 1.0f;
 
     // 顶部墨色标题带
     r2d_set_color(r2d, 40, 40, 48, 255);

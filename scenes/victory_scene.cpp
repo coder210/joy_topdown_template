@@ -21,21 +21,27 @@ void VictoryScene::Load() {
     log_info("[victory scene] start...");
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
 
+    int w = 0, h = 0;
+    r2d_get_logical_presentation(ctx->r2d, &w, &h, NULL);
+    const float s = (h > 0) ? ((float)h / 320.0f) : 1.0f;
+    const float LW = (float)((w > 0) ? w : 960);
+    const float LH = (float)((h > 0) ? h : 640);
 
+    // 按钮尺寸用高度基准，宽屏下不被横向拉宽；设计稿 center：(150,275) / (330,275)
     self->btn_replay = button_create(ctx->r2d,
-            (70.0f + 80.0f) / 480.0f, (250.0f + 25.0f) / 320.0f,
-            160.0f / 480.0f, 50.0f / 320.0f);
+            (150.0f * s) / LW, (275.0f * s) / LH,
+            (160.0f * s) / LW, (50.0f * s) / LH);
     UIStyle::applyPaperButton(self->btn_replay);
     button_set_text_offset(self->btn_replay, 0, 3.0f);
     button_set_textx(self->btn_replay, font24, "再战一局", (int)strlen("再战一局"), { 0, 0, 0, 255 });
-    
+
     self->btn_menu = button_create(ctx->r2d,
-            (250.0f + 80.0f) / 480.0f, (250.0f + 25.0f) / 320.0f,
-            160.0f / 480.0f, 50.0f / 320.0f);
+            (330.0f * s) / LW, (275.0f * s) / LH,
+            (160.0f * s) / LW, (50.0f * s) / LH);
     UIStyle::applyPaperButton(self->btn_menu);
     button_set_text_offset(self->btn_menu, 0, 3.0f);
     button_set_textx(self->btn_menu, font24, "回主菜单", (int)strlen("回主菜单"), { 0, 0, 0, 255 });
-    }
+}
 
 void VictoryScene::HandleUiEvent(const void* e) {
     auto* self = this;
@@ -89,20 +95,23 @@ void VictoryScene::Render() {
     jrect_t full = { 0, 0, (float)w, (float)h };
     shape_draw_rectangle(r2d, "fill", full);
 
-    // 标题（墨绿，水墨风）
+    // 标题（墨绿，水墨风），按实际文字宽度水平居中
     jcolor_t title_c = { 20, 120, 60, 255 };
-    // 坐标比例化（192/70 为设计稿 480x320 下的值）
+    int tw = 0, th = 0;
+    jtext_measurex(r2d, font28, "通  关", (int)strlen("通  关"), title_c, &tw, &th);
     jtext_printf(r2d, font28, "通  关", (int)strlen("通  关"), title_c,
-                 192.0f / 480.0f, 70.0f / 320.0f);
+                 ((float)w - (float)tw) * 0.5f / (float)w, 70.0f / 320.0f);
 
     char buf[128];
     jcolor_t sub_c = { 60, 60, 70, 255 };
     snprintf(buf, sizeof(buf), "第 %d 关的所有敌人已被肃清", ctx->selected_level);
+    jtext_measurex(r2d, font24, buf, (int)strlen(buf), sub_c, &tw, &th);
     jtext_printf(r2d, font24, buf, (int)strlen(buf), sub_c,
-                 130.0f / 480.0f, 132.0f / 320.0f);
+                 ((float)w - (float)tw) * 0.5f / (float)w, 132.0f / 320.0f);
     jcolor_t tip_c = { 110, 110, 118, 255 };
+    jtext_measurex(r2d, font24, "恭喜通关！", (int)strlen("恭喜通关！"), tip_c, &tw, &th);
     jtext_printf(r2d, font24, "恭喜通关！", (int)strlen("恭喜通关！"), tip_c,
-                 192.0f / 480.0f, 168.0f / 320.0f);
+                 ((float)w - (float)tw) * 0.5f / (float)w, 168.0f / 320.0f);
 
     if (self->btn_replay) button_draw(self->btn_replay);
     if (self->btn_menu)   button_draw(self->btn_menu);

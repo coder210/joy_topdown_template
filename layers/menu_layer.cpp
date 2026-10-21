@@ -27,9 +27,9 @@ void MenuLayer::load_menu_buttons()
 
         // 按钮尺寸/间距按设计稿 480x320 换算：逻辑分辨率改变时观感不变。
         //（原来是直接用 120 / 44 / 12 / 20 这些设计稿像素，分辨率一改按钮就会变小并偏移）
-        const float sx = (float)logical_width  / 480.0f;
+        // 宽度也用高度基准，宽屏下按钮不会被横向拉宽
         const float sy = (float)logical_height / 320.0f;
-        float btn_width = 120.0f * sx, btn_height = 44.0f * sy;
+        float btn_width = 120.0f * sy, btn_height = 44.0f * sy;
         float btn_x = ((float)logical_width - btn_width) * 0.5f;
         float gap = 12.0f * sy;
         // 整体下沉：空出顶部标题区域、底部给版本号留白，使四枚按钮垂直均衡。

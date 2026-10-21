@@ -10,6 +10,7 @@
 #include "../asset_manager.h"
 #include "../systems/character_catalog.h"
 #include "../systems/weapon_catalog.h"
+#include "../logical_presentation.h" // 选角页用自适应宽度（铺满、无左右黑边）
 
 // Master-Detail 布局（设计稿 480x320；s = 逻辑宽/480）
 static const float BAND_H       = 36.0f;    // 顶部墨色标题带
@@ -46,9 +47,12 @@ static void draw_card_avatar(Context* ctx, const CharacterDef& cd, float cx, flo
     (void)iw;
 
     jrect_t src = { 0.0f, 0.0f, ih, ih };        // 第 0 帧
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = (design_h * (lwp / 480.0f)) / ih;
+    // 立绘按“高度基准”缩放，与列表/面板一致；否则宽屏下会按宽度放大、溢出框
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
+    (void)lw;
+    const float base = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
+    const float s = (design_h * base) / ih;
     vec2_t pos = { cx, cy };
     vec2_t scl = { s, s };
     vec2_t org = { ih * 0.5f, ih * 0.5f };
@@ -69,9 +73,10 @@ void CharacterSelectScene::apply_card_scroll() {
     if (!card_view) return;
     const int n = (int)g_characterCatalog.size();
     const float oy = scrollview_get_offset_y(card_view);
-    float lwp = 0.0f;
-    r2d_fpx(this->ctx()->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
+    (void)lw;
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     for (int i = 0; i < n && i < MAX_CHARACTERS; i++)
         if (btn_cards[i])
             button_set_position(btn_cards[i], LIST_X * s,
@@ -83,9 +88,10 @@ void CharacterSelectScene::ensure_selected_visible() {
     if (!card_view) return;
     const int n = (int)g_characterCatalog.size();
     if (selected < 0 || selected >= n) return;
-    float lwp = 0.0f;
-    r2d_fpx(this->ctx()->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
+    (void)lw;
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     float off = scrollview_get_offset_y(card_view);
     const float view_top = LIST_Y * s;
     const float view_bot = (LIST_Y + LIST_H) * s;
@@ -106,9 +112,10 @@ void CharacterSelectScene::draw_card(int i) {
 
     const CharacterDef& cd = g_characterCatalog.get(i);
     vec2_t p = button_get_position(btn);
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
+    (void)lw;
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     float x = p.x, y = p.y, w = LIST_W * s, h = ROW_H * s;
     bool sel = (i == selected);
     bool hov = (hovered_ == i);
@@ -159,9 +166,9 @@ void CharacterSelectScene::draw_card(int i) {
 // 右侧详情：大立绘 + 名字 + 血量/移速/武器/定位
 void CharacterSelectScene::draw_preview_panel(Context* ctx, int index) {
     jr2d_p r2d = ctx->r2d;
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
 
     const int n = (int)g_characterCatalog.size();
     if (index < 0 || index >= n) return;
@@ -170,7 +177,11 @@ void CharacterSelectScene::draw_preview_panel(Context* ctx, int index) {
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
     font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
 
-    float px = PANEL_X * s, py = PANEL_Y * s, pw = PANEL_W * s, ph = PANEL_H * s;
+    // 面板按剩余宽度拉伸：设计稿(960x640)下与 PANEL_W 一致，宽屏时铺满右侧
+    float px = PANEL_X * s, py = PANEL_Y * s;
+    float pw = (float)lw - px - 12.0f * s;
+    if (pw < PANEL_W * s) pw = PANEL_W * s;   // 极窄兜底
+    float ph = PANEL_H * s;
 
     // 面板底 + 阴影 + 描边
     r2d_set_color(r2d, 0, 0, 0, 26);
@@ -181,7 +192,11 @@ void CharacterSelectScene::draw_preview_panel(Context* ctx, int index) {
     shape_draw_rectangle(r2d, "line", { px, py, pw, ph });
 
     // 大立绘框
-    float vx = PREVIEW_X * s, vy = PREVIEW_Y * s, vw = PREVIEW_W * s, vh = PREVIEW_H * s;
+    // 立绘框跟随面板宽度拉伸，左右各留 8*s
+    float vx = PREVIEW_X * s, vy = PREVIEW_Y * s;
+    float vw = px + pw - 8.0f * s - vx;
+    if (vw < PREVIEW_W * s) vw = PREVIEW_W * s;
+    float vh = PREVIEW_H * s;
     r2d_set_color(r2d, 236, 232, 224, 255);
     shape_draw_rectangle(r2d, "fill", { vx, vy, vw, vh });
     r2d_set_color(r2d, 190, 186, 178, 255);
@@ -250,11 +265,16 @@ void CharacterSelectScene::Load() {
     const int n = (int)g_characterCatalog.size();
     const int nn = (n < MAX_CHARACTERS) ? n : MAX_CHARACTERS;
 
-    float lwp = 0.0f;
-    r2d_fpx(ctx->r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    // 选角页改用自适应逻辑宽度：高度固定 640，宽度跟随窗口宽高比，铺满无黑边。
+    presentation_set_adaptive(ctx->r2d);
 
-    // 左侧角色列表：纵向滚动
+    int lw = 0, lh = 0;
+    r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
+    const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
+    const float LW = (float)((lw > 0) ? lw : 960);
+    const float LH = (float)((lh > 0) ? lh : 640);
+
+    // 左侧角色列表：纵向滚动（定宽靠左）
     self->card_view = scrollview_create(ctx->r2d, 0.0f, 0.0f, 1.0f, 1.0f);
     if (self->card_view) {
         scrollview_set_view_px(self->card_view, LIST_X * s, LIST_Y * s, LIST_W * s, LIST_H * s);
@@ -262,11 +282,13 @@ void CharacterSelectScene::Load() {
                 (LIST_Y + 4.0f + (float)nn * ROW_SPACING + 8.0f) * s);
     }
 
+    // 行按钮按像素换算成比例创建，自适应宽度下仍精确落在 LIST_X 起的位置
     for (int i = 0; i < nn; i++) {
+        const float cx_px = (LIST_X + LIST_W * 0.5f) * s;
+        const float cy_px = (LIST_Y + 4.0f + (float)i * ROW_SPACING + ROW_H * 0.5f) * s;
         self->btn_cards[i] = button_create(ctx->r2d,
-                (LIST_X + LIST_W * 0.5f) / 480.0f,
-                (LIST_Y + 4.0f + (float)i * ROW_SPACING + ROW_H * 0.5f) / 320.0f,
-                LIST_W / 480.0f, ROW_H / 320.0f);
+                cx_px / LW, cy_px / LH,
+                (LIST_W * s) / LW, (ROW_H * s) / LH);
         UIStyle::applyPaperButton(self->btn_cards[i]);
     }
     self->apply_card_scroll();
@@ -275,26 +297,38 @@ void CharacterSelectScene::Load() {
         ? ctx->selected_char_id : 0;
     self->ensure_selected_visible();
 
-    // 昵称输入框：放进顶部标题带右侧，和“昵称”标签分开，不再重叠
-    self->nickname_input = inputbox_create(ctx->r2d,
-            330.0f / 480.0f, 8.0f / 320.0f, 126.0f / 480.0f, 24.0f / 320.0f, font24);
-    inputbox_set_text(self->nickname_input, ctx->selected_nickname);
+    // 昵称输入框：锚定右边缘（宽屏不漂移；设计稿下 x=660、宽 252）
+    {
+        const float ix_px = LW - 150.0f * s;
+        self->nickname_input = inputbox_create(ctx->r2d,
+                ix_px / LW, (8.0f * s) / LH,
+                (126.0f * s) / LW, (24.0f * s) / LH, font24);
+        inputbox_set_text(self->nickname_input, ctx->selected_nickname);
+    }
 
-    // 右下「开始游戏」
-    self->btn_confirm = button_create(ctx->r2d,
-            (340.0f + 58.0f) / 480.0f, (270.0f + 16.0f) / 320.0f,
-            116.0f / 480.0f, 32.0f / 320.0f);
-    UIStyle::applyPaperButton(self->btn_confirm);
-    button_set_text_offset(self->btn_confirm, 0, 3.0f * s);
-    button_set_textx(self->btn_confirm, font24, "开始游戏", (int)strlen("开始游戏"), { 0, 0, 0, 255 });
+    // 右下「开始游戏」：锚定右边缘（设计稿下 center=398）
+    {
+        const float cx_px = LW - 82.0f * s;
+        const float cy_px = 286.0f * s;
+        self->btn_confirm = button_create(ctx->r2d,
+                cx_px / LW, cy_px / LH,
+                (116.0f * s) / LW, (32.0f * s) / LH);
+        UIStyle::applyPaperButton(self->btn_confirm);
+        button_set_text_offset(self->btn_confirm, 0, 3.0f * s);
+        button_set_textx(self->btn_confirm, font24, "开始游戏", (int)strlen("开始游戏"), { 0, 0, 0, 255 });
+    }
 
-    // 左下「返回」
-    self->btn_back = button_create(ctx->r2d,
-            (182.0f + 48.0f) / 480.0f, (270.0f + 16.0f) / 320.0f,
-            96.0f / 480.0f, 32.0f / 320.0f);
-    UIStyle::applyPaperButton(self->btn_back);
-    button_set_text_offset(self->btn_back, 0, 3.0f * s);
-    button_set_textx(self->btn_back, font24, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
+    // 左下「返回」：锚定面板左边界（设计稿下 center=230）
+    {
+        const float cx_px = 230.0f * s;
+        const float cy_px = 286.0f * s;
+        self->btn_back = button_create(ctx->r2d,
+                cx_px / LW, cy_px / LH,
+                (96.0f * s) / LW, (32.0f * s) / LH);
+        UIStyle::applyPaperButton(self->btn_back);
+        button_set_text_offset(self->btn_back, 0, 3.0f * s);
+        button_set_textx(self->btn_back, font24, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
+    }
 }
 
 void CharacterSelectScene::HandleUiEvent(const void* e) {
@@ -378,9 +412,7 @@ void CharacterSelectScene::Render() {
     int w, h;
     r2d_get_logical_presentation(r2d, &w, &h, NULL);
 
-    float lwp = 0.0f;
-    r2d_fpx(r2d, 1.0f, 0.0f, 0.0f, 0.0f, &lwp, NULL, NULL, NULL);
-    const float s = lwp / 480.0f;
+    const float s = (h > 0) ? ((float)h / 320.0f) : 1.0f;
 
     // 米色纸底
     r2d_set_color(r2d, 238, 234, 226, 255);

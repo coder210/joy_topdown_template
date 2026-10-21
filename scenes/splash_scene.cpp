@@ -57,7 +57,11 @@ void SplashScene::Render() {
     if (logo) {
         // 尺寸/位置比例化：100 与 50 均相对设计稿 480x320；
         // 宽、高分别除以 480 / 320，保证缩放后仍是正方形
-        const float lw_f = 100.0f / 480.0f, lh_f = 100.0f / 320.0f;
+        // 用高度基准算边长，保证宽屏下 logo 仍是正方形（不横向拉伸）
+        const float sy = (h > 0) ? ((float)h / 320.0f) : 1.0f;
+        const float side = 100.0f * sy;
+        const float lw_f = (w > 0) ? (side / (float)w) : 0.0f;
+        const float lh_f = (h > 0) ? (side / (float)h) : 0.0f;
         image_draw1_f(r2d, logo, NULL,
                       (1.0f - lw_f) * 0.5f, 50.0f / 320.0f, lw_f, lh_f);
     }
