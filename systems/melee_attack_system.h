@@ -17,7 +17,7 @@ struct Context;
 // 近战攻击参数
 static constexpr float PLAYER_MELEE_RANGE  = 1.0f;  // 玩家攻击盒向前延伸距离（米）
 static constexpr int   PLAYER_MELEE_DAMAGE = 25;    // ENEMY_MAX_HP=50，两刀击杀
-static constexpr int   ENEMY_MELEE_DAMAGE  = 20;    // PLAYER_MAX_HP=10000(测试临时值)，约500刀击杀
+static constexpr int   ENEMY_MELEE_DAMAGE  = 20;    // PLAYER_MAX_HP=100，五刀击杀
 
 // 近战攻击结算：消费 PlayerEventInput.pending_actions（玩家由 input_consume_input_system
 // 生产、敌人由 ai_system 生产）。攻击盒延伸方向优先用鼠标瞄准角 aim_yaw（与渲染视觉挥砍

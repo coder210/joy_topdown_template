@@ -286,8 +286,11 @@ void GameScene::Render()
     // 2D 战争迷雾：覆盖地图与实体，仅暴露视野附近，墙后与远端被墨雾遮蔽
     //fog_pass_2d(ctx);
 
-    // 玩家碰撞盒（淡墨调试可视化）
-    //drawing_collision_debug_pass(ctx);
+    // 碰撞盒调试可视化（玩家红框 / 墙绿框）
+    // 开关由 pass 内部判定：settings.show_collision（设置页"显示碰撞框"勾选）。
+    // 原来这行被注释掉，而 render() 里那处调用又受 cfg_.drawCollisionDebug 限制
+    // —— kModeConfigs 里 4 个模式该值全是 false，等于永远不画，勾了也没反应。
+    drawing_collision_debug_pass(ctx);
 
     // 模式特有渲染（碰撞调试、HUD 等）
     render();
@@ -438,8 +441,9 @@ void GameScene::tick()
 
 void GameScene::render()
 {
-    // 权威碰撞网格调试：Host / Server 开启
-    if (cfg_.drawCollisionDebug) drawing_collision_debug_pass(this->ctx());
+    // 碰撞调试绘制已移到主绘制序列（见上方 drawing_collision_debug_pass 调用），
+    // 由设置页"显示碰撞框"开关控制。不再走 cfg_.drawCollisionDebug ——
+    // kModeConfigs 里 4 个模式该值都是 false，按它判断则任何模式都画不出来。
 }
 
 void GameScene::destroy()

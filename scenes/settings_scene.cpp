@@ -63,6 +63,14 @@ void SettingsScene::sync_settings() {
         changed = true;
     }
 
+    // 显示碰撞框：原来漏了这一项的同步，勾选后状态没写回 settings，
+    // 于是离开设置页再回来时 Load 又按 show_collision=false 显示成未勾选。
+    bool show_col = (checkbox_get_state(collision_cb) == JOY_CHECKBOX_CHECKED);
+    if (show_col != ctx->settings.show_collision) {
+        ctx->settings.show_collision = show_col;
+        changed = true;
+    }
+
     if (changed) settings_save(&ctx->settings);
 }
 

@@ -17,10 +17,15 @@
 struct Context;
 
 // 箭参数（暂用固定默认值，后续可从 weapon_catalog 扩展 per-weapon 字段）
-static constexpr float BULLET_SPEED        = 10.0f;  // 米/秒
+// 箭速：原 10 米/秒。逻辑 20Hz 下每 tick 走 0.5 米，扫掠判定必须有 0.5 米拖尾，
+// 导致"离得挺远就中"。降到 6 -> 每 tick 0.3 米，拖尾缩短 40%。
+static constexpr float BULLET_SPEED        = 6.0f;   // 米/秒
 static constexpr int   BULLET_DAMAGE       = 20;     // 两发命中 ENEMY_MAX_HP=50
 static constexpr int   BULLET_LIFE_TICKS   = 120;    // 6s @20Hz
-static constexpr float BULLET_SIZE         = 0.15f;  // 碰撞盒边长（米）
+// 碰撞盒边长（米）。原为 0.15，但箭贴图绘制尺寸是 1 米（见 draw_bullet_pass.h），
+// 判定只覆盖贴图的 15%，视觉上箭穿过敌人却不命中。
+// 先调到 0.4 解决"打不中"，再收到 0.3：配合降速，扫掠盒总长 0.9 -> 0.6 米。
+static constexpr float BULLET_SIZE         = 0.30f;
 static constexpr float BULLET_SPAWN_OFFSET = 0.5f;   // 出生点沿瞄准方向偏移（避免重叠自身）
 
 // 拉弓时长（tick）：按下射击后拉弓多久才离弦（期间弓显示"有箭的弓"纹理、箭还搭在弦上）。

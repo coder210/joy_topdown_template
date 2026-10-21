@@ -17,7 +17,8 @@ static constexpr const char* kTerrainAtlasPath = "joy_topdown_template/tilesheet
 
 // 地图地形渲染：按 64×64 网格逐格贴图集瓦片（Scribble 手绘白底深线风格）。
 // 图集缺失时兜底为纯色块（墙=墨色、地面=纯白），保证仍可运行。
-// 格子尺寸每格 1 米（=50px），与实体/相机渲染的 1米=50px 精确一致，保证对齐。
+// 格子尺寸每格 1 米（像素由 meters_to_pixels 换算，随 PIXELS_PER_METER 变化），
+// 与实体/相机/碰撞网格精确对齐。（旧注释写"=50px"是 PPM=50 时代的遗留，现已不固定。）
 static void draw_map_pass(Context* ctx)
 {
     auto& gs = ctx->ecs.ctx().get<GlobalState>();

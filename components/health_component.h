@@ -2,8 +2,8 @@
 #define HEALTH_COMPONENT_H
 #include <joy/jmath.h>
 
-// 玩家初始血量（远程敌人子弹伤害结算用）。测试用临时调大：10000（敌人近战 20/子弹伤害有限，基本打不死）。
-static constexpr int PLAYER_MAX_HP = 10000;
+// 玩家初始血量（远程敌人子弹伤害结算用）
+static constexpr int PLAYER_MAX_HP = 100;
 // 敌人初始血量（玩家远程子弹伤害结算用）
 static constexpr int ENEMY_MAX_HP = 50;
 // 重生耗时（tick 数）：3 秒 @ 20Hz 逻辑 tick（帧同步计数，避免浮点累积误差）
