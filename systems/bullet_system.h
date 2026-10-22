@@ -19,42 +19,6 @@ struct Context;
 // 与玩家/敌人运动解耦（子弹不带 LogicVelocityComponent，不受 movement/collision 系统处理），
 // 全程定点数 -> 帧同步确定性。
 
-/* OBB 扫掠相交测试，相交判定用 joy 内置的 SAT（collision2df_check_polygons）。
- *
- * A = 箭的扫掠旋转盒：中心 (cax,cay)，单位长轴 (aux,auy)，半长 ahl（已含扫掠拉伸），半宽 ahs
- * B = 敌人盒：中心 (cbx,cby)，轴对齐，半宽 bhx / 半高 bhy
- *
- * joy 只有瓦片地图专用的 joy_tilemap_sweep_x/y，没有通用"扫掠"接口，
- * 所以扫掠体（沿运动方向拉长的盒子）仍由自己构造；但拉长之后的凸多边形
- * 相交直接用 joy 的 SAT，不必再自己维护一份分离轴实现。
- *
- * 传的是顶点而不是角度，因此不需要 atan2/sin/cos —— 全程定点数，
- * 保持帧同步确定性。 */
-static bool bullet_swept_obb_hit(
-        fp_t cax, fp_t cay, fp_t aux, fp_t auy, fp_t ahl, fp_t ahs,
-        fp_t cbx, fp_t cby, fp_t bhx, fp_t bhy)
-{
-        // A 的两条半轴分量：长轴 (aux,auy)*ahl，短轴 (-auy,aux)*ahs
-        fp_t mx = fp_mul(aux, ahl), my = fp_mul(auy, ahl);
-        fp_t nx = fp_mul(fp_sub(fp_zero(), auy), ahs), ny = fp_mul(aux, ahs);
-
-        vec2f_t av[4];   // A：扫掠旋转盒 4 顶点
-        av[0].x = fp_add(fp_add(cax, mx), nx);  av[0].y = fp_add(fp_add(cay, my), ny);
-        av[1].x = fp_add(fp_sub(cax, mx), nx);  av[1].y = fp_add(fp_sub(cay, my), ny);
-        av[2].x = fp_sub(fp_sub(cax, mx), nx);  av[2].y = fp_sub(fp_sub(cay, my), ny);
-        av[3].x = fp_sub(fp_add(cax, mx), nx);  av[3].y = fp_sub(fp_add(cay, my), ny);
-
-        vec2f_t ev[4];   // B：敌人 AABB 4 顶点
-        ev[0].x = fp_sub(cbx, bhx);  ev[0].y = fp_sub(cby, bhy);
-        ev[1].x = fp_add(cbx, bhx);  ev[1].y = fp_sub(cby, bhy);
-        ev[2].x = fp_add(cbx, bhx);  ev[2].y = fp_add(cby, bhy);
-        ev[3].x = fp_sub(cbx, bhx);  ev[3].y = fp_add(cby, bhy);
-
-        polygonf_t pa = { av, 4 };
-        polygonf_t pb = { ev, 4 };
-        return collision2df_check_polygons(pa, pb);
-}
-
 static void bullet_system(entt::registry& registry, Context* ctx, float dt)
 {
     auto bullets = registry.view<BulletComponent, LogicPositionComponent,
@@ -87,33 +51,33 @@ static void bullet_system(entt::registry& registry, Context* ctx, float dt)
         fp_t cx = fp_add(lpos.x, fp_div(lrec.width,  fp_from_float(2.0f)));
         fp_t cy = fp_add(lpos.y, fp_div(lrec.height, fp_from_float(2.0f)));
 
-        // 越界或撞墙 -> 销毁
-        int gx = collision_fp_floor_to_int(cx);
-        int gy = collision_fp_floor_to_int(cy);
+        // 运动方向单位向量 + 本 tick 位移
+        fp_t mvx = fp_sub(cx, prev_cx), mvy = fp_sub(cy, prev_cy);
+        fp_t travel = fp_sqrt(fp_add(fp_mul(mvx, mvx), fp_mul(mvy, mvy)));
+        fp_t ddx = fp_one(), ddy = fp_zero();
+        if (travel > 0) { ddx = fp_div(mvx, travel); ddy = fp_div(mvy, travel); }
+
+        // 箭碰撞盒半长(沿飞行) / 半宽(垂直)：与贴图实际可见尺寸一致(0.6875 × 0.156)
+        fp_t hlong  = fp_div(fp_from_float(BULLET_HIT_LEN), fp_from_float(2.0f));
+        fp_t hshort = fp_div(fp_from_float(BULLET_HIT_WID), fp_from_float(2.0f));
+
+        // 命中墙/边界：用"箭尖"(中心沿飞行方向前移半长)判定，箭尖到墙即销毁（碰撞盒对齐贴图）。
+        fp_t tipx = fp_add(cx, fp_mul(ddx, hlong));
+        fp_t tipy = fp_add(cy, fp_mul(ddy, hlong));
+        int gx = collision_fp_floor_to_int(tipx);
+        int gy = collision_fp_floor_to_int(tipy);
         if (gx < 0 || gy < 0 || gx >= MAP_W || gy >= MAP_H ||
             map_is_collidable(map_tile_at(gx, gy))) {
             to_destroy.push_back(e);
             continue;
         }
 
-        // 命中敌人：自实现的 OBB 扫掠判定（SAT）。
-        // 原来只在"落点"做一次 AABB：箭每 tick 位移 0.5 米(50px)，擦边球能否命中取决于
-        // 采样点恰好落在哪 —— 表现为"看着没碰到却命中 / 明显重叠才命中"。
-        // 现在把箭沿速度方向拉成覆盖整段轨迹的旋转矩形，再与敌人盒做 SAT 相交测试。
-        fp_t mvx = fp_sub(cx, prev_cx), mvy = fp_sub(cy, prev_cy);
-        fp_t travel = fp_sqrt(fp_add(fp_mul(mvx, mvx), fp_mul(mvy, mvy)));
-        fp_t ddx = fp_one(), ddy = fp_zero();                       // 运动方向单位向量
-        if (travel > 0) { ddx = fp_div(mvx, travel); ddy = fp_div(mvy, travel); }
-
-        fp_t bhalf = fp_div(lrec.width, fp_from_float(2.0f));       // 箭半边长
-
-        // 扫掠体：直接用 joy 的 collision2df_swept_obb 求「起点盒 ⊕ 位移」的凸包。
-        // 箭沿自身长轴平移，凸包退化成矩形；斜向平移时是六边形 —— 统一按多边形处理。
+        // 命中敌人：把箭（贴图大小的旋转矩形）沿速度拉成覆盖整段轨迹的扫掠体，做 SAT。
         vec2f_t swept[8];
         int swept_n = 0;
         vec2f_t bcenter = { prev_cx, prev_cy };
         vec2f_t baxis   = { ddx, ddy };
-        collision2df_swept_obb(bcenter, baxis, bhalf, bhalf, mvx, mvy, swept, &swept_n);
+        collision2df_swept_obb(bcenter, baxis, hlong, hshort, mvx, mvy, swept, &swept_n);
         polygonf_t arrow_poly = { swept, swept_n };
 
         auto enemies = registry.view<EnemyComponent, LogicPositionComponent,

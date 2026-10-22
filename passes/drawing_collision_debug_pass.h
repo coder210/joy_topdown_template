@@ -105,16 +105,16 @@ static void drawing_collision_debug_pass(Context* ctx)
         // 扫掠体：直接调 joy 的 collision2df_swept_obb（与 bullet_system 同一个函数），
         // 传「起点盒 + 位移」，凸包由 joy 求 —— 不再在这里手写拉长/回退，
         // 避免两套实现各自漂移。起点 = 当前中心回退一个 tick 的位移。
-        float half = w * 0.5f;
         float pcx = ccx - dx * travel;      // 起点中心（世界米）
         float pcy = ccy - dy * travel;
 
         vec2f_t sc = { fp_from_float(pcx), fp_from_float(pcy) };
         vec2f_t sa = { fp_from_float(dx),  fp_from_float(dy)  };
-        fp_t fhalf = fp_div(rect.width, fp_from_float(2.0f));
+        fp_t hlong  = fp_div(fp_from_float(BULLET_HIT_LEN), fp_from_float(2.0f));
+        fp_t hshort = fp_div(fp_from_float(BULLET_HIT_WID), fp_from_float(2.0f));
         vec2f_t swept[8];
         int swept_n = 0;
-        collision2df_swept_obb(sc, sa, fhalf, fhalf,
+        collision2df_swept_obb(sc, sa, hlong, hshort,
                                fp_from_float(dx * travel),
                                fp_from_float(dy * travel),
                                swept, &swept_n);

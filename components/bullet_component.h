@@ -3,6 +3,12 @@
 
 #include <joy/jmath.h>
 
+// 箭贴图实际可见尺寸（64px 格子内仅 10×44 非透明像素；64px = 1 米）：
+//   宽 10/64 = 0.15625 米，长 44/64 = 0.6875 米。
+// 碰撞盒对齐贴图：沿飞行方向(长) BULLET_HIT_LEN、垂直方向(短) BULLET_HIT_WID。
+static constexpr float BULLET_HIT_LEN = 0.6875f;
+static constexpr float BULLET_HIT_WID = 0.15625f;
+
 // 箭/子弹逻辑组件：由 player_shoot_system 在发射时生成，bullet_system 每 tick 推进。
 // 速度使用定点数（fp_t），与玩家/敌人运动同一套定点体系 -> 帧同步确定性。
 struct BulletComponent {

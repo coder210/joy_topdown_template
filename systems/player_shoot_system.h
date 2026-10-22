@@ -79,7 +79,7 @@ static void spawn_player_bullet(entt::registry& registry, Context* ctx,
     fp_t cy = fp_add(lpos.y, fp_div(lrec.height, fp_from_float(2.0f)));
     fp_t sx = fp_add(cx, fp_mul(dx, fp_from_float(BULLET_SPAWN_OFFSET)));
     fp_t sy = fp_add(cy, fp_mul(dy, fp_from_float(BULLET_SPAWN_OFFSET)));
-    fp_t bw = fp_from_float(BULLET_SIZE), bh = fp_from_float(BULLET_SIZE);
+    fp_t bw = fp_from_float(BULLET_HIT_WID), bh = fp_from_float(BULLET_HIT_LEN);
 
     entt::entity bullet = registry.create();
 
