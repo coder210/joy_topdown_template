@@ -76,12 +76,9 @@ static void drawing_collision_debug_pass(Context* ctx)
         shape_draw_rectangle(ctx->r2d, "line", r);
     }
 
-    /* 箭/子弹：画"扫掠旋转盒(OBB)"，必须与 bullet_system 的判定完全一致。
-     * 判定已不是落点 AABB，而是箭沿速度方向拉长、覆盖整 tick 位移的旋转矩形；
-     * 若这里仍画 40x40 的轴对齐小方框，看到的框就和真实判定对不上。
-     * 构造方式与 bullet_system 一致：半长 = 半边长 + 位移/2，中心回退位移/2。 */
+    /* 箭/子弹：画"贴图大小的旋转盒(OBB)"，必须与 bullet_system 的判定完全一致。
+     * [TEST] 已去掉扫掠：只在当前位置画盒子，不覆盖整 tick 位移。 */
     auto bview = ctx->ecs.view<BulletComponent, LogicPositionComponent, LogicRectComponent>();
-    const float tick = ctx->ecs.ctx().get<GlobalState>().fixed_timestep;
     jcolor_t bc = { 60, 190, 255, 210 };
     for (auto e : bview) {
         auto& pos  = bview.get<LogicPositionComponent>(e);
@@ -100,24 +97,15 @@ static void drawing_collision_debug_pass(Context* ctx)
         float vlen = sqrtf(vx * vx + vy * vy);
         float dx = 1.0f, dy = 0.0f;
         if (vlen > 0.0f) { dx = vx / vlen; dy = vy / vlen; }
-        float travel = vlen * tick;
-
-        // 扫掠体：直接调 joy 的 collision2df_swept_obb（与 bullet_system 同一个函数），
-        // 传「起点盒 + 位移」，凸包由 joy 求 —— 不再在这里手写拉长/回退，
-        // 避免两套实现各自漂移。起点 = 当前中心回退一个 tick 的位移。
-        float pcx = ccx - dx * travel;      // 起点中心（世界米）
-        float pcy = ccy - dy * travel;
-
-        vec2f_t sc = { fp_from_float(pcx), fp_from_float(pcy) };
+        // [TEST] 去掉扫掠：画"当前位置"的贴图大小旋转盒（与 bullet_system 判定一致）。
+        vec2f_t sc = { fp_from_float(ccx), fp_from_float(ccy) };
         vec2f_t sa = { fp_from_float(dx),  fp_from_float(dy)  };
         fp_t hlong  = fp_div(fp_from_float(BULLET_HIT_LEN), fp_from_float(2.0f));
         fp_t hshort = fp_div(fp_from_float(BULLET_HIT_WID), fp_from_float(2.0f));
         vec2f_t swept[8];
         int swept_n = 0;
         collision2df_swept_obb(sc, sa, hlong, hshort,
-                               fp_from_float(dx * travel),
-                               fp_from_float(dy * travel),
-                               swept, &swept_n);
+                               fp_zero(), fp_zero(), swept, &swept_n);
 
         vec2_t pts[8];
         for (int i = 0; i < swept_n; i++) {

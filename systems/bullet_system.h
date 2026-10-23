@@ -72,12 +72,12 @@ static void bullet_system(entt::registry& registry, Context* ctx, float dt)
             continue;
         }
 
-        // 命中敌人：把箭（贴图大小的旋转矩形）沿速度拉成覆盖整段轨迹的扫掠体，做 SAT。
+        // [TEST] 去掉扫掠：只在"当前落点"用贴图大小的旋转盒做 SAT（观察真实移动碰撞）。
         vec2f_t swept[8];
         int swept_n = 0;
-        vec2f_t bcenter = { prev_cx, prev_cy };
+        vec2f_t bcenter = { cx, cy };
         vec2f_t baxis   = { ddx, ddy };
-        collision2df_swept_obb(bcenter, baxis, hlong, hshort, mvx, mvy, swept, &swept_n);
+        collision2df_swept_obb(bcenter, baxis, hlong, hshort, fp_zero(), fp_zero(), swept, &swept_n);
         polygonf_t arrow_poly = { swept, swept_n };
 
         auto enemies = registry.view<EnemyComponent, LogicPositionComponent,
