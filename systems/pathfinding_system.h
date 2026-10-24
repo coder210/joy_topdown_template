@@ -155,7 +155,10 @@ static const int PF_RECOMPUTE_INTERVAL = 30;
 
 static void pathfinding_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
-    fp_t step = fp_mul(fp_from_float(2.5f), fp_from_float(game_runtime(ctx).FIXED_TIMESTEP));
+    // 【临时测试-测完务必还原】步长置 0 → 敌人完全静止，当固定靶子用（便于观察箭的碰撞判定）。
+    // 还原为：
+    //   fp_t step = fp_mul(fp_from_float(2.5f), fp_from_float(game_runtime(ctx).FIXED_TIMESTEP));
+    fp_t step = fp_zero();
 
     auto view = registry.view<EnemyComponent, AIComponent, PathComponent,
                               LogicPositionComponent, ActionStateComponent>();

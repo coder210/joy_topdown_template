@@ -61,13 +61,50 @@ static void bullet_system(entt::registry& registry, Context* ctx, float dt)
         fp_t hlong  = fp_div(fp_from_float(BULLET_HIT_LEN), fp_from_float(2.0f));
         fp_t hshort = fp_div(fp_from_float(BULLET_HIT_WID), fp_from_float(2.0f));
 
-        // 命中墙/边界：用"箭尖"(中心沿飞行方向前移半长)判定，箭尖到墙即销毁（碰撞盒对齐贴图）。
+        // 命中墙/边界：用"箭尖"(中心沿飞行方向前移半长)判定（碰撞盒对齐贴图）。
+        // 【临时测试-测完务必还原】箭撞墙"被阻住"：回退本 tick 位移，箭停在墙前，
+        // 既不穿透也不销毁，便于核对"箭框 vs 绿色墙框"的接触位置。
+        // 这里刻意不清零 b.vx/b.vy —— 速度保留才能保证下一 tick 仍能算出正确的
+        // 飞行方向（ddx/ddy），否则 travel=0 会让方向退化成默认的 +X，画出横躺的框。
+        // 还原为：把 `|| hit_wall` 补回下面的边界条件（命中即销毁）。
         fp_t tipx = fp_add(cx, fp_mul(ddx, hlong));
         fp_t tipy = fp_add(cy, fp_mul(ddy, hlong));
         int gx = collision_fp_floor_to_int(tipx);
         int gy = collision_fp_floor_to_int(tipy);
-        if (gx < 0 || gy < 0 || gx >= MAP_W || gy >= MAP_H ||
-            map_is_collidable(map_tile_at(gx, gy))) {
+        const bool hit_wall = map_is_collidable(map_tile_at(gx, gy));
+        if (hit_wall) {
+            // 整 tick 回退会让箭停在"距墙最多一个 tick 位移(0.3m/30px)"的位置，
+            // 看着像"明明离墙还有一段距离就判定碰墙"。这里改为在 [上一位置, 当前位置]
+            // 之间二分逼近，定位到"再往前一丝就进墙"的最远安全点。
+            // 定点数 + 固定迭代次数 -> 帧同步两端结果一致。
+            const fp_t sx = fp_sub(lpos.x, fp_mul(b.vx, fp_from_float(dt)));  // 本 tick 起点
+            const fp_t sy = fp_sub(lpos.y, fp_mul(b.vy, fp_from_float(dt)));
+            const fp_t mdx = fp_mul(b.vx, fp_from_float(dt));                 // 本 tick 位移
+            const fp_t mdy = fp_mul(b.vy, fp_from_float(dt));
+            const fp_t two = fp_from_float(2.0f);
+            fp_t lo = fp_zero(), hi = fp_one();
+            fp_t bestx = sx, besty = sy;                                      // 已知安全的最远点
+            for (int it = 0; it < 10; it++) {
+                const fp_t mid = fp_div(fp_add(lo, hi), two);
+                const fp_t px  = fp_add(sx, fp_mul(mdx, mid));
+                const fp_t py  = fp_add(sy, fp_mul(mdy, mid));
+                const fp_t pcx = fp_add(px, fp_div(lrec.width,  two));
+                const fp_t pcy = fp_add(py, fp_div(lrec.height, two));
+                const fp_t ptx = fp_add(pcx, fp_mul(ddx, hlong));
+                const fp_t pty = fp_add(pcy, fp_mul(ddy, hlong));
+                const int pgx = collision_fp_floor_to_int(ptx);
+                const int pgy = collision_fp_floor_to_int(pty);
+                const bool blocked = (pgx < 0 || pgy < 0 || pgx >= MAP_W || pgy >= MAP_H)
+                                     || map_is_collidable(map_tile_at(pgx, pgy));
+                if (blocked) { hi = mid; }
+                else { lo = mid; bestx = px; besty = py; }
+            }
+            lpos.x = bestx;
+            lpos.y = besty;
+            cx = fp_add(lpos.x, fp_div(lrec.width,  fp_from_float(2.0f)));
+            cy = fp_add(lpos.y, fp_div(lrec.height, fp_from_float(2.0f)));
+        }
+        if (gx < 0 || gy < 0 || gx >= MAP_W || gy >= MAP_H) {
             to_destroy.push_back(e);
             continue;
         }
@@ -107,16 +144,47 @@ static void bullet_system(entt::registry& registry, Context* ctx, float dt)
             if (overlap) {
                 hp.hp -= b.damage;
                 if (hp.hp < 0) hp.hp = 0;
+                // 【临时测试-测完务必还原】箭击退已注释：命中时本会给敌人施加
+                // KnockbackComponent 把它推走，干扰"箭停在接触点"的观察。测完解除注释。
                 // 击退：仅对敌人施加（避免玩家被推导致联机不同步），沿子弹速度方向
-                fp_t len = fp_sqrt(fp_add(fp_mul(b.vx, b.vx), fp_mul(b.vy, b.vy)));
-                if (len > 0) {
-                    fp_t ks = fp_from_float(KNOCKBACK_SPEED);
-                    auto& kb = registry.emplace_or_replace<KnockbackComponent>(ee);
-                    kb.vx = fp_div(fp_mul(b.vx, ks), len);
-                    kb.vy = fp_div(fp_mul(b.vy, ks), len);
-                    kb.ticks = KNOCKBACK_TICKS;
+                // fp_t len = fp_sqrt(fp_add(fp_mul(b.vx, b.vx), fp_mul(b.vy, b.vy)));
+                // if (len > 0) {
+                //     fp_t ks = fp_from_float(KNOCKBACK_SPEED);
+                //     auto& kb = registry.emplace_or_replace<KnockbackComponent>(ee);
+                //     kb.vx = fp_div(fp_mul(b.vx, ks), len);
+                //     kb.vy = fp_div(fp_mul(b.vy, ks), len);
+                //     kb.ticks = KNOCKBACK_TICKS;
+                // }
+
+                // 【临时测试-测完务必还原】碰到敌人"像碰到墙一样"：不再穿透也不销毁，
+                // 而是在本 tick 位移内二分逼近，找出"再往前一丝就碰到敌人"的最远位置，
+                // 把箭停在敌人框前。定点数 + 固定 10 次迭代 -> 帧同步两端一致。
+                // 还原为：to_destroy.push_back(e);（撞到即销毁）
+                {
+                    const fp_t esx = fp_sub(lpos.x, fp_mul(b.vx, fp_from_float(dt))); // 本 tick 起点
+                    const fp_t esy = fp_sub(lpos.y, fp_mul(b.vy, fp_from_float(dt)));
+                    const fp_t edx = fp_mul(b.vx, fp_from_float(dt));                 // 本 tick 位移
+                    const fp_t edy = fp_mul(b.vy, fp_from_float(dt));
+                    const fp_t two = fp_from_float(2.0f);
+                    fp_t lo = fp_zero(), hi = fp_one();
+                    fp_t bestx = esx, besty = esy;                                    // 已知不重叠的最远点
+                    for (int it = 0; it < 10; it++) {
+                        const fp_t mid = fp_div(fp_add(lo, hi), two);
+                        const fp_t px  = fp_add(esx, fp_mul(edx, mid));
+                        const fp_t py  = fp_add(esy, fp_mul(edy, mid));
+                        vec2f_t pc = { fp_add(px, fp_div(lrec.width,  two)),
+                                       fp_add(py, fp_div(lrec.height, two)) };
+                        vec2f_t pv[8];
+                        int pv_n = 0;
+                        collision2df_swept_obb(pc, baxis, hlong, hshort,
+                                               fp_zero(), fp_zero(), pv, &pv_n);
+                        polygonf_t probe = { pv, pv_n };
+                        if (collision2df_check_polygons(probe, enemy_poly)) { hi = mid; }
+                        else { lo = mid; bestx = px; besty = py; }
+                    }
+                    lpos.x = bestx;
+                    lpos.y = besty;
                 }
-                to_destroy.push_back(e);
                 break;  // 命中一个目标即可，跳出敌人循环
             }
         }

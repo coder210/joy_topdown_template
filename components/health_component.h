@@ -5,7 +5,8 @@
 // 玩家初始血量（远程敌人子弹伤害结算用）
 static constexpr int PLAYER_MAX_HP = 10000;
 // 敌人初始血量（玩家远程子弹伤害结算用）
-static constexpr int ENEMY_MAX_HP = 50;
+// 【临时测试-测完务必还原】原值 50，调成 3000 让敌人不会被打死，便于反复测试箭的判定
+static constexpr int ENEMY_MAX_HP = 3000;
 // 重生耗时（tick 数）：3 秒 @ 20Hz 逻辑 tick（帧同步计数，避免浮点累积误差）
 static constexpr int PLAYER_RESPAWN_TICKS = 60;
 // 重生无敌保护（tick 数）：2 秒 @ 20Hz。避免玩家重生回出生点时
