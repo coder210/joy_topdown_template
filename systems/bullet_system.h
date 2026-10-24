@@ -15,6 +15,15 @@
 
 struct Context;
 
+/* 命中敌人的处置方式（二选一，互斥）：
+ *   true  = 停在接触点（不销毁）—— 观察用
+ *   false = 命中即销毁 —— 正式行为
+ *
+ * 为什么必须互斥：二分逼近求的是"最后一个【不重叠】的位置"，即接触前的一瞬。
+ * 如果把它和销毁串起来，箭会被移回"还没碰到"的位置再销毁，表现就是
+ * "箭没碰到敌人就消失了"。销毁必须在"已经重叠"的位置直接发生，不做回退。 */
+static constexpr bool BULLET_ENEMY_STOP = false;
+
 // 子弹推进系统：每 tick 移动 + 命中敌人扣血 + 寿命/越界/撞墙销毁。
 // 与玩家/敌人运动解耦（子弹不带 LogicVelocityComponent，不受 movement/collision 系统处理），
 // 全程定点数 -> 帧同步确定性。
@@ -156,10 +165,11 @@ static void bullet_system(entt::registry& registry, Context* ctx, float dt)
                 //     kb.ticks = KNOCKBACK_TICKS;
                 // }
 
-                // 【临时测试-测完务必还原】碰到敌人"像碰到墙一样"：不再穿透也不销毁，
-                // 而是在本 tick 位移内二分逼近，找出"再往前一丝就碰到敌人"的最远位置，
-                // 把箭停在敌人框前。定点数 + 固定 10 次迭代 -> 帧同步两端一致。
-                // 还原为：to_destroy.push_back(e);（撞到即销毁）
+                // 二分逼近：先求出"最后一个不重叠的位置" = 精确接触点。
+                // 停住和销毁【都】需要它，因为渲染发生在逻辑之后：
+                //   若在本 tick 直接 destroy，渲染时实体已不存在，玩家看到的最后一帧是
+                //   上一 tick 的位置（距目标最多一个 tick 位移 0.3m ≈ 30px），
+                //   表现就是"箭离敌人还有一段距离就没了"。
                 {
                     const fp_t esx = fp_sub(lpos.x, fp_mul(b.vx, fp_from_float(dt))); // 本 tick 起点
                     const fp_t esy = fp_sub(lpos.y, fp_mul(b.vy, fp_from_float(dt)));
@@ -184,6 +194,13 @@ static void bullet_system(entt::registry& registry, Context* ctx, float dt)
                     }
                     lpos.x = bestx;
                     lpos.y = besty;
+                }
+                if (!BULLET_ENEMY_STOP) {
+                    // 【销毁】延迟 1 tick 再销毁：本 tick 让箭渲染在"接触点"上（紧贴敌人），
+                    // 下一 tick 走寿命分支真正销毁。这样看到的是"碰到即消失"，
+                    // 而不是在上一 tick 的位置凭空消失。
+                    // 复用 life_ticks 而非新增字段 -> BulletComponent 快照结构不变，帧同步安全。
+                    b.life_ticks = 1;
                 }
                 break;  // 命中一个目标即可，跳出敌人循环
             }
