@@ -17,6 +17,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          # 引擎仓 joy 目前是私有：需要 SUBMODULE_TOKEN（对 joy 有 Contents:Read 的 PAT）。
+          # 引擎公开后这行可保留，会自动回落到 github.token。
+          token: ${{ secrets.SUBMODULE_TOKEN || github.token }}
 
       - name: Get Emscripten
         run: |
