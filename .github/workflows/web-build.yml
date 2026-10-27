@@ -55,6 +55,12 @@ jobs:
           if [ -f "_site/joy_topdown_template.html" ]; then
             mv "_site/joy_topdown_template.html" "_site/index.html"
           fi
+          # 网页图标：Emscripten 下不能用 window_set_icon（SDL 的 EM_ASM 依赖
+          # SharedArrayBuffer），改用 HTML 的 <link rel="icon">
+          if [ -f "logo.png" ]; then
+            cp logo.png _site/favicon.png
+            sed -i 's#<head>#<head><link rel="icon" type="image/png" href="favicon.png">#' _site/index.html
+          fi
           find _site -type l -delete
 
       - name: Verify no symlinks remain

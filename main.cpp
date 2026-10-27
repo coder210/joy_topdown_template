@@ -144,8 +144,15 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         // 全局自适应宽度：所有场景铺满窗口、无左右黑边（与游戏场景一致）
         presentation_set_adaptive(ctx->r2d);
 
-        // 设置窗口图标（logo.png 位于 textures 目录下）
+        // 设置窗口图标（logo.png 位于 branding 目录下）
+        // 网页版必须跳过：SDL3 在 Emscripten 下设置图标的 EM_ASM 里有
+        //   `pngData.buffer instanceof SharedArrayBuffer`
+        // 浏览器未开启 COOP/COEP 跨域隔离时 SharedArrayBuffer 未定义，
+        // 这一句会直接抛 ReferenceError 导致启动失败（GitHub Pages 无法自定义响应头，
+        // 所以永远拿不到 SharedArrayBuffer）。网页图标改用 HTML 的 <link rel="icon">。
+#if !defined(__EMSCRIPTEN__)
         window_set_icon(ctx->window, "joy_topdown_template/branding/logo.png");
+#endif
 
         // 应用全屏设置
         if (ctx->settings.fullscreen) {
