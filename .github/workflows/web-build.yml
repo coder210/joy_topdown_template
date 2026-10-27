@@ -1,0 +1,117 @@
+name: Build joy2d For Web
+
+# 仅本项目（joy_topdown_template）的 Web CI：手动可触发，且仅在触及本项目或其编译依赖时自动跑。
+# 产物经 upload-pages-artifact 上传，再由 deploy job 发布到默认 GitHub Pages 地址。
+on:
+  workflow_dispatch:        # Actions 页手动触发
+  push:
+    paths:
+      - 'joy_topdown_template/**'
+      - 'joy/**'
+      - 'SDL/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/web-build.yml'
+  pull_request:
+    paths:
+      - 'joy_topdown_template/**'
+      - 'joy/**'
+      - 'SDL/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/web-build.yml'
+
+jobs:
+  build-web:
+    name: Build joy2d for Web (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [joy_topdown_template]                    # 仅本项目
+        include:
+          - project: joy_topdown_template
+            build_macro: "BUILD_JOY_TOPDOWN_TEMPLATE"      # 对应根 CMakeLists 的 option
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Get Emscripten
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git --depth=1
+          cd emsdk
+          ./emsdk install 3.1.64
+          ./emsdk activate 3.1.64
+
+      - name: Configure with Emscripten
+        run: |
+          source emsdk/emsdk_env.sh
+          emcmake cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXE_LINKER_FLAGS="-s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=256MB -s STACK_SIZE=5MB" \
+            -DCMAKE_C_FLAGS="-s USE_PTHREADS=0" \
+            -DCMAKE_CXX_FLAGS="-s USE_PTHREADS=0 -s DISABLE_EXCEPTION_CATCHING=0" \
+            -D${{ matrix.build_macro }}=ON
+
+      - name: Build
+        run: |
+          source emsdk/emsdk_env.sh
+          cmake --build build --parallel --verbose
+
+      - name: List build directory (debug)
+        run: ls -la build/
+
+      - name: Prepare for upload (per project)
+        run: |
+          mkdir -p _site_${{ matrix.project }}
+          # 复制所有 Web 相关文件（跟随符号链接）
+          # 注意：如果文件不存在，cp 会报错并导致步骤失败，便于及时发现缺失文件
+          cp -L build/Release/*.wasm build/Release/*.js build/Release/*.html build/Release/*.data _site_${{ matrix.project }}/ || true
+          # 将主 HTML 重命名为 index.html（如果存在）
+          if [ -f "_site_${{ matrix.project }}/${{ matrix.project }}.html" ]; then
+            mv "_site_${{ matrix.project }}/${{ matrix.project }}.html" "_site_${{ matrix.project }}/index.html"
+          fi
+          # 删除任何残留的符号链接（确保安全）
+          find _site_${{ matrix.project }} -type l -delete
+
+      - name: Verify no symlinks remain
+        run: |
+          if [ $(find _site_${{ matrix.project }} -type l | wc -l) -ne 0 ]; then
+            echo "::error::Symlinks still exist in artifact"
+            exit 1
+          fi
+
+      - name: List upload directory content
+        run: ls -la _site_${{ matrix.project }}/
+
+      - name: Fix permissions
+        run: |
+          chmod -c -R +rX "_site_${{ matrix.project }}" | while read line; do
+            echo "::warning title=Invalid file permissions automatically fixed::$line"
+          done
+
+      # 使用专为 GitHub Pages 设计的 artifact 上传 action
+      # 始终上传：不再依赖仓库变量 vars.UPLOAD_ARTIFACTS（未设置该变量时原条件恒为 false，从不上传）
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: ${{ matrix.project }}-web   # 需与 deploy job 的 artifact_name 一致
+          retention-days: 7
+          path: _site_${{ matrix.project }}/
+
+  deploy:
+    needs: build-web
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages (joy_topdown_template web client)
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: joy_topdown_template-web   # 必须与上传时该项目的 artifact 名称一致

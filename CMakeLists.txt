@@ -1,3 +1,37 @@
+# ============================================================
+# 独立仓库模式：本文件直接作为仓库根 CMakeLists 使用（拆仓后）。
+# 单仓模式（被上层根 CMake add_subdirectory）下整段跳过，行为不变。
+# 引擎以 submodule 形式位于 third_party/joy（内含 joy/ SDL/ msgpack/ spine/）。
+# ============================================================
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    cmake_minimum_required(VERSION 3.16)
+    project(joy_topdown_template C CXX)
+
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE INTERNAL "")
+
+    if ((APPLE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin") OR EMSCRIPTEN)
+        set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
+        set(SDL_SHARED OFF)
+    else()
+        set(SDL_SHARED ON)
+    endif()
+
+    if(MSVC)
+        if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
+            add_definitions(/MP)
+        endif()
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+
+    set(JOY_REPO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy")
+    add_subdirectory("${JOY_REPO_DIR}/msgpack")
+    add_subdirectory("${JOY_REPO_DIR}/spine")
+    add_subdirectory("${JOY_REPO_DIR}/SDL")
+endif()
+
 # 可执行文件名（单二进制：单机/Host/客户端/独立服务端，运行时 --mode 切换）
 set(EXECUTABLE_NAME "joy_topdown_template")
 message(STATUS "EXECUTABLE_NAME = '${EXECUTABLE_NAME}'")
@@ -174,7 +208,12 @@ if(EMSCRIPTEN)
 endif()
 
 # 引入 joy 框架源码（纯文件引入，不再构建独立库 target）
-include(${CMAKE_SOURCE_DIR}/joy/joy_add.cmake)
+# 单仓：<仓库根>/joy/joy_add.cmake；拆仓后：third_party/joy/joy/joy_add.cmake
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/joy/joy_add.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/joy/joy_add.cmake")
+else()
+    include(${CMAKE_SOURCE_DIR}/joy/joy_add.cmake)
+endif()
 joy_add_sources(${EXECUTABLE_NAME})
 
 # 添加项目自身目录为头文件搜索路径
