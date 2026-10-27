@@ -27,9 +27,9 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     endif()
 
     set(JOY_REPO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy")
-    add_subdirectory("${JOY_REPO_DIR}/msgpack")
-    add_subdirectory("${JOY_REPO_DIR}/spine")
-    add_subdirectory("${JOY_REPO_DIR}/SDL")
+    add_subdirectory("${JOY_REPO_DIR}/msgpack" "${CMAKE_BINARY_DIR}/msgpack")
+    add_subdirectory("${JOY_REPO_DIR}/spine"   "${CMAKE_BINARY_DIR}/spine")
+    add_subdirectory("${JOY_REPO_DIR}/SDL"     "${CMAKE_BINARY_DIR}/SDL")
 endif()
 
 # 可执行文件名（单二进制：单机/Host/客户端/独立服务端，运行时 --mode 切换）
