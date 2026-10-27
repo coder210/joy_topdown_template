@@ -13,13 +13,12 @@ enum online_event_code {
         ONLINE_EVENT_BACK = 4,
 };
 
-// 联机大厅（局域网房间浏览器），布局：顶部标题 + 全宽房间列表 + 底部操作条。
-// 该结构单列、控件大，桌面与手机横屏都适用（触屏友好）。
-//
-// - 自动发现同网段房主（LanDiscovery，可插拔 IRoomSource，未来可换 Steam/主服务器）
-// - 创建房间 / 加入选中 / 刷新 / 返回 + 直连 IP
-// 选好房间后只写 settings.server_ip/port 并发 ONLINE_EVENT_CLIENT，
-// 真正连接仍由 GameScene 按 MODE_CLIENT 建立（复用现有流程）。
+// 联机大厅（局域网房间浏览器）。
+// 视觉与布局对齐「选择角色」场景：米色纸底 + 顶部墨色标题带 + 左列表 / 右详情 Master-Detail + 纸质按钮。
+//   - 左侧：房间卡片列表（选中深框 + 红条）
+//   - 右侧：选中房间详情
+//   - 顶部右上角「直连」→ 居中弹窗输入 IP/端口
+//   - 底部：创建房间 / 加入房间 / 刷新 / 返回
 class OnlineScene : public Scene {
 public:
     explicit OnlineScene(Context* ctx);
@@ -30,15 +29,17 @@ public:
     void HandleUiEvent(const void* e) override;
 
 private:
-    button_p btn_refresh = NULL, btn_create = NULL, btn_join = NULL,
-             btn_back = NULL, btn_direct = NULL;
+    button_p btn_create = NULL, btn_join = NULL, btn_refresh = NULL, btn_back = NULL;
+    button_p btn_direct_open = NULL;                 // 标题带右上角「直连」
+    button_p btn_connect = NULL, btn_cancel = NULL;  // 直连弹窗按钮
     inputbox_p ip_input = NULL;
     inputbox_p port_input = NULL;
+    bool direct_open_ = false;                       // 直连弹窗是否打开
     int selected_ = -1;
 
-    // 房间列表面板几何（逻辑坐标），按当前逻辑分辨率每帧重算
+    // 列表/面板几何（逻辑像素），按当前逻辑分辨率每帧重算
     float list_x = 0, list_y = 0, list_w = 0, list_h = 0;
-    float header_h = 0, row_h = 0;
+    float row_x = 0, row_w = 0, row_top = 0, row_h = 0, row_pitch = 0;
 
     void layout();
     void join_selected();

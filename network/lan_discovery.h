@@ -16,6 +16,17 @@
 //
 // 全部走 joy 的 sys_* socket（Windows / Linux / Android 可用；macOS 引擎本身不支持 socket）。
 // 单例：同一进程内房主广播与客户端监听可同时存在（不同 socket）。
+
+// 浏览器（Emscripten）没有原始 UDP：局域网广播发现在网页里不可用（大厅显示空列表），
+// 但直连 / WebSocket 客户端仍可用（引擎在 emscripten 下用浏览器原生 WebSocket）。
+static inline bool lan_discovery_supported() {
+#if defined(JOY_EMSCRIPTEN) || defined(__EMSCRIPTEN__)
+        return false;
+#else
+        return true;
+#endif
+}
+
 class LanDiscovery : public IRoomSource {
 public:
     static LanDiscovery& Get() {
@@ -25,6 +36,7 @@ public:
 
     // ---------------- 房主侧 ----------------
     bool start_beacon(const char* name, int game_port, int map_id, int max_players) {
+        if (!lan_discovery_supported()) return false;   // 浏览器无原始 UDP
         stop_beacon();
         beacon_fd_ = sys_udp();
         if (beacon_fd_ < 0) return false;
@@ -49,6 +61,7 @@ public:
 
     // ---------------- 客户端侧 ----------------
     bool start_listen() {
+        if (!lan_discovery_supported()) return false;   // 浏览器无原始 UDP
         if (listen_fd_ >= 0) return true;
         listen_fd_ = sys_udp();
         if (listen_fd_ < 0) return false;
