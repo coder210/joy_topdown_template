@@ -34,6 +34,7 @@
 #include "../systems/melee_attack_system.h"
 #include "../systems/player_shoot_system.h"
 #include "../systems/bullet_system.h"
+#include "../network/lan_discovery.h"
 
 
 #include "../systems/player_death_system.h"
@@ -169,6 +170,20 @@ void GameScene::Update(float dt)
 
     // 网络层更新（模式特有）
     networkUpdate();
+
+    // 局域网房间广播：房主/专用服每 200ms 驱动一次（内部仍 1s 才真正发包），
+    // 降低每帧对连接数查询/时钟读取的调用频率，避免给主循环添负担。
+    if (LanDiscovery::Get().beacon_active()) {
+        static uint64_t s_last_lan_ms = 0;
+        uint64_t now_ms = get_ticks();
+        if (now_ms - s_last_lan_ms >= 200) {
+            s_last_lan_ms = now_ms;
+            int n = ctx->net_server ? netserver_connection_count(ctx->net_server) : 0;
+            if (cfg_.localPlayer) n += 1;
+            LanDiscovery::Get().set_beacon_players(n);
+            LanDiscovery::Get().update();
+        }
+    }
 
     // 单机暂停：跳过固定步模拟；联机不暂停（本地暂停会让双端帧同步发散）。
     // 暂停期间不累积时间，恢复后也不会补跑一串 tick。
@@ -333,6 +348,9 @@ void GameScene::Destroy()
 {
     Context* ctx = this->ctx();
 
+    // 停止局域网广播（房主/专用服）
+    LanDiscovery::Get().stop_beacon();
+
     // 网络清理
     if (ctx->netclient) {
         netclient_destroy(ctx->netclient);
@@ -390,6 +408,15 @@ void GameScene::init()
     else if (cfg_.transport == Transport::Client)
         ctx->netclient = netclient_create(NET_CLIENT_WEBSOCKET,
                                           ctx->settings.server_ip, ctx->settings.server_port);
+
+    // 房主/专用服：开始局域网广播，让大厅能发现本房间
+    if (cfg_.transport == Transport::Server) {
+        auto& gsv = ctx->ecs.ctx().get<GlobalState>();
+        char room_name[64];
+        snprintf(room_name, sizeof(room_name), "%s的房间", ctx->selected_nickname);
+        LanDiscovery::Get().start_beacon(room_name, ctx->settings.server_port,
+                                         gsv.level, kRoomMaxPlayers);
+    }
 
     if (cfg_.localPlayer) {
         // 只有权威端才自己注入本地玩家；客户端的玩家由服务端下发的 join 命令产生

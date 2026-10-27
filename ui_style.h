@@ -30,6 +30,16 @@ public:
         setColors(btn, { 255, 255, 255, 255 }, { 220, 225, 235, 255 }, { 200, 200, 210, 255 });
     }
 
+    // 大厅次按钮：浅灰填充（白底上清晰可见，触屏友好）
+    static void applyLightButton(button_p btn) {
+        setColors(btn, { 236, 238, 244, 255 }, { 220, 224, 233, 255 }, { 202, 207, 219, 255 });
+    }
+
+    // 大厅主行动按钮（创建房间）：蓝色实心 + 白字，形成明确主次
+    static void applyPrimaryButton(button_p btn) {
+        setColors(btn, { 66, 133, 244, 255 }, { 90, 152, 250, 255 }, { 48, 110, 214, 255 });
+    }
+
 private:
     static void setColors(button_p btn, jcolor_t normal, jcolor_t hover, jcolor_t pressed) {
         button_set_normal_color(btn, normal);

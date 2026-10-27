@@ -130,11 +130,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 #endif
 
-        // 窗口与逻辑分辨率同为 960x640（480x320 的 2 倍，仍保持 3:2）。
-        // 配套 PIXELS_PER_METER=100（见 CMakeLists）：PPM 同步翻倍，
-        //   所以可视世界仍是 9.6x6.4 米、角色显示大小不变，只是渲染更精细、
-        //   文字按 48px 原生烘焙更锐利。UI 全部为比例坐标，自动适配。
-        ctx->window = create_window("Joy Topdown", 960, 640);
+        // 临时改为 480x320 小窗口便于本地测试（逻辑分辨率仍由 presentation_set_adaptive
+        // 锁定 640 高、宽度跟随窗口宽高比，内容比例不变，只是渲染进更小的窗口）。
+        // 正式包改回 960x640。
+        ctx->window = create_window("Joy Topdown", 480, 320);
         ctx->r2d = r2d_create(ctx->window);
         // 2D 形状（矩形/线段）的 alpha 由“绘制混合模式”控制；引擎默认是 NONE，
         // 导致半透明 HUD 底色被画成不透明。这里全局开启 BLEND：

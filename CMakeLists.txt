@@ -73,8 +73,10 @@ set(PROJECT_FILES
     layers/menu_layer.h
     layers/pause_menu_layer.h
     # ---- network ----
+    network/lan_discovery.h
     network/network_manager.cpp
     network/network_manager.h
+    network/room_info.h
     # ---- passes ----
     passes/camera_follow_pass.h
     passes/drawing_collision_debug_pass.h
