@@ -1,93 +1,53 @@
-name: Build joy for Android
+name: Build joy_topdown_template for Android
 
-# 仅本项目（joy_topdown_template）的安卓 CI：手动可触发，且仅在触及本项目或其编译依赖时自动跑。
-# 注意：安卓构建会编译共享引擎 joy/**（joy.h、janim.h 等都在其编译链里），
-# 所以路径过滤必须包含 joy/**，否则改了引擎头（如 joy/janim.h）不会触发安卓 CI。
+# 独立仓库：SDL 的 Android 工程位于 third_party/joy/SDL/android-project。
+# 游戏根 CMakeLists 从 app/ 向上 5 层（app -> android-project -> SDL -> joy -> third_party -> 仓库根）。
 on:
-  workflow_dispatch:        # 在 Actions 标签页手动触发
+  workflow_dispatch:
   push:
-    paths:
-      - 'joy_topdown_template/**'
-      - 'joy/**'
-      - 'SDL/**'
-      - 'build.gradle'
-      - 'CMakeLists.txt'
-      - '.github/workflows/android-build.yml'
+    branches: [main]
   pull_request:
-    paths:
-      - 'joy_topdown_template/**'
-      - 'joy/**'
-      - 'SDL/**'
-      - 'build.gradle'
-      - 'CMakeLists.txt'
-      - '.github/workflows/android-build.yml'
 
 jobs:
   build:
-    strategy:
-      matrix:
-        target: [joy_topdown_template]                  # 仅本项目的安卓 CI
-        include:
-          - target: joy_topdown_template
-            build_macro: "BUILD_JOY_TOPDOWN_TEMPLATE"   # 对应根 CMakeLists 的 option
-      fail-fast: false                   # 一个失败不影响另一个
-
-    name: Build ${{ matrix.target }} APK
+    name: Build APK
     runs-on: ubuntu-latest
-
     steps:
-      # 1. 检出代码（包含子模块）
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # 2. 设置 JDK 17（Gradle 需要）
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3. 将项目根目录下的 build.gradle 复制到 SDL 的 Android 项目模板中
       - name: Copy build.gradle to SDL project
+        run: cp build.gradle third_party/joy/SDL/android-project/app/
+
+      - name: Patch build.gradle for standalone layout
         run: |
-          cp build.gradle SDL/android-project/app/
+          cd third_party/joy/SDL/android-project/app/
 
-      # 4. 根据目标修改 build.gradle 中的 CMake 参数（使用矩阵中定义的变量）
-      - name: Modify CMake arguments in build.gradle
-        run: |
-          cd SDL/android-project/app/
-          # 备份原文件
-          cp build.gradle build.gradle.bak
+          # 游戏根 CMakeLists（5 层）
+          sed -i 's#\.\./\.\./\.\./CMakeLists.txt#../../../../../CMakeLists.txt#' build.gradle
 
-          # 构建新的 arguments 字符串（包含原有矩阵宏和新增参数）
-          # 使用单引号保护 ${System.getProperty(...)} 不被 Shell 展开
-          NEW_ARGS='arguments "-D'"${{ matrix.build_macro }}"'=ON", "-DANDROID_APP_PLATFORM=android-16", "-DANDROID_STL=c++_static", "-DCMAKE_VERBOSE_MAKEFILE=ON", "-DMOBILE_MAIN_DIR=${System.getProperty("user.dir")}/app/src/main"'
+          # 传入 MOBILE_MAIN_DIR，游戏 CMake 据此推导 MOBILE_ASSETS_DIR
+          sed -i 's#-DANDROID_APP_PLATFORM=android-16"#-DANDROID_APP_PLATFORM=android-16", "-DMOBILE_MAIN_DIR=${System.getProperty("user.dir")}/app/src/main"#' build.gradle
 
-          # 尝试替换已有的 arguments 行（使用 # 作为分隔符，避免与路径中的 / 冲突）
-          sed -i -E "s#arguments[[:space:]]+\".*\"#${NEW_ARGS}#" build.gradle
+          grep -nE "path |arguments " build.gradle
 
-          # 如果替换失败（文件中没有 arguments 行），则在 defaultConfig 块内插入
-          if ! grep -q "arguments" build.gradle; then
-            # 注意：原插入逻辑可能不符合 Groovy 语法，但保持与原脚本一致
-            sed -i "/defaultConfig {/a \\        externalNativeBuild.cmake.${NEW_ARGS}" build.gradle
-          fi
-
-          # 打印修改后的内容以便调试
-          cat build.gradle
-
-      # 5. 添加 copyIcons 任务到 build.gradle，确保图标在资源合并前更新
       - name: Add copyIcons task to build.gradle
         run: |
-          cd SDL/android-project/app/
+          cd third_party/joy/SDL/android-project/app/
           cat >> build.gradle << 'EOF'
 
-          // 复制图标到所有 mipmap 目录，确保资源合并前更新
           task copyIcons {
               doLast {
                   def densities = ['hdpi', 'mdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']
-                  def sourceFile = file('../../../${{ matrix.target }}/logo.png')
+                  def sourceFile = file('../../../../../logo.png')
                   if (!sourceFile.exists()) {
                       throw new GradleException("logo.png not found at ${sourceFile.absolutePath}")
                   }
@@ -101,39 +61,18 @@ jobs:
                           into targetDir
                           rename '.*', 'ic_launcher.png'
                       }
-                      println "Copied logo.png to ${targetDir}/ic_launcher.png"
                   }
               }
           }
 
           preBuild.dependsOn copyIcons
 
-          // 动态设置应用显示名称
           if (project.hasProperty('appDisplayName')) {
               android.defaultConfig {
                   resValue "string", "app_name", project.appDisplayName
               }
           }
 
-          // 根据传入参数动态设置包名(applicationId)
-          if (project.hasProperty('applicationId')) {
-              android.defaultConfig {
-                  applicationId project.applicationId
-              }
-              println "Application ID set to: ${project.applicationId}"
-          } else if (project.hasProperty('packageSuffix')) {
-              // 如果只传了后缀，组合出完整包名(假设基础包名为 com.joy2d)
-              def basePackage = "com.joy2d"
-              android.defaultConfig {
-                  applicationId "${basePackage}.${project.packageSuffix}"
-              }
-              println "Application ID set to: ${basePackage}.${project.packageSuffix}"
-          } else {
-              // 未传参数时使用默认值(如 org.libsdl.app)
-              println "Using default application ID from manifest"
-          }
-
-          // 动态设置 APK 输出文件名
           android.applicationVariants.all { variant ->
               variant.outputs.all { output ->
                   def targetName = project.hasProperty('targetName') ? project.targetName : 'Game'
@@ -141,21 +80,17 @@ jobs:
                   outputFileName = "${targetName}-${buildType}.apk"
               }
           }
-
           EOF
 
-      # 6. 构建 APK
       - name: Build APK
         run: |
-          cd SDL/android-project/
+          cd third_party/joy/SDL/android-project/
           chmod +x gradlew
-          ./gradlew assembleDebug -PtargetName=${{ matrix.target }} -PappDisplayName="${{ matrix.target }}" -PpackageSuffix=${{ matrix.target }}
+          ./gradlew assembleDebug -PtargetName=joy_topdown_template -PappDisplayName="Joy Topdown"
 
-      # 7. 上传 APK 产物，文件名区分目标。
-      #    始终上传：不再依赖仓库变量 vars.UPLOAD_ARTIFACTS（未设置该变量时原条件恒为 false，APK 从不留档）。
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}-debug
+          name: joy_topdown_template-debug
           retention-days: 7
-          path: SDL/android-project/app/build/outputs/apk/debug/${{ matrix.target }}-debug.apk
+          path: third_party/joy/SDL/android-project/app/build/outputs/apk/debug/joy_topdown_template-debug.apk
