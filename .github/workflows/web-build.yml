@@ -31,11 +31,17 @@ jobs:
       - name: Configure with Emscripten
         run: |
           source emsdk/emsdk_env.sh
+          # 网页版强制单线程：SharedArrayBuffer 需要 COOP/COEP 跨域隔离头，
+          # 而 GitHub Pages 无法自定义响应头，一旦构建带 pthread/共享内存就会
+          # 在浏览器里报 "SharedArrayBuffer is not defined"。
+          # 所以编译与链接都要显式关掉：USE_PTHREADS / SHARED_MEMORY /
+          # WASM_WORKERS / PROXY_TO_PTHREAD，并限定 ENVIRONMENT=web。
           emcmake cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_EXE_LINKER_FLAGS="-s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=256MB -s STACK_SIZE=5MB" \
+            -DSDL_PTHREADS=OFF \
             -DCMAKE_C_FLAGS="-s USE_PTHREADS=0" \
-            -DCMAKE_CXX_FLAGS="-s USE_PTHREADS=0 -s DISABLE_EXCEPTION_CATCHING=0"
+            -DCMAKE_CXX_FLAGS="-s USE_PTHREADS=0 -s DISABLE_EXCEPTION_CATCHING=0" \
+            -DCMAKE_EXE_LINKER_FLAGS="-s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=256MB -s STACK_SIZE=5MB -s USE_PTHREADS=0 -s SHARED_MEMORY=0 -s WASM_WORKERS=0 -s PROXY_TO_PTHREAD=0 -s ENVIRONMENT=web"
 
       - name: Build
         run: |
