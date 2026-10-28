@@ -52,6 +52,13 @@
 
 // 运行模式由 cfg_（kModeConfigs 中按 ctx->mode 取的能力配置）驱动，见 game_scene_common.h
 
+// ---- 本地 join 快照（兜底）----
+// Emscripten 下 unpack_command 恒定失败（同一份代码 Windows 正常），导致网页单机
+// 永远拿不到 join、num_joins 恒为 0，玩家不会创建。init() 时存一份权威端本地 join，
+// 解包失败时直接补给 NetComponent，保证单机可玩。
+static S2CPlayerJoin g_local_join_snapshot;
+static bool           g_local_join_valid = false;
+
 void GameScene::Load()
 {
     Context* ctx = this->ctx();
@@ -157,13 +164,23 @@ bool GameScene::consumeCommandFrame()
                 // 帧同步校验（客户端 / 单机，经虚函数）
                 verifyFrameSync(frame_id, inputs, in, server_checksum);
             }
-        } else if (!s_unpack_diag_done) {
-            s_unpack_diag_done = true;
-            int n = (int)command_data.size();
-            char hex[64] = { 0 };
-            for (int i = 0; i < n && i < 20; i++)
-                snprintf(hex + i * 3, 4, "%02x ", (unsigned char)command_data[i]);
-            log_info("[diag] unpack_command FAILED len=%d bytes=%s", n, hex);
+        } else {
+            // 解包失败兜底：权威端本地玩家直接应用 join。
+            // 只要还没有玩家实体就补一次，玩家建出来后条件自然不成立（自限）。
+            if (g_local_join_valid && cfg_.authoritative &&
+                ctx->ecs.view<PlayerComponent>().size() == 0) {
+                auto& cmd = ctx->ecs.ctx().get<NetComponent>();
+                cmd.num_joins = 1;
+                cmd.joins[0] = g_local_join_snapshot;
+            }
+            if (!s_unpack_diag_done) {
+                s_unpack_diag_done = true;
+                int n = (int)command_data.size();
+                char hex[64] = { 0 };
+                for (int i = 0; i < n && i < 20; i++)
+                    snprintf(hex + i * 3, 4, "%02x ", (unsigned char)command_data[i]);
+                log_info("[diag] unpack_command FAILED len=%d bytes=%s (fallback local join applied)", n, hex);
+            }
         }
     } else if (!s_unpack_diag_done) {
         s_unpack_diag_done = true;
@@ -435,7 +452,13 @@ void GameScene::init()
 
     if (cfg_.localPlayer) {
         // 只有权威端才自己注入本地玩家；客户端的玩家由服务端下发的 join 命令产生
-        if (cfg_.authoritative) GameSceneCommon::injectCommonPlayer(this);
+        if (cfg_.authoritative) {
+            GameSceneCommon::injectCommonPlayer(this);
+            // 快照本地 join：解包失败时用它兜底建玩家（见 consumeCommandFrame）
+            auto& pj = net_session(ctx).player_joins;
+            g_local_join_valid = !pj.empty();
+            if (g_local_join_valid) g_local_join_snapshot = pj.back();
+        }
         GameSceneCommon::initControlsAndAudio(this);
 
         // 暂停菜单（右上角按钮 + 菜单/确认/设置），仅本地玩家场景需要
