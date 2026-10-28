@@ -159,7 +159,11 @@ bool GameScene::consumeCommandFrame()
             }
         } else if (!s_unpack_diag_done) {
             s_unpack_diag_done = true;
-            log_info("[diag] unpack_command FAILED len=%d", (int)command_data.size());
+            int n = (int)command_data.size();
+            char hex[64] = { 0 };
+            for (int i = 0; i < n && i < 20; i++)
+                snprintf(hex + i * 3, 4, "%02x ", (unsigned char)command_data[i]);
+            log_info("[diag] unpack_command FAILED len=%d bytes=%s", n, hex);
         }
     } else if (!s_unpack_diag_done) {
         s_unpack_diag_done = true;
@@ -474,6 +478,15 @@ void GameScene::tick()
     int frame_id = gs.next_frame_id++;
     if (cfg_.localPlayer) this->net_.CollectLocalInput();
     this->net_.CollectInput(frame_id);
+
+    // 临时诊断：打包后的命令长度（与解包端 len 对比，判断是"没写进去"还是"写坏了"）
+    static bool s_pack_diag = false;
+    if (!s_pack_diag && !game_runtime(this->ctx()).command_queue.empty()) {
+        s_pack_diag = true;
+        log_info("[diag] packed command len=%d frame=%d",
+            (int)game_runtime(this->ctx()).command_queue.back().size(), frame_id);
+    }
+
     if (cfg_.transport == Transport::Server) this->net_.InputForwarding();
 }
 
