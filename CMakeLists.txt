@@ -47,6 +47,13 @@ if (ANDROID)
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE MOBILE_TOUCH)
 else()
     add_executable(${EXECUTABLE_NAME})
+    # Linux 下可执行文件名与资产命名空间目录同名（如 joy_topdown_template），
+    # 无后缀的 exe 文件会抢占该目录名导致资产拷贝失败；把 exe 放进同名子目录，
+    # 使其成为真正的目录以同时容纳 exe 与资产（与 Windows .exe 行为一致）。
+    if(UNIX AND NOT APPLE)
+        set_target_properties(${EXECUTABLE_NAME} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/${EXECUTABLE_NAME}")
+    endif()
 endif()
 
 # 逻辑分辨率 960x640（480x320 的 2 倍）：PPM 同步翻倍 50 → 100。
