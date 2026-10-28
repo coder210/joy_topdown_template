@@ -50,7 +50,9 @@ else()
     # Linux 下可执行文件名与资产命名空间目录同名（如 joy_topdown_template），
     # 无后缀的 exe 文件会抢占该目录名导致资产拷贝失败；把 exe 放进同名子目录，
     # 使其成为真正的目录以同时容纳 exe 与资产（与 Windows .exe 行为一致）。
-    if(UNIX AND NOT APPLE)
+    # 注意：Emscripten(Web) 同样满足 UNIX 且非 APPLE，但 Web 产物必须落在
+    # build/Release/<exename>.html（web-build.yml 按此查找），不能套用子目录逻辑，故显式排除。
+    if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
         set_target_properties(${EXECUTABLE_NAME} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/${EXECUTABLE_NAME}")
     endif()
