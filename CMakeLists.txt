@@ -250,7 +250,17 @@ if (APPLE)
         file(RELATIVE_PATH relpath "${ASSETS_ROOT}" "${FILE}")
         get_filename_component(dir "${relpath}" DIRECTORY)
         target_sources(${EXECUTABLE_NAME} PRIVATE "${FILE}")
-        set_property(SOURCE "${FILE}" PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${dir}")
+        # macOS bundle 有 Contents/ 分层（exe 在 Contents/MacOS/，资源在
+        # Contents/Resources/），同名可执行文件与 <namespace> 资源目录不冲突。
+        # 但 iOS/visionOS/tvOS 是扁平 bundle，可执行文件直接在 .app 根目录，
+        # 资源若也用 <namespace>/...（即 joy_topdown_template/...）会与同名 exe
+        # 撞名（ld: open() failed, errno=21 EISDIR）。故非 Darwin Apple 套一层
+        # joy_topdown_template_assets/ 让资源目录名不等于可执行文件名，避免冲突。
+        if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+            set_property(SOURCE "${FILE}" PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${dir}")
+        else()
+            set_property(SOURCE "${FILE}" PROPERTY MACOSX_PACKAGE_LOCATION "joy_topdown_template_assets/${dir}")
+        endif()
     endmacro()
     foreach(asset_file ${ASSET_FILES})
         add_resource("${ASSETS_ROOT}/${asset_file}")
