@@ -52,13 +52,6 @@
 
 // 运行模式由 cfg_（kModeConfigs 中按 ctx->mode 取的能力配置）驱动，见 game_scene_common.h
 
-// ---- 本地 join 快照（兜底）----
-// Emscripten 下 unpack_command 恒定失败（同一份代码 Windows 正常），导致网页单机
-// 永远拿不到 join、num_joins 恒为 0，玩家不会创建。init() 时存一份权威端本地 join，
-// 解包失败时直接补给 NetComponent，保证单机可玩。
-static S2CPlayerJoin g_local_join_snapshot;
-static bool           g_local_join_valid = false;
-
 void GameScene::Load()
 {
     Context* ctx = this->ctx();
@@ -136,7 +129,6 @@ bool GameScene::consumeCommandFrame()
 {
     Context* ctx = this->ctx();
     bool got_command = false;
-    static bool s_unpack_diag_done = false;   // 临时诊断：只报一次
     if (!game_runtime(ctx).command_queue.empty()) {
         std::string command_data = game_runtime(ctx).command_queue.front();
         game_runtime(ctx).command_queue.pop();
@@ -164,40 +156,7 @@ bool GameScene::consumeCommandFrame()
                 // 帧同步校验（客户端 / 单机，经虚函数）
                 verifyFrameSync(frame_id, inputs, in, server_checksum);
             }
-        } else {
-            // —— 根因诊断（一次性，复跑定位失败发生在哪一步）——
-            if (!s_unpack_diag_done) {
-                s_unpack_diag_done = true;
-                int n = (int)command_data.size();
-                char hx[120] = { 0 };
-                int lim = n > 48 ? 48 : n;
-                for (int i = 0; i < lim; i++)
-                    snprintf(hx + i * 3, 4, "%02x ", (unsigned char)command_data[i]);
-                jmsgpack_unpacked_t r2; jmsgpack_unpacked_init(&r2); size_t o2 = 0;
-                int ret = jmsgpack_unpack_next(&r2, command_data.c_str(), (size_t)n, &o2);
-                const char* stage = "payload-ok";
-                if (ret < 0)                         stage = "unpack_next<0";
-                else if (r2.data.type != JMSGPACK_OBJECT_ARRAY || r2.data.via.array.size < 2)
-                                                 stage = "top-not-array-or-size<2";
-                else {
-                    auto* pl = &r2.data.via.array.ptr[1];
-                    if (pl->type != JMSGPACK_OBJECT_ARRAY || pl->via.array.size < 5)
-                                                 stage = "payload-not-array-or-size<5";
-                }
-                jmsgpack_unpacked_destroy(&r2);
-                log_info("[DIAG-ROOTCAUSE] ret=%d stage=%s len=%d bytes=%s", ret, stage, n, hx);
-            }
-            // 解包失败兜底：权威端本地玩家直接应用 join（自限）。
-            if (g_local_join_valid && cfg_.authoritative &&
-                ctx->ecs.view<PlayerComponent>().size() == 0) {
-                auto& cmd = ctx->ecs.ctx().get<NetComponent>();
-                cmd.num_joins = 1;
-                cmd.joins[0] = g_local_join_snapshot;
-            }
         }
-    } else if (!s_unpack_diag_done) {
-        s_unpack_diag_done = true;
-        log_info("[diag] command_queue EMPTY on tick");
     }
     return got_command;
 }
@@ -467,10 +426,6 @@ void GameScene::init()
         // 只有权威端才自己注入本地玩家；客户端的玩家由服务端下发的 join 命令产生
         if (cfg_.authoritative) {
             GameSceneCommon::injectCommonPlayer(this);
-            // 快照本地 join：解包失败时用它兜底建玩家（见 consumeCommandFrame）
-            auto& pj = net_session(ctx).player_joins;
-            g_local_join_valid = !pj.empty();
-            if (g_local_join_valid) g_local_join_snapshot = pj.back();
         }
         GameSceneCommon::initControlsAndAudio(this);
 

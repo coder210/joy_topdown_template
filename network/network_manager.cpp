@@ -175,10 +175,15 @@ void NetworkManager::ClientReceive()
                 jmsgpack_unpacked_init(&r);
                 size_t off = 0;
                 int is_loading = 0;
-                if (jmsgpack_unpack_next(&r, (const char*)msg.data, (int)msg.len, &off) >= 0
-                    && r.data.type == JMSGPACK_OBJECT_ARRAY && r.data.via.array.size >= 2
-                    && r.data.via.array.ptr[0].type == JMSGPACK_OBJECT_POSITIVE_INTEGER)
-                    is_loading = (r.data.via.array.ptr[0].via.u64 == S2C_CMD_LOADING);
+                if (jmsgpack_unpack_next(&r, (const char*)msg.data, (int)msg.len, &off) >= 0) {
+                    const jmsgpack_object_t* root = jmsgpack_unpacked_data(&r);
+                    if (root && jmsgpack_object_type(root) == JMSGPACK_OBJECT_ARRAY
+                            && jmsgpack_object_array_size(root) >= 2) {
+                        const jmsgpack_object_t* first = jmsgpack_object_array_at(root, 0);
+                        if (first && jmsgpack_object_type(first) == JMSGPACK_OBJECT_POSITIVE_INTEGER)
+                            is_loading = ((int)jmsgpack_object_u64(first) == S2C_CMD_LOADING);
+                    }
+                }
                 jmsgpack_unpacked_destroy(&r);
 
                 if (is_loading) {
