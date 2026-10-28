@@ -129,6 +129,7 @@ bool GameScene::consumeCommandFrame()
 {
     Context* ctx = this->ctx();
     bool got_command = false;
+    static bool s_unpack_diag_done = false;   // 临时诊断：只报一次
     if (!game_runtime(ctx).command_queue.empty()) {
         std::string command_data = game_runtime(ctx).command_queue.front();
         game_runtime(ctx).command_queue.pop();
@@ -156,7 +157,13 @@ bool GameScene::consumeCommandFrame()
                 // 帧同步校验（客户端 / 单机，经虚函数）
                 verifyFrameSync(frame_id, inputs, in, server_checksum);
             }
+        } else if (!s_unpack_diag_done) {
+            s_unpack_diag_done = true;
+            log_info("[diag] unpack_command FAILED len=%d", (int)command_data.size());
         }
+    } else if (!s_unpack_diag_done) {
+        s_unpack_diag_done = true;
+        log_info("[diag] command_queue EMPTY on tick");
     }
     return got_command;
 }
@@ -193,8 +200,12 @@ void GameScene::Update(float dt)
     auto& gs = ctx->ecs.ctx().get<GlobalState>();
     // ---- 临时诊断：每秒打点 dt 累计 / 渲染帧数 / 实际逻辑 tick 数 ----
     if (get_ticks() - s_diag_t0 >= 1000) {
-        log_info("[diag] framerate=%d dt_sum=%.4f ticks=%d logic=%d",
-            s_diag_frames, s_diag_dtsum, s_diag_ticks, gs.logic_fps);
+        auto& nc = ctx->ecs.ctx().get<NetComponent>();
+        log_info("[diag] framerate=%d dt_sum=%.4f ticks=%d logic=%d | mode=%d auth=%d local=%d conv=%u net_frame=%d joins=%d inputs=%d players=%d char_id=%d",
+            s_diag_frames, s_diag_dtsum, s_diag_ticks, gs.logic_fps,
+            (int)ctx->mode, (int)cfg_.authoritative, (int)cfg_.localPlayer,
+            (unsigned)net_session(ctx).local_conv, nc.frame_id, nc.num_joins, nc.num_inputs,
+            (int)ctx->ecs.view<PlayerComponent>().size(), (int)ctx->selected_char_id);
         s_diag_frames = 0; s_diag_dtsum = 0; s_diag_ticks = 0; s_diag_t0 = get_ticks();
     }
     s_diag_frames++; s_diag_dtsum += dt;
