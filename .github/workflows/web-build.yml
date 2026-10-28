@@ -29,6 +29,10 @@ jobs:
           ./emsdk activate 3.1.64
 
       - name: Configure with Emscripten
+        # -fno-strict-aliasing: 引擎 jmsgpack.c / protocol.h 用 (msgpack_object*)<->(jmsgpack_object_t*)
+        # 类型双关访问同一块 zone 内存，属于严格别名违规；clang 在 wasm(-O3) 下做 TBAA 优化会把对
+        # 嵌套数组元素的读取优化成乱值，导致 unpack_command 在嵌套层失败（Windows/MSVC 不做该优化故正常）。
+        # 关掉它即可根除，不引入其它影响。
         run: |
           source emsdk/emsdk_env.sh
           # 网页版强制单线程：SharedArrayBuffer 需要 COOP/COEP 跨域隔离头，
@@ -39,10 +43,6 @@ jobs:
           emcmake cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DSDL_PTHREADS=OFF \
-            # -fno-strict-aliasing: 引擎 jmsgpack.c / protocol.h 用 (msgpack_object*)<->(jmsgpack_object_t*)
-            # 类型双关访问同一块 zone 内存，属于严格别名违规。clang 在 wasm(-O3) 下会做 TBAA 优化，
-            # 把对嵌套数组元素的读取优化成乱值，导致 unpack_command 在嵌套层失败（Windows/MSVC 不做该优化故正常）。
-            # 关掉它即可根除，不引入其它影响。
             -DCMAKE_C_FLAGS="-s USE_PTHREADS=0 -fno-strict-aliasing" \
             -DCMAKE_CXX_FLAGS="-s USE_PTHREADS=0 -s DISABLE_EXCEPTION_CATCHING=0 -fno-strict-aliasing" \
             -DCMAKE_EXE_LINKER_FLAGS="-s ALLOW_MEMORY_GROWTH=1 -s TOTAL_MEMORY=256MB -s STACK_SIZE=5MB -s USE_PTHREADS=0 -s SHARED_MEMORY=0 -s WASM_WORKERS=0 -s PROXY_TO_PTHREAD=0 -s ENVIRONMENT=web"
