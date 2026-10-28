@@ -4,8 +4,6 @@ name: Build joy_topdown_template for Windows
 # 由 _ci/build.yml 的 build-win job 拆分而来；只构建本项目目标 joy_topdown_template。
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:

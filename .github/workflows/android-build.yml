@@ -4,8 +4,6 @@ name: Build joy_topdown_template for Android
 # 游戏根 CMakeLists 从 app/ 向上 5 层（app -> android-project -> SDL -> joy -> third_party -> 仓库根）。
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:

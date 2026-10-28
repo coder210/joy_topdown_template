@@ -4,8 +4,6 @@ name: Build joy_topdown_template For Web
 # 产物上传为 Pages artifact，并由 deploy job 发布到 GitHub Pages。
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:
