@@ -47,15 +47,10 @@ if (ANDROID)
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE MOBILE_TOUCH)
 else()
     add_executable(${EXECUTABLE_NAME})
-    # Linux 下可执行文件名与资产命名空间目录同名（如 joy_topdown_template），
-    # 无后缀的 exe 文件会抢占该目录名导致资产拷贝失败；把 exe 放进同名子目录，
-    # 使其成为真正的目录以同时容纳 exe 与资产（与 Windows .exe 行为一致）。
-    # 注意：Emscripten(Web) 同样满足 UNIX 且非 APPLE，但 Web 产物必须落在
-    # build/Release/<exename>.html（web-build.yml 按此查找），不能套用子目录逻辑，故显式排除。
-    if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
-        set_target_properties(${EXECUTABLE_NAME} PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/${EXECUTABLE_NAME}")
-    endif()
+    # 资产已从 assets/joy_topdown_template/ 上移到 assets/ 根目录（audio/、levels/ 等），
+    # 不再带与可执行文件同名的命名空间前缀，故 Linux 无后缀 exe 与资产目录撞名的问题
+    # 已根治，无需再把 exe 塞进同名子目录。Emscripten(Web) 同上，产物直接落在
+    # build/Release/<exename>.html（web-build.yml 按此查找）。
 endif()
 
 # 逻辑分辨率 960x640（480x320 的 2 倍）：PPM 同步翻倍 50 → 100。
@@ -246,21 +241,14 @@ endforeach()
 # 根据不同平台处理资产
 if (APPLE)
     # macOS/iOS: 放入 Resources 目录
+    # 资产已上移到 assets/ 根目录（audio/、levels/ 等），不再带 joy_topdown_template/
+    # 命名空间前缀，故资源目录名绝不会等于同名可执行文件，扁平 Apple bundle
+    # (iOS/visionOS/tvOS) 也不会再撞名（原 ld: EISDIR 已根治）。
     macro(add_resource FILE)
         file(RELATIVE_PATH relpath "${ASSETS_ROOT}" "${FILE}")
         get_filename_component(dir "${relpath}" DIRECTORY)
         target_sources(${EXECUTABLE_NAME} PRIVATE "${FILE}")
-        # macOS bundle 有 Contents/ 分层（exe 在 Contents/MacOS/，资源在
-        # Contents/Resources/），同名可执行文件与 <namespace> 资源目录不冲突。
-        # 但 iOS/visionOS/tvOS 是扁平 bundle，可执行文件直接在 .app 根目录，
-        # 资源若也用 <namespace>/...（即 joy_topdown_template/...）会与同名 exe
-        # 撞名（ld: open() failed, errno=21 EISDIR）。故非 Darwin Apple 套一层
-        # joy_topdown_template_assets/ 让资源目录名不等于可执行文件名，避免冲突。
-        if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
-            set_property(SOURCE "${FILE}" PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${dir}")
-        else()
-            set_property(SOURCE "${FILE}" PROPERTY MACOSX_PACKAGE_LOCATION "joy_topdown_template_assets/${dir}")
-        endif()
+        set_property(SOURCE "${FILE}" PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${dir}")
     endmacro()
     foreach(asset_file ${ASSET_FILES})
         add_resource("${ASSETS_ROOT}/${asset_file}")
@@ -315,7 +303,7 @@ else()
     # 这里只清 levels/，不影响其他资产；随后 foreach 会立刻把现行 levelN.lua 拷回来。
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E remove_directory
-                "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/joy_topdown_template/levels"
+                "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/levels"
         COMMENT "Cleaning stale level maps in output dir"
     )
 

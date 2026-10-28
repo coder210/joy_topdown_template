@@ -14,7 +14,7 @@ struct Context;
 // 飞行中的箭/子弹渲染：用 tilesheet.png row9 col7 的箭贴图（64×64），
 // 按速度方向旋转（贴图原生箭尖朝上 = -90°）。纯渲染，不参与帧同步、不进快照。
 // 图集缺失时跳过绘制（逻辑仍在跑），不阻塞游戏。
-static const char* kBulletTilesheetPath = "joy_topdown_template/tilesheet.png";
+static const char* kBulletTilesheetPath = "tilesheet.png";
 
 static void draw_bullet_pass(Context* ctx)
 {

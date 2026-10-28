@@ -151,7 +151,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         // 这一句会直接抛 ReferenceError 导致启动失败（GitHub Pages 无法自定义响应头，
         // 所以永远拿不到 SharedArrayBuffer）。网页图标改用 HTML 的 <link rel="icon">。
 #if !defined(__EMSCRIPTEN__)
-        window_set_icon(ctx->window, "joy_topdown_template/branding/logo.png");
+        window_set_icon(ctx->window, "branding/logo.png");
 #endif
 
         // 应用全屏设置

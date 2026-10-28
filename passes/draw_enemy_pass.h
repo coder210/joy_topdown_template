@@ -16,7 +16,7 @@ struct Context;
 // 敌人纹理（与玩家同画风）：64x64 调色板、深墨 #2A2A2A 粗描边 + 白色内衬 + 纯色主体块。
 // 剪影为"圆角团 + 双角 + 双眼"，主色用品红 #F04C9E（与 绿/紫/红/黄 四个玩家色区分）。
 // 加载失败时自动回退到墨色占位方块（见下）。
-static const char* kEnemyImpPath  = "joy_topdown_template/sprites/enemies/imp.png";
+static const char* kEnemyImpPath  = "sprites/enemies/imp.png";
 // 绘制高度 = 1 米（原来是写死 50px，即 PPM=50 时的 1 米）。
 // 用 PIXELS_PER_METER 表达，逻辑分辨率/PPM 提高后自动等比放大，观感不变。
 static const float  kEnemyDrawH   = (float)PIXELS_PER_METER;

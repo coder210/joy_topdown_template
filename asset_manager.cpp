@@ -15,17 +15,17 @@ AssetManager::AssetManager()
 {
 	// 内置默认路径：resources.json 缺失/解析失败时的兜底，保证游戏仍可运行。
 	// 真源是 resources.json，加载成功后会逐条覆盖这里的值。
-	resource_paths_[std::string(kCatFonts) + "/simhei"] = "joy_topdown_template/fonts/simhei.ttf";
+	resource_paths_[std::string(kCatFonts) + "/simhei"] = "fonts/simhei.ttf";
 	for (int i = 1; i <= kDefaultLevelCount; i++) {
 		char key[32], val[128];
 		snprintf(key, sizeof(key), "%s/level%d", kCatMaps, i);
-		snprintf(val, sizeof(val), "joy_topdown_template/levels/level%d.lua", i);
+		snprintf(val, sizeof(val), "levels/level%d.lua", i);
 		resource_paths_[key] = val;
 	}
 	// 音频为可选资源：文件不存在时 audio_*_create 返回 NULL，而 joy 的 set_gain / play 对 NULL 安全，
 	// 游戏静音继续运行。真实文件名以 resources.json 的 audio 段为准。
-	resource_paths_[std::string(kCatAudio) + "/footstep"] = "joy_topdown_template/audio/footstep.wav";
-	resource_paths_[std::string(kCatAudio) + "/bgm"]      = "joy_topdown_template/audio/bgm.wav";
+	resource_paths_[std::string(kCatAudio) + "/footstep"] = "audio/footstep.wav";
+	resource_paths_[std::string(kCatAudio) + "/bgm"]      = "audio/bgm.wav";
 
 	// 用索引文件覆盖默认值（资源路径的唯一真源）
 	load_resources_json();

@@ -10,7 +10,7 @@ void WeaponCatalog::setBuiltinDefault()
 {
     defs_.clear();
     byKey_.clear();
-    atlas_   = "joy_topdown_template/sprites/weapons/weapons.png";
+    atlas_   = "sprites/weapons/weapons.png";
     cell_px_ = kWeaponCellPx;
 
     static const struct {

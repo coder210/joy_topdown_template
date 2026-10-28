@@ -1,5 +1,5 @@
 {
-    "atlas": "joy_topdown_template/sprites/weapons/weapons.png",
+    "atlas": "sprites/weapons/weapons.png",
     "cell_px": 64,
     "weapons": {
         "sword":           { "name": "长剑",   "row": 0, "col": 0, "hold_scale": 0.55, "hold_dx": 0.40, "hold_dy": 0.12, "hold_angle": -90, "grip_x": 32, "grip_y": 47, "kind": "melee" },

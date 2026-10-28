@@ -54,9 +54,9 @@ private:
         static const char* pathFor(Kind k) {
                 auto* am = AssetManager::GetInstance();
                 const char* id = (k == kClick) ? "click" : (k == kSwitch) ? "switch" : "tap";
-                const char* fallback = (k == kClick) ? "joy_topdown_template/audio/click-a.ogg"
-                                     : (k == kSwitch) ? "joy_topdown_template/audio/switch-a.ogg"
-                                                      : "joy_topdown_template/audio/tap-a.ogg";
+                const char* fallback = (k == kClick) ? "audio/click-a.ogg"
+                                     : (k == kSwitch) ? "audio/switch-a.ogg"
+                                                      : "audio/tap-a.ogg";
                 if (am) {
                         const char* p = am->GetResourcePath(AssetManager::kCatAudio, id);
                         if (p) return p;

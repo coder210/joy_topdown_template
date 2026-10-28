@@ -12,8 +12,8 @@ struct Context;
 
 // Scribble Dungeons 地形图集：14 列 × 11 行，每块 64×64
 //（源坐标映射见 map_def.h 的 tile_sprite_of / TILE_ATLAS_BLK）
-// 路径与 jtilemap 加载器一致：图集位于 joy_topdown_template/tilesheet.png（Tiled 加载器按 MAP_ASSET_BASE 解析）
-static constexpr const char* kTerrainAtlasPath = "joy_topdown_template/tilesheet.png";
+// 路径与 jtilemap 加载器一致：图集位于 tilesheet.png（Tiled 加载器按 MAP_ASSET_BASE 解析）
+static constexpr const char* kTerrainAtlasPath = "tilesheet.png";
 
 // 地图地形渲染：按 64×64 网格逐格贴图集瓦片（Scribble 手绘白底深线风格）。
 // 图集缺失时兜底为纯色块（墙=墨色、地面=纯白），保证仍可运行。

@@ -19,8 +19,8 @@
             "scaleInDock": 1
         }
     },
-    "last.exportedFilePath": "E:/c++/joy/joy_topdown_template/assets/joy_topdown_template/levels",
-    "last.imagePath": "E:/c++/joy/joy_topdown_template/assets/joy_topdown_template/tilesheets",
+    "last.exportedFilePath": "E:/c++/joy/joy_topdown_template/assets/levels",
+    "last.imagePath": "E:/c++/joy/joy_topdown_template/assets/tilesheets",
     "map.lastUsedExportFilter": "Lua 文件 (*.lua)",
     "map.lastUsedFormat": "tmx",
     "map.tileHeight": 64,

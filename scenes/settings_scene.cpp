@@ -287,7 +287,7 @@ void SettingsScene::Load() {
     {
         auto* am = AssetManager::GetInstance();
         const char* bgm_path = am ? am->GetResourcePath(AssetManager::kCatAudio, "bgm")
-                                  : "joy_topdown_template/audio/bgm.wav";
+                                  : "audio/bgm.wav";
         if (bgm_path) {
             preview_dev = audio_open_device();
             if (preview_dev) {

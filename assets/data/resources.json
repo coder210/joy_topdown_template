@@ -1,0 +1,27 @@
+{
+    "fonts": {
+        "simhei": "fonts/simhei.ttf"
+    },
+    "maps": {
+        "level1": "levels/level1.lua",
+        "level2": "levels/level2.lua",
+        "level3": "levels/level3.lua",
+        "level4": "levels/level4.lua",
+        "level5": "levels/level5.lua",
+        "level6": "levels/level6.lua",
+        "level7": "levels/level7.lua",
+        "level8": "levels/level8.lua"
+    },
+    "audio": {
+        "footstep": "audio/footstep.wav",
+        "bgm": "audio/bgm.wav",
+        "click": "audio/click-a.ogg",
+        "switch": "audio/switch-a.ogg",
+        "tap": "audio/tap-a.ogg",
+        "bow": "audio/bow.wav"
+    },
+    "config": {
+        "characters": "data/characters.json",
+        "weapons": "data/weapons.json"
+    }
+}

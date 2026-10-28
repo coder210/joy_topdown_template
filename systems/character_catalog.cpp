@@ -25,7 +25,7 @@ void CharacterCatalog::setBuiltinDefault()
     d.name = "战士";
     d.max_hp = 140;
     d.move_speed = fp_from_float(2.4f);
-    d.sprite_dir = "joy_topdown_template/sprites/characters/green/";
+    d.sprite_dir = "sprites/characters/green/";
     d.weapon = "sword";                  // 对应武器（单一固定，无切换）
     d.color  = 0xFF4394;                 // 默认绿（与内置 warrior 一致）
     d.anims[ANIM_IDLE].file = "idle";   // Scribble 角色为单帧静态，其余动画渲染降级 idle

@@ -8,7 +8,7 @@
 // 资源索引文件（相对运行时工作目录）：集中存放字体 / 地图等非品牌资源的运行时相对路径。
 // 代码侧一律按 (category, id) 查表取路径，路径字符串只存在于本文件一处。
 // 这是唯一的"引导路径"——索引自身的位置，无法再外提。
-#define RESOURCES_JSON_PATH "joy_topdown_template/data/resources.json"
+#define RESOURCES_JSON_PATH "data/resources.json"
 
 class AssetManager
 {
@@ -21,7 +21,7 @@ public:
 
 	// 品牌资源：不进索引（直接访问），但路径同样收敛到此处一处常量，
 	// 避免同一路径在多个场景里重复书写。
-	static constexpr const char* kPathBrandingLogo = "joy_topdown_template/branding/logo.png";
+	static constexpr const char* kPathBrandingLogo = "branding/logo.png";
 
 	static AssetManager* GetInstance();
 	static void Init();

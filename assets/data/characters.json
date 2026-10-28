@@ -1,7 +1,7 @@
 {
   "warrior": {
     "name": "战士",
-    "sprite_dir": "joy_topdown_template/sprites/characters/green/",
+    "sprite_dir": "sprites/characters/green/",
     "color": "0x37D98C",
     "weapon": "sword",
     "stats": { "hp": 140, "speed": 2.4 },
@@ -9,7 +9,7 @@
   },
   "rogue": {
     "name": "盗贼",
-    "sprite_dir": "joy_topdown_template/sprites/characters/purple/",
+    "sprite_dir": "sprites/characters/purple/",
     "color": "0x9179FF",
     "weapon": "dagger",
     "stats": { "hp": 110, "speed": 3.0 },
@@ -17,7 +17,7 @@
   },
   "ranger": {
     "name": "弓手",
-    "sprite_dir": "joy_topdown_template/sprites/characters/red/",
+    "sprite_dir": "sprites/characters/red/",
     "color": "0xFC5C65",
     "weapon": "bow",
     "stats": { "hp": 100, "speed": 2.8 },
@@ -25,7 +25,7 @@
   },
   "mage": {
     "name": "法师",
-    "sprite_dir": "joy_topdown_template/sprites/characters/yellow/",
+    "sprite_dir": "sprites/characters/yellow/",
     "color": "0xFFB600",
     "weapon": "staff",
     "stats": { "hp": 90, "speed": 2.6 },

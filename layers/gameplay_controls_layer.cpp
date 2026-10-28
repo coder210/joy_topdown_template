@@ -72,14 +72,14 @@ void GameplayControlsLayer::drawButton(const gc_button_meta* m)
         float out = R + 2.0f;
 
         // 纹理路径：label 决定用方向键素材还是通用圆钮素材
-        const char* basePath = "joy_topdown_template/sprites/ui/button_circle.png";
-        const char* hlPath   = "joy_topdown_template/sprites/ui/button_circle_highlight.png";
+        const char* basePath = "sprites/ui/button_circle.png";
+        const char* hlPath   = "sprites/ui/button_circle_highlight.png";
         bool isDpad = false;
         if (m->label) {
-                if      (strcmp(m->label, "上") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_north.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_north_highlight.png"; isDpad = true; }
-                else if (strcmp(m->label, "下") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_south.png"; hlPath = "joy_topdown_template/sprites/ui/dpad_element_south_highlight.png"; isDpad = true; }
-                else if (strcmp(m->label, "左") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_west.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_west_highlight.png";  isDpad = true; }
-                else if (strcmp(m->label, "右") == 0) { basePath = "joy_topdown_template/sprites/ui/dpad_element_east.png";  hlPath = "joy_topdown_template/sprites/ui/dpad_element_east_highlight.png";  isDpad = true; }
+                if      (strcmp(m->label, "上") == 0) { basePath = "sprites/ui/dpad_element_north.png"; hlPath = "sprites/ui/dpad_element_north_highlight.png"; isDpad = true; }
+                else if (strcmp(m->label, "下") == 0) { basePath = "sprites/ui/dpad_element_south.png"; hlPath = "sprites/ui/dpad_element_south_highlight.png"; isDpad = true; }
+                else if (strcmp(m->label, "左") == 0) { basePath = "sprites/ui/dpad_element_west.png";  hlPath = "sprites/ui/dpad_element_west_highlight.png";  isDpad = true; }
+                else if (strcmp(m->label, "右") == 0) { basePath = "sprites/ui/dpad_element_east.png";  hlPath = "sprites/ui/dpad_element_east_highlight.png";  isDpad = true; }
         }
         // 按下态取「触摸按下(pressed_btn) 或 键盘同步(button_get_pressed)」两者之一，
         // 这样空格/虚拟攻击键都能点亮金色辉光，与方向键经摇杆显示同理。
@@ -149,21 +149,21 @@ void GameplayControlsLayer::load_controls()
         move_stick = joystick_create(ctx_->r2d, 0.17f, 0.70f, 0.15f);
         // 默认纹理（全方向）→ Style D
         joystick_set_textures(move_stick,
-                "joy_topdown_template/sprites/ui/joystick_circle_pad_d.png",
-                "joy_topdown_template/sprites/ui/joystick_circle_nub_c.png");
+                "sprites/ui/joystick_circle_pad_d.png",
+                "sprites/ui/joystick_circle_nub_c.png");
         // 各方向模式对应不同纹理（根“几向”选择）
         joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_4WAY,
-                "joy_topdown_template/sprites/ui/joystick_circle_pad_a.png",
-                "joy_topdown_template/sprites/ui/joystick_circle_nub_a.png");
+                "sprites/ui/joystick_circle_pad_a.png",
+                "sprites/ui/joystick_circle_nub_a.png");
         joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_8WAY,
-                "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
-                "joy_topdown_template/sprites/ui/joystick_circle_nub_b.png");
+                "sprites/ui/joystick_circle_pad_c.png",
+                "sprites/ui/joystick_circle_nub_b.png");
         joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_VERTICAL,
-                "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
-                "joy_topdown_template/sprites/ui/joystick_circle_nub_a.png");
+                "sprites/ui/joystick_circle_pad_c.png",
+                "sprites/ui/joystick_circle_nub_a.png");
         joystick_set_textures_for_mode(move_stick, JOYSTICK_DIR_HORIZONTAL,
-                "joy_topdown_template/sprites/ui/joystick_circle_pad_c.png",
-                "joy_topdown_template/sprites/ui/joystick_circle_nub_b.png");
+                "sprites/ui/joystick_circle_pad_c.png",
+                "sprites/ui/joystick_circle_nub_b.png");
         joystick_set_dir_mode(move_stick, JOYSTICK_DIR_8WAY);   // 八向（含四个斜角），支持斜向移动
 
         // 右下攻击键：通用圆钮 + 圆心墨黑「攻」字 + 冷却环。
