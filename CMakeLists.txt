@@ -276,7 +276,16 @@ else()
             # 其他桌面平台：复制到可执行文件同目录
             set(outname "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/${filename}")
         endif()
+        # 目标目录在部分 CMake 版本（如 3.22）下 copy_if_different 不会自动创建，
+        # 全新构建时父目录尚不存在会导致 copy 失败；显式 mkdir 保证跨版本一致。
+        get_filename_component(_asset_rel_dir "${filename}" DIRECTORY)
+        if (ANDROID)
+            set(_asset_outdir "${MOBILE_ASSETS_DIR}/${_asset_rel_dir}")
+        else()
+            set(_asset_outdir "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/${_asset_rel_dir}")
+        endif()
         add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${_asset_outdir}"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ASSETS_ROOT}/${filename}" "${outname}"
         )
     endmacro()
