@@ -165,21 +165,34 @@ bool GameScene::consumeCommandFrame()
                 verifyFrameSync(frame_id, inputs, in, server_checksum);
             }
         } else {
-            // 解包失败兜底：权威端本地玩家直接应用 join。
-            // 只要还没有玩家实体就补一次，玩家建出来后条件自然不成立（自限）。
+            // —— 根因诊断（一次性，复跑定位失败发生在哪一步）——
+            if (!s_unpack_diag_done) {
+                s_unpack_diag_done = true;
+                int n = (int)command_data.size();
+                char hx[120] = { 0 };
+                int lim = n > 48 ? 48 : n;
+                for (int i = 0; i < lim; i++)
+                    snprintf(hx + i * 3, 4, "%02x ", (unsigned char)command_data[i]);
+                jmsgpack_unpacked_t r2; jmsgpack_unpacked_init(&r2); size_t o2 = 0;
+                int ret = jmsgpack_unpack_next(&r2, command_data.c_str(), (size_t)n, &o2);
+                const char* stage = "payload-ok";
+                if (ret < 0)                         stage = "unpack_next<0";
+                else if (r2.data.type != JMSGPACK_OBJECT_ARRAY || r2.data.via.array.size < 2)
+                                                 stage = "top-not-array-or-size<2";
+                else {
+                    auto* pl = &r2.data.via.array.ptr[1];
+                    if (pl->type != JMSGPACK_OBJECT_ARRAY || pl->via.array.size < 5)
+                                                 stage = "payload-not-array-or-size<5";
+                }
+                jmsgpack_unpacked_destroy(&r2);
+                log_info("[DIAG-ROOTCAUSE] ret=%d stage=%s len=%d bytes=%s", ret, stage, n, hx);
+            }
+            // 解包失败兜底：权威端本地玩家直接应用 join（自限）。
             if (g_local_join_valid && cfg_.authoritative &&
                 ctx->ecs.view<PlayerComponent>().size() == 0) {
                 auto& cmd = ctx->ecs.ctx().get<NetComponent>();
                 cmd.num_joins = 1;
                 cmd.joins[0] = g_local_join_snapshot;
-            }
-            if (!s_unpack_diag_done) {
-                s_unpack_diag_done = true;
-                int n = (int)command_data.size();
-                char hex[64] = { 0 };
-                for (int i = 0; i < n && i < 20; i++)
-                    snprintf(hex + i * 3, 4, "%02x ", (unsigned char)command_data[i]);
-                log_info("[diag] unpack_command FAILED len=%d bytes=%s (fallback local join applied)", n, hex);
             }
         }
     } else if (!s_unpack_diag_done) {
