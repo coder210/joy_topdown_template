@@ -1,0 +1,49 @@
+name: Build joy_topdown_template for Linux
+
+# 桌面平台之一：Linux（ubuntu-latest）。
+# 由 _ci/build.yml 的 build-linux job 拆分而来；只构建本项目目标 joy_topdown_template。
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-linux:
+    name: Build for Linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULE_TOKEN || github.token }}
+
+      # 引擎自带 SDL 在 Linux 从源码编译，需要这些系统库
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y --no-install-recommends build-essential git cmake ninja-build \
+            gnome-desktop-testing libasound2-dev libpulse-dev libaudio-dev libjack-dev \
+            libsndio-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev \
+            libgles2-mesa-dev libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev \
+            fcitx-libs-dev libpipewire-0.3-dev libwayland-dev libdecor-0-dev liburing-dev \
+            libxtst-dev
+
+      - name: Configure
+        run: |
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                -S . -B build
+
+      - name: Build
+        run: cmake --build build --target joy_topdown_template --config Release
+
+      - name: Upload Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: joy_topdown_template-Linux
+          retention-days: 7
+          # 桌面构建把 assets/ POST_BUILD 复制到 build/Release/，一起上传即完整可运行包
+          path: |
+            build/Release/**
