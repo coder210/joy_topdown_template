@@ -4,3 +4,9 @@ build*/
 CMakeLists.txt.user
 CMakeUserPresets.json
 compile_commands.json
+
+# 脚本后端独立仓库：本项目不接入（纯 C/C++ + entt），需要时自行 clone
+# 到 third_party/ 下，并从 CMakeLists 里按需 add_subdirectory。
+third_party/joy_lua/
+third_party/joy_js/
+third_party/joy_csharp/
