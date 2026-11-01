@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../context.h"
 #include "../protocol.h"
 // 注：下方组件/系统头仅为维持与原 network_utils.h 一致的 include 顺序，避免某些

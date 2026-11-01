@@ -1,7 +1,7 @@
 #ifndef DRAW_BULLET_PASS_H
 #define DRAW_BULLET_PASS_H
 #include <math.h>
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../components/global_state_component.h"
 #include "../components/logic_position_component.h"
 #include "../components/logic_rect_component.h"

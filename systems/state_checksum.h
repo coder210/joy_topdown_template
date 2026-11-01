@@ -1,7 +1,7 @@
 #ifndef STATE_CHECKSUM_H
 #define STATE_CHECKSUM_H
-#include <src/jmath.h>
-#include <src/joy.h>
+#include <joy/jmath.h>
+#include <joy/joy.h>
 #include <vector>
 #include <algorithm>
 #include <string>

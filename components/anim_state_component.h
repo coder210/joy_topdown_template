@@ -1,5 +1,5 @@
 #pragma once
-#include <src/janim.h>
+#include <joy/janim.h>
 
 // 角色序列帧动画的运行时状态（每实体一份）。
 // 纯渲染表现，不参与帧同步、不进快照。

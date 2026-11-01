@@ -1,6 +1,6 @@
 #ifndef LOADING_SCENE_H
 #define LOADING_SCENE_H
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../context.h"
 #include "scene.h"
 

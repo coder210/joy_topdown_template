@@ -2,7 +2,7 @@
 #define GAME_SCENE_H
 #include <map>
 #include <memory>
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../context.h"
 #include "scene.h"
 #include "game_scene_common.h"

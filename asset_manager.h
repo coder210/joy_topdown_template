@@ -1,6 +1,6 @@
 #ifndef ASSET_MANAGER_H
 #define ASSET_MANAGER_H
-#include <src/joy.h>
+#include <joy/joy.h>
 #include <string>
 #include <map>
 #include <unordered_map>

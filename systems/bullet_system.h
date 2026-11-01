@@ -11,7 +11,7 @@
 #include "../components/knockback_component.h"
 #include "../systems/collision_system.h"   // collision_fp_floor_to_int
 #include "../systems/map_def.h"            // MAP_W/H, map_tile_at, map_is_collidable
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct Context;
 

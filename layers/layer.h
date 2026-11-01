@@ -1,5 +1,5 @@
 #pragma once
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../context.h"
 
 // UI 层基类（阶段 3 之后）：纯 C++ 类，由宿主 Scene 直接持有并桥接。

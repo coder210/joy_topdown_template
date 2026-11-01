@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <src/joy.h>
+#include <joy/joy.h>
 
 static void frame_display_pass(jr2d_p r2d, font_p font, int frame_id, int logic_fps,
         float x, float y, int enemy_count = -1, int entity_id = -1)

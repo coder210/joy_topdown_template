@@ -5,7 +5,7 @@
 #include <cstring>
 #include <cstdio>
 #include <memory>
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "game_scene.h"
 #include "game_scene_common.h"
 #include "../protocol.h"

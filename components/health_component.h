@@ -1,6 +1,6 @@
 #ifndef HEALTH_COMPONENT_H
 #define HEALTH_COMPONENT_H
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 // 玩家初始血量（远程敌人子弹伤害结算用）
 static constexpr int PLAYER_MAX_HP = 10000;

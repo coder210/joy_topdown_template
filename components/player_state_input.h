@@ -1,6 +1,6 @@
 #ifndef PLAYER_STATE_INPUT_H
 #define PLAYER_STATE_INPUT_H
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 #pragma pack(push, 1)  // 确保内存紧凑，方便未来直接用于网络序列化
 struct PlayerStateInput {

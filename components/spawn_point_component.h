@@ -1,6 +1,6 @@
 #ifndef SPAWN_POINT_COMPONENT_H
 #define SPAWN_POINT_COMPONENT_H
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 // 默认出生点（与 client handle_loading 发送的 join 位置一致：地图中央开阔地）
 static const fp_t DEFAULT_SPAWN_X = fp_from_float(15.5f);

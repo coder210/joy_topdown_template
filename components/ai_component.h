@@ -1,6 +1,6 @@
 #ifndef AI_COMPONENT_H
 #define AI_COMPONENT_H
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct AIComponent {
     fp_t patrol_center_x, patrol_center_y; // 巡逻中心点

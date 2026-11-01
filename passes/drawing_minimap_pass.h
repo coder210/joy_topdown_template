@@ -1,7 +1,7 @@
 #ifndef DRAWING_MINIMAP_PASS_H
 #define DRAWING_MINIMAP_PASS_H
 
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../components/global_state_component.h"
 #include "../components/enemy_component.h"
 #include "../components/player_component.h"

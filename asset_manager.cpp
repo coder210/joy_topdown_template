@@ -1,5 +1,5 @@
 #include "asset_manager.h"
-#include <src/external/cJSON.h>
+#include <joy/external/cJSON.h>
 #include <cstdio>
 #include <cstring>
 

@@ -2,7 +2,7 @@
 #define DRAWING_MAP_PASS_H
 
 #include <cmath>
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../components/global_state_component.h"
 #include "../systems/map_def.h"
 #include "../protocol.h"

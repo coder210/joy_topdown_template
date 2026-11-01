@@ -1,5 +1,5 @@
 #include "splash_scene.h"
-#include <src/joy.h>
+#include <joy/joy.h>
 #include <stdio.h>
 #include "main_scene.h"
 #include "../asset_manager.h"

@@ -1,6 +1,6 @@
 #ifndef UI_STYLE_H
 #define UI_STYLE_H
-#include <src/joy.h>
+#include <joy/joy.h>
 
 // 跨 layer / scene 共享的按钮配色。
 // 原先 setup_button_style 自由函数在 menu_layer / gameplay_controls_layer /

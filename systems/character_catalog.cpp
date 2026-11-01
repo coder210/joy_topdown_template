@@ -1,6 +1,6 @@
 #include "character_catalog.h"
 #include "../asset_manager.h"
-#include <src/external/cJSON.h>
+#include <joy/external/cJSON.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

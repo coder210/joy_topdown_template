@@ -5,7 +5,7 @@
 #include "../components/health_component.h"
 #include "../components/logic_position_component.h"
 #include "../components/logic_rect_component.h"
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct Context;
 

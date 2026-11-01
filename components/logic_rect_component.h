@@ -1,6 +1,6 @@
 #ifndef LOGIC_RECT_COMPONENT_H
 #define LOGIC_RECT_COMPONENT_H
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct LogicRectComponent
 {

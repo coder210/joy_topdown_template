@@ -1,7 +1,7 @@
 #ifndef GLOBAL_STATE_COMPONENT_H
 #define GLOBAL_STATE_COMPONENT_H
-#include <src/jmath.h>
-#include <src/joy.h>
+#include <joy/jmath.h>
+#include <joy/joy.h>
 
 // 全局单例状态（通过 registry.ctx().get<GlobalState>() 访问）
 struct GlobalState {

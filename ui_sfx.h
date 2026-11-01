@@ -1,7 +1,7 @@
 #ifndef UI_SFX_H
 #define UI_SFX_H
 
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "asset_manager.h"
 
 // UI / 按钮音效（Kenney UI Pack，CC0）。

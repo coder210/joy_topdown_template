@@ -1,5 +1,5 @@
 #include "loading_scene.h"
-#include <src/joy.h>
+#include <joy/joy.h>
 #include <stdio.h>
 #include "game_scene.h"
 #include "../asset_manager.h"

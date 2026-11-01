@@ -1,6 +1,6 @@
 #ifndef LOGIC_POSITION_COMPONENT_H
 #define LOGIC_POSITION_COMPONENT_H
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct LogicPositionComponent
 {

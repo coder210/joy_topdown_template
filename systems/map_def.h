@@ -1,7 +1,7 @@
 #ifndef MAP_DEF_H
 #define MAP_DEF_H
 
-#include <src/joy.h>
+#include <joy/joy.h>
 #include <cstdio>
 #include <cmath>
 #include <cstring>   // std::memcpy

@@ -1,7 +1,7 @@
 #ifndef LOGICAL_PRESENTATION_H
 #define LOGICAL_PRESENTATION_H
 
-#include <src/joy.h>
+#include <joy/joy.h>
 
 // 固定 3:2 设计分辨率（960x640）。当前所有场景已统一使用自适应宽度
 // （见 presentation_set_adaptive），此函数保留，供确需固定比例布局时使用。

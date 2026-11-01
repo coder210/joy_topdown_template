@@ -1,6 +1,6 @@
 #ifndef TRANSFORM_COMPONENT_H
 #define TRANSFORM_COMPONENT_H
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct TransformComponent {
 	vec2_t position;

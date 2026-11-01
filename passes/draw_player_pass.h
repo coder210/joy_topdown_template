@@ -1,7 +1,7 @@
 #ifndef DRAW_PLAYER_PASS_H
 #define DRAW_PLAYER_PASS_H
-#include <src/joy.h>
-#include <src/janim.h>          /* joy 原生帧动画状态机：支持精灵表裁剪 + 状态过渡 */
+#include <joy/joy.h>
+#include <joy/janim.h>          /* joy 原生帧动画状态机：支持精灵表裁剪 + 状态过渡 */
 #include <string>
 #include <unordered_map>
 #include <cstring>

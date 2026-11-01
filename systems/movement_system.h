@@ -7,7 +7,7 @@
 #include "../components/player_component.h"
 #include "character_catalog.h"
 #include "map_def.h"
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct Context;
 

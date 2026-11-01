@@ -1,7 +1,7 @@
 #ifndef PATHFINDING_COMPONENT_H
 #define PATHFINDING_COMPONENT_H
 
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 /* 敌人寻路状态（纯数据）
  *  - ai_system 在追击时写入 target_gx/gy 并置 dirty

@@ -12,7 +12,7 @@
 #include "../components/bullet_component.h"
 #include "../systems/weapon_catalog.h"
 #include "../protocol.h"
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 struct Context;
 

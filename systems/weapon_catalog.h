@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <src/joy.h>
+#include <joy/joy.h>
 
 // 武器表：唯一真源是 data/weapons.json（经 resources.json 的 config.weapons 索引）。
 // 本文件只做"运行时 catalog"——解析、缓存、按整数 id / key 查询。

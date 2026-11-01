@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../components/enemy_component.h"
 #include "../components/health_component.h"
 #include "../components/global_state_component.h"

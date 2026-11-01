@@ -1,7 +1,7 @@
 #ifndef BULLET_COMPONENT_H
 #define BULLET_COMPONENT_H
 
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 // 箭贴图实际可见尺寸（64px 格子内仅 10×44 非透明像素；64px = 1 米）：
 //   宽 10/64 = 0.15625 米，长 44/64 = 0.6875 米。

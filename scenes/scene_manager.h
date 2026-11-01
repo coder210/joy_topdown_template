@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include <src/joy.h>
+#include <joy/joy.h>
 
 class Scene;   // 前向声明：方法仅用 Scene*，实现在 cpp 实例化（避免与 scene.h 循环 include）
 

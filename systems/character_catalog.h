@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <src/jmath.h>
+#include <joy/jmath.h>
 
 // 角色表：唯一真源是 data/characters.json（经 resources.json 的 config.characters 索引）。
 // 本文件只做"运行时 catalog"——解析、缓存、按整数 id / key 查询，不再内嵌任何角色数值。

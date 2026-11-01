@@ -1,6 +1,6 @@
 #ifndef LEVEL_SELECT_SCENE_H
 #define LEVEL_SELECT_SCENE_H
-#include <src/joy.h>
+#include <joy/joy.h>
 #include "../context.h"
 #include "scene.h"
 

@@ -8,7 +8,7 @@
 // （角色/武器/敌人都在用）可靠且支持旋转。
 // 结构：轨道纹理 = 外 pad 像素"深墨描边 + 半透明墨底"；填充纹理 = 透明底 + 彩色胶囊，
 //        每帧按血量比例重绘像素后上传。两者都 1:1 绘制、绕中心旋转。
-#include <src/joy.h>
+#include <joy/joy.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>

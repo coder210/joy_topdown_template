@@ -1,5 +1,5 @@
 #include "main_scene.h"
-#include <src/joy.h>
+#include <joy/joy.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
