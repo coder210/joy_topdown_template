@@ -31,7 +31,7 @@ static void draw_map_pass(Context* ctx)
     r2d_set_color(ctx->r2d, 255, 255, 255, 255);
     shape_draw_rectangle_f(ctx->r2d, "fill", 0.0f, 0.0f, 1.0f, 1.0f);
 
-    // 首选：Tiled 瓦片渲染（关卡 .lua 带 tileset 时按 GID 贴图绘制）
+    // 首选：Tiled 瓦片渲染（关卡 .tmj 带 tileset 时按 GID 贴图绘制）
     // 每格画布像素强制为 1 米(=50px)，与实体/相机/碰撞网格精确对齐；相机传画布像素。
     if (g_map_info.tilemap) {
         if (!g_map_info.tilemap_render)

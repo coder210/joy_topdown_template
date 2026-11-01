@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cmath>
 #include <cstring>   // std::memcpy
-#include "../asset_manager.h"   // 关卡 .lua 路径走资源索引单点查询
+#include "../asset_manager.h"   // 关卡 .tmj 路径走资源索引单点查询
 
 // 诊断日志（定义见文件末尾）
 static void map_log_load(const char* source, int level);
@@ -15,12 +15,12 @@ static void map_log_load(const char* source, int level);
 static constexpr const char* MAP_ASSET_BASE = "";
 
 // ============================================================
-// 关卡数据唯一来源：Tiled 地图 → 导出 levels/levelN.lua（路径见 resources.json 的 maps 段）。
-// 玩法网格 g_map_grid 由 map_load_from_tilemap 从 .lua 解析填充：
+// 关卡数据唯一来源：Tiled 地图 → 导出 levels/levelN.tmj（路径见 resources.json 的 maps 段）。
+// 玩法网格 g_map_grid 由 map_load_from_tilemap 经 jtilemap 的 cJSON 后端从 .json 解析填充：
 //   墙 → "Collision" 对象层的矩形；出生点 → "Player"/"spawn" 对象层；
 //   敌人出生点 → "Enemy" 对象层（或 spawn 层里 type=="enemy" 的对象）。
 // 服务端/客户端解析同一文件 → 逐格一致，可作帧同步依据。
-// 注意：引擎只认 Tiled 的 Lua 导出（.lua），不解析 .tmx（那是编辑器源文件）。
+// 注意：引擎现用 cJSON 解析 Tiled 的 JSON 导出（.json），不再依赖 Lua 虚拟机。
 // ============================================================
 
 // C++11 兼容：
@@ -99,7 +99,7 @@ static jtilemap_object_layer_p map_find_collision_layer(jtilemap_p tm)
     return nullptr;
 }
 
-// 探测给定路径的关卡 .lua 是否可读（单点路径；候选前缀遍历已由资源索引取代）
+// 探测给定路径的关卡 .tmj 是否可读（单点路径；候选前缀遍历已由资源索引取代）
 static bool map_tm_probe_path(const char* path)
 {
         // 走 joy 的 utils_check_file（SDL IO）：安卓下关卡 lua 在 APK 里，
@@ -107,7 +107,7 @@ static bool map_tm_probe_path(const char* path)
         return utils_check_file(path);
 }
 
-// 本关是否"已制作"：resources.json 的 maps 段指向的 levelN.lua 是否存在。
+// 本关是否"已制作"：resources.json 的 maps 段指向的 levelN.tmj 是否存在。
 // 选关界面据此把缺图的关卡标为制作中并阻止进入（避免空图进游戏）。
 static inline bool level_map_available(int level)
 {
@@ -170,14 +170,14 @@ static jtilemap_object_layer_p map_find_enemy_layer(jtilemap_p tm)
     return nullptr;
 }
 
-// 用 jtilemap 装载本关 Tiled 导出的 levels/levelN.lua 作为玩法+渲染唯一数据源。
+// 用 jtilemap（cJSON 后端）装载本关 Tiled 导出的 levels/levelN.tmj 作为玩法+渲染唯一数据源。
 //  - 玩法网格 g_map_grid：暂不解析墙（满地图单源对齐前玩家/敌人自由通行；后续加"collision"层再判墙）。
 //  - 出生/敌人点：来自 "spawn" 对象层的 player/enemy 对象。
 //  - tilemap 同时交给渲染层绘制（draw_map_pass 按 GID 裁 Kenney 图集）。
 // 成功（文件存在且解析成功）返回 true；缺失/解析失败返回 false，由调用方回退 ASCII 保证可玩。
 static bool map_load_from_tilemap(int level)
 {
-    // 关卡 .lua 路径统一走资源索引：category="maps"、id="level<N>"。
+    // 关卡 .tmj 路径统一走资源索引：category="maps"、id="level<N>"。
     // 原实现在此遍历 3 个候选前缀（"levels/"、"levels/"、"../levels/"），
     // 现由 AssetManager 单点解析（索引缺失时回退内置默认路径），路径真源只剩 resources.json 一处。
     char map_id[32];
@@ -191,7 +191,7 @@ static bool map_load_from_tilemap(int level)
     snprintf(path, sizeof(path), "%s", rel);
     if (!map_tm_probe_path(path)) return false;
 
-    jtilemap_p tm = jtilemap_load_file(path);
+    jtilemap_p tm = jtilemap_load_file_json(path);
     if (!tm) return false;
 
     // 玩法网格尺寸以 tilemap 为准：小地图/碰撞/寻路/移动等系统共用这组动态宽高。
@@ -258,7 +258,7 @@ static inline void map_load_level(int level)
     g_map_info = {};                    // 清零（enemy_cells 归零）
     g_map_info.level = level;
 
-    // 唯一数据源：Tiled 导出的 levelN.lua。缺失/解析失败即视为"该关未制作"，
+    // 唯一数据源：Tiled 导出的 levelN.tmj。缺失/解析失败即视为"该关未制作"，
     // 由选关界面（level_map_available）拦截并提示，不会带着空图进游戏。
     if (map_load_from_tilemap(level)) { map_log_load("tilemap", level); return; }
     map_log_load("missing", level);

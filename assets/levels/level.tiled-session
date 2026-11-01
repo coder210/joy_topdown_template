@@ -11,17 +11,17 @@
             "scale": 0.46757812499999996,
             "selectedLayer": 2,
             "viewCenter": {
-                "x": 1003.0409356725148,
-                "y": 637.3266499582289
+                "x": 812.6984126984128,
+                "y": 633.0492898913952
             }
         },
         "level1.tmx#tilesheet": {
             "scaleInDock": 1
         }
     },
-    "last.exportedFilePath": "E:/c++/joy/joy_topdown_template/assets/levels",
+    "last.exportedFilePath": "E:/c++/joy_topdown_template/assets/levels",
     "last.imagePath": "E:/c++/joy/joy_topdown_template/assets/tilesheets",
-    "map.lastUsedExportFilter": "Lua 文件 (*.lua)",
+    "map.lastUsedExportFilter": "JSON map files (*.tmj *.json)",
     "map.lastUsedFormat": "tmx",
     "map.tileHeight": 64,
     "map.tileWidth": 64,

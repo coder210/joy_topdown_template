@@ -12,8 +12,8 @@
 #include "../logical_presentation.h" // 选关页用自适应宽度（铺满、无左右黑边）
 
 // 关卡元信息 —— 条数须与 map_def.h 的 LEVEL_COUNT、resources.json 的 maps 段一致。
-// 地图数据本体在 assets/.../levels/levelN.lua（Tiled 导出），缺图的关卡标记为"制作中"。
-// 注：第 6~8 关目前是"占位测试关卡"——地图直接复制 level1.lua，正式版应在 Tiled 各自作图。
+// 地图数据本体在 assets/.../levels/levelN.tmj（Tiled 导出），缺图的关卡标记为"制作中"。
+// 注：第 6~8 关目前是"占位测试关卡"——地图直接复制 level1.tmj，正式版应在 Tiled 各自作图。
 struct LevelMeta { const char* name; const char* desc; };
 static const LevelMeta LEVEL_META[] = {
     { "荒野迷城", "开阔原野，篱墙成列，练手入门" },
@@ -336,7 +336,7 @@ void LevelSelectScene::Load() {
     self->selected = (ctx->selected_level >= 1 && ctx->selected_level <= LEVEL_META_COUNT)
         ? ctx->selected_level - 1 : 0;
 
-    // 探测各关地图是否已制作（Tiled 导出的 levelN.lua 是否存在）。
+    // 探测各关地图是否已制作（Tiled 导出的 levelN.tmj 是否存在）。
     self->tip_active = false;
     for (int i = 0; i < LEVEL_META_COUNT && i < LEVEL_SLOT_MAX; i++)
         self->level_ready[i] = level_map_available(i + 1);

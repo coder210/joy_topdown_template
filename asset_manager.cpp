@@ -19,7 +19,8 @@ AssetManager::AssetManager()
 	for (int i = 1; i <= kDefaultLevelCount; i++) {
 		char key[32], val[128];
 		snprintf(key, sizeof(key), "%s/level%d", kCatMaps, i);
-		snprintf(val, sizeof(val), "levels/level%d.lua", i);
+		// Tiled 导出的 JSON 地图扩展名为 .tmj（.tmx 为 XML 版），别写成 .json
+		snprintf(val, sizeof(val), "levels/level%d.tmj", i);
 		resource_paths_[key] = val;
 	}
 	// 音频为可选资源：文件不存在时 audio_*_create 返回 NULL，而 joy 的 set_gain / play 对 NULL 安全，

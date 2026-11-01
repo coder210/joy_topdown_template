@@ -24,7 +24,7 @@ private:
     // 区分“点击行”与“滑动列表”：按下只记录，松手且仍在同一行才算点击
     int   press_row_ = -1;
     float press_x_ = 0.0f, press_y_ = 0.0f;
-    // 各关地图是否已制作（Tiled 导出的 levelN.lua 是否存在）；缺图的关卡标"制作中"且不可进入
+    // 各关地图是否已制作（Tiled 导出的 levelN.tmj 是否存在）；缺图的关卡标"制作中"且不可进入
     bool level_ready[LEVEL_SLOT_MAX] = { false };
     // "此关正在制作中" 提示（模态：显示期间消费所有事件，点击任意处关闭）
     bool tip_active = false;
