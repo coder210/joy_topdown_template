@@ -190,7 +190,7 @@ target_sources(${EXECUTABLE_NAME}
 
 # Apple 平台额外图标
 if(APPLE)
-    add_definitions(-DLUA_USE_IOS)
+    # 核心已不含 Lua，原先的 -DLUA_USE_IOS 不再需要
     target_sources(${EXECUTABLE_NAME} PRIVATE logo.png)
 endif()
 
@@ -298,9 +298,9 @@ else()
     endmacro()
 
     # 关卡目录先清空再拷贝：copy_if_different 只增不删，若只靠下面的 foreach 拷贝，
-    # 从 assets 删掉的旧关卡(.lua)会留在运行目录变成"幽灵关卡"——游戏会当它已制作并加载
+    # 从 assets 删掉的旧关卡(levelN.tmj)会留在运行目录变成"幽灵关卡"——游戏会当它已制作并加载
     # （level_map_available 查的就是运行路径），导致选关页显示可进、进游戏却用到过期地图。
-    # 这里只清 levels/，不影响其他资产；随后 foreach 会立刻把现行 levelN.lua 拷回来。
+    # 这里只清 levels/，不影响其他资产；随后 foreach 会立刻把现行关卡文件拷回来。
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E remove_directory
                 "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/levels"
