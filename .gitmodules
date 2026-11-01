@@ -1,3 +1,12 @@
 [submodule "third_party/joy"]
 	path = third_party/joy
 	url = ../joy
+[submodule "third_party/joy_lua"]
+	path = third_party/joy_lua
+	url = ../joy_lua
+[submodule "third_party/joy_js"]
+	path = third_party/joy_js
+	url = ../joy_js
+[submodule "third_party/joy_csharp"]
+	path = third_party/joy_csharp
+	url = ../joy_csharp
