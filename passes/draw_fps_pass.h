@@ -1,7 +1,7 @@
 #pragma once
 #include <stdio.h>
 #include <string.h>
-#include <joy/joy.h>
+#include <src/joy.h>
 
 // ============================================================
 // FPS 显示（纯视觉 HUD，不影响帧同步/ECS 逻辑）

@@ -1,7 +1,7 @@
 #ifndef INTERPOLATE_PASS_H
 #define INTERPOLATE_PASS_H
 #include <math.h>
-#include <joy/jmath.h>
+#include <src/jmath.h>
 #include "../components/logic_position_component.h"
 #include "../components/logic_rect_component.h"
 #include "../components/transform_component.h"

@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "room_info.h"
 
 // 局域网房间发现（UDP 广播），IRoomSource 的 LAN 实现。

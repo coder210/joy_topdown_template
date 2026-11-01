@@ -1,7 +1,7 @@
 # ============================================================
 # 独立仓库模式：本文件直接作为仓库根 CMakeLists 使用（拆仓后）。
 # 单仓模式（被上层根 CMake add_subdirectory）下整段跳过，行为不变。
-# 引擎以 submodule 形式位于 third_party/joy（内含 joy/ SDL/ msgpack/ spine/）。
+# 引擎以 submodule 形式位于 third_party/joy（内含 src/ SDL/ msgpack/ spine/）。
 # ============================================================
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     cmake_minimum_required(VERSION 3.16)
@@ -212,11 +212,11 @@ if(EMSCRIPTEN)
 endif()
 
 # 引入 joy 框架源码（纯文件引入，不再构建独立库 target）
-# 单仓：<仓库根>/joy/joy_add.cmake；拆仓后：third_party/joy/joy/joy_add.cmake
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/joy/joy_add.cmake")
-    include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/joy/joy_add.cmake")
+# 单仓：<仓库根>/src/joy_add.cmake；拆仓后：third_party/joy/src/joy_add.cmake
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/src/joy_add.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/src/joy_add.cmake")
 else()
-    include(${CMAKE_SOURCE_DIR}/joy/joy_add.cmake)
+    include(${CMAKE_SOURCE_DIR}/src/joy_add.cmake)
 endif()
 joy_add_sources(${EXECUTABLE_NAME})
 

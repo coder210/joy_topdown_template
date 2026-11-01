@@ -4,7 +4,7 @@
 #include <map>
 #include <string>
 #include <cstdint>
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../protocol.h"
 #include "../systems/state_checksum.h"
 

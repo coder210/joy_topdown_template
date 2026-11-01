@@ -1,7 +1,7 @@
 #ifndef PLAYER_EVENT_INPUT_H
 #define PLAYER_EVENT_INPUT_H
 #include <vector>
-#include <joy/jmath.h>
+#include <src/jmath.h>
 
 struct PlayerEventInput {
     // 动作类型（对齐 3D：近战/射击/射线由同一事件队列分发，敌我共用）

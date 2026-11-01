@@ -1,6 +1,6 @@
 #ifndef LOGIC_VELOCITY_COMPONENT_H
 #define LOGIC_VELOCITY_COMPONENT_H
-#include <joy/jmath.h>
+#include <src/jmath.h>
 
 struct LogicVelocityComponent
 {

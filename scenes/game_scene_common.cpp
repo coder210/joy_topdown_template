@@ -1,5 +1,5 @@
 #include <cstring>
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "game_scene_common.h"
 #include "game_scene.h"
 #include "../context.h"

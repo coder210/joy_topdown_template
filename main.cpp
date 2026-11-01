@@ -2,7 +2,7 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_hints.h>   // SDL_HINT_ORIENTATIONS / SDL_SetHint（移动端横屏）
-#include <joy/joy.h>
+#include <src/joy.h>
 #include <cstring>
 #include "context.h"
 #include "asset_manager.h"

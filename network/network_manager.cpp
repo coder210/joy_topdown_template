@@ -1,7 +1,7 @@
 #include "network_manager.h"
 #include <cstring>
 #include <math.h>
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "protocol.h"
 #include "components/global_state_component.h"
 #include "components/action_state_component.h"

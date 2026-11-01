@@ -1,6 +1,6 @@
 #ifndef CHARACTER_SELECT_SCENE_H
 #define CHARACTER_SELECT_SCENE_H
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../context.h"
 #include "scene.h"
 #include "../systems/character_catalog.h"

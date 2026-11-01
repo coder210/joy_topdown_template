@@ -1,7 +1,7 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../context.h"
 #include "scene_manager.h"   // 供场景子类访问 SceneManager 类型（经 ctx->scene_mgr 调用 requestTransition/setPending）
 

@@ -1,6 +1,6 @@
 #ifndef ONLINE_SCENE_H
 #define ONLINE_SCENE_H
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../context.h"
 #include "scene.h"
 

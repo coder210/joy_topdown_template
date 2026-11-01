@@ -1,6 +1,6 @@
 #ifndef MAIN_SCENE_H
 #define MAIN_SCENE_H
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../context.h"
 #include "scene.h"
 #include "../layers/menu_layer.h"

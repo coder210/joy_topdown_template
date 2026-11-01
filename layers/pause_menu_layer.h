@@ -2,7 +2,7 @@
 #define PAUSE_MENU_LAYER_H
 
 #include "layer.h"
-#include <joy/joy.h>
+#include <src/joy.h>
 
 // 游戏内暂停菜单（方案 B）：
 // - 右上角「||」按钮 → 打开暂停菜单：继续 / 设置 / 返回主菜单 / 退出游戏

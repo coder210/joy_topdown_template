@@ -11,7 +11,7 @@
 #include <chrono>
 #include <memory>
 #include "entt.hpp"
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "protocol.h"
 #include "components/global_state_component.h"
 #include "systems/state_checksum.h"

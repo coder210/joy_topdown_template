@@ -2,7 +2,7 @@
 #define FOG_PASS_2D_H
 #include <vector>
 #include <cmath>
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../components/global_state_component.h"
 #include "../components/player_component.h"
 #include "../components/transform_component.h"

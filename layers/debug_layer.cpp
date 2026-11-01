@@ -1,5 +1,5 @@
 ﻿#include "debug_layer.h"
-#include <joy/joy.h>
+#include <src/joy.h>
 
 DebugLayer::DebugLayer(Context* ctx) : UILayer(ctx) {}
 

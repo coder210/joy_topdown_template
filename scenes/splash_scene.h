@@ -1,6 +1,6 @@
 #ifndef SPLASH_SCENE_H
 #define SPLASH_SCENE_H
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../context.h"
 #include "scene.h"
 

@@ -1,6 +1,6 @@
 #ifndef KNOCKBACK_COMPONENT_H
 #define KNOCKBACK_COMPONENT_H
-#include <joy/jmath.h>
+#include <src/jmath.h>
 
 // 击退效果：被命中时由 melee/bullet 系统写入，knockback_system 每 tick 施加一次
 // 位移并衰减。与 AI/寻路/输入的速度通道完全独立，不会被覆盖（否则敌人像纸片挨打不动）。

@@ -1,7 +1,7 @@
 #ifndef PLAYER_STATUS_HUD_PASS_H
 #define PLAYER_STATUS_HUD_PASS_H
 
-#include <joy/joy.h>
+#include <src/joy.h>
 #include "../components/player_component.h"
 #include "../components/transform_component.h"
 #include "../components/action_state_component.h"
