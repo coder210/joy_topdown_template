@@ -13,13 +13,13 @@
 #include "entt.hpp"
 #include <joy/joy.h>
 #include "protocol.h"
-#include "components/global_state_component.h"
+#include "net/transport/i_transport.h"
+#include "world/global_state.h"
 #include "systems/state_checksum.h"
-// 游戏场景共享运行量：拆自原 context_net_state / game_scene_state，
-// 存为 registry.ctx() 上下文组件（同 GlobalState 模式），经 game_runtime()/net_session() 读取。
-#include "components/game_runtime_component.h"
-#include "components/net_session_component.h"
-#include "components/system_registry_component.h"
+// 世界级资源（非实体组件）：存为 registry.ctx() 资源，经 game_runtime()/net_session() 读取。
+#include "world/game_runtime.h"
+#include "net/net_session.h"
+#include "world/system_registry.h"
 // 运行模式枚举（GameMode）与用户自定义事件码（TRANSITION/VICTORY_EVENT）
 #include "scenes/game_scene_common.h"
 #include "events.h"
@@ -42,8 +42,9 @@ struct Context {
         jwindow_p window;
         jr2d_p r2d;
         SceneManager* scene_mgr = nullptr;  // 指向 main 创建的 SceneManager；场景经其 requestTransition/setPending 登记过渡目标（不拥有）
-        netclient_p netclient;
-        netserver_p net_server;
+        // 网络传输（ITransport 抽象）：GameScene 按模式创建/销毁，单机为 null。
+        // 上层不再直接接触 joy 的 netclient_*/netserver_*。
+        ITransport* transport = nullptr;
         entt::registry ecs;
 
         // ---- 音频 ----
@@ -64,19 +65,9 @@ struct Context {
         // 玩家常驻 HUD 只保留右上角“剩余敌人 / 总数”，避免遮挡视野。
         bool show_debug_hud = false;
 
-        // ========== 鼠标（仅渲染层瞄准用，不参与帧同步）==========
-        // 鼠标事件给的是窗口像素，统一经 r2d_coordinates_from_window 换算到逻辑坐标(480x320)。
-        // 由 GameplayControlsLayer 的 on_mousemoved 写入；无鼠标(服务端/未移动过)时 mouse_valid=false。
-        vec2_t mouse_logical = { -1.0f, -1.0f };
-        bool   mouse_valid   = false;
-
-        // ========== 瞄准角（本地计算后量化成 0..254 整数随输入上传，两端一致）==========
-        // 由 collect_aim_yaw_q 按优先级写入/读取；-1 表示尚未设置。
-        // 来源优先级：键盘方向 > 摇杆（移动端兜底）。不再使用鼠标位置瞄准（取消"鼠标旋转"）。
-        // 键盘方向现按 dx/dy 合成向量经 atan2 求角，支持八向（含斜角），再 aim_yaw_quantize 量化；
-        // 该 255 档逻辑保持不变，以后改回模拟输入（如摇杆全方向）即可恢复 255 档细分。
-        int aim_keyboard_yaw_q = -1;   // 键盘方向锁存角（松手后保留，便于停步后仍能朝该方向开火）
-        int aim_stick_yaw_q    = -1;   // 摇杆方向锁存角（移动端）
+        // 说明：游戏内运行时状态（输入掩码 / 瞄准角锁存 / 关卡进度 / 帧时钟）已统一归位到
+        // world/game_runtime.h 的 GameRuntime；鼠标坐标与 mouse_valid 原为旧"鼠标瞄准"
+        // 遗留状态，现已无读者，一并移除。Context 只保留跨场景共享的配置与对象句柄。
 };
 
 // ========== System 调度基础设施 ==========
@@ -147,8 +138,7 @@ static int get_entity_id(Context* ctx)
 // 保证可反复进出游戏场景而不重复注册系统或重复 emplace 单例组件。
 static void reset_context_for_mode(Context* ctx, GameModeKind mode)
 {
-    if (ctx->netclient) { netclient_destroy(ctx->netclient); ctx->netclient = NULL; }
-    if (ctx->net_server) { netserver_destroy(ctx->net_server); ctx->net_server = NULL; }
+    if (ctx->transport) { delete ctx->transport; ctx->transport = nullptr; }
 
     ctx->ecs = entt::registry();   // 全新 registry（含 ctx() 上下文）
     // 说明：GameRuntime / NetSession / SystemRegistry 存于 registry.ctx()，随全新 registry

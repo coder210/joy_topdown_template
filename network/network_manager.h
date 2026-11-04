@@ -9,7 +9,7 @@
 // 注：下方组件/系统头仅为维持与原 network_utils.h 一致的 include 顺序，避免某些
 // 组件头中定义的 `Entity` 别名与 entt::basic_registry 的默认模板参数冲突
 // （snapshot_system.h 在 game_mode_common.cpp 中实例化时会触发该冲突）。
-#include "components/global_state_component.h"
+#include "world/global_state.h"
 #include "components/action_state_component.h"
 #include "components/ai_component.h"
 #include "components/connection_component.h"
@@ -37,7 +37,7 @@ public:
 
     // 服务端 / Host（MODE_SERVER / MODE_HOST）：收玩家命令、推进并广播命令帧
     void ServerReceive();
-    void ServerTick();          // netserver_update + ServerReceive（原 server_network_tick）
+    void ServerTick();          // transport->Update() + ServerReceive（原 server_network_tick）
     void CollectInput(int frame_id);
     void InputForwarding();
 

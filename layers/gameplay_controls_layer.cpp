@@ -242,7 +242,6 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                 joystick_touch_down(self->move_stick, x, y);
                 self->stick_active = joystick_is_dragging(self->move_stick) ? 1 : 0;
                 if (self->stick_active) {
-                        self->ctx_->mouse_valid = false;   // 拖动摇杆时让 aim 走摇杆而非鼠标
                         self->updateStick();
                 }
         };
@@ -273,14 +272,8 @@ void GameplayControlsLayer::HandleEvent(const void* ev)
                 if (self->stick_active) {
                         joystick_touch_move(self->move_stick, x, y);
                         self->updateStick();
-                        self->ctx_->mouse_valid = false;   // 拖动摇杆时瞄准走摇杆而非鼠标
                         return;
                 }
-                // 非摇杆拖动：桌面端用鼠标瞄准；移动端(MOBILE_TOUCH)不污染瞄准
-#ifndef MOBILE_TOUCH
-                self->ctx_->mouse_logical = r2d_coordinates_from_window(self->ctx_->r2d, x, y);
-                self->ctx_->mouse_valid   = true;
-#endif
         };
         dispatch_event(cbs, ev, this);
 }
@@ -323,7 +316,7 @@ void GameplayControlsLayer::updateStick()
                 if (dir.x >  0.35f) *mask |= INPUT_RIGHT;
                 // 瞄准角：模拟全方向（与鼠标同约定，屏幕 y 向下、顺时针为正）
                 float deg = atan2f(dir.y, dir.x) * 180.0f / 3.1415926f;
-                ctx_->aim_stick_yaw_q = aim_yaw_quantize(deg);
+                game_runtime(ctx_).aim_stick_yaw_q = aim_yaw_quantize(deg);
         }
         // 回中(mag<=deadzone)：上面已清零 → 无方向位；瞄准角仍锁存（可朝最后方向开火）
         last_set_ev = 0; last_rel_ev = 0;   // 不再走单方向 GAMEPLAY_CONTROL 事件

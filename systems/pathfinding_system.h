@@ -6,7 +6,7 @@
 #include "../components/enemy_component.h"
 #include "../components/logic_position_component.h"
 #include "../components/action_state_component.h"
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include "map_def.h"
 #include <joy/jmath.h>
 #include <cmath>

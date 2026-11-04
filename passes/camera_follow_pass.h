@@ -1,6 +1,7 @@
 #ifndef CAMERA_FOLLOW_PASS_H
 #define CAMERA_FOLLOW_PASS_H
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
+#include "../config/display_config.h"
 #include "../components/player_component.h"
 #include "../components/transform_component.h"
 #include "../protocol.h"
@@ -8,13 +9,13 @@
 struct Context;
 
 // 将摄像机跟随指定玩家，使玩家居中于屏幕。
-// 视口半宽/半高由"实际逻辑分辨率"推导（不再写死 960x640 / 4.8x3.2 米）：
+// 视口半宽/半高由"实际逻辑分辨率"推导（不再写死 480x320 / 9.6x6.4 米）：
 // 宽屏（手机横屏）逻辑宽度更大 → 横向多看世界，玩家依然居中。
 static void camera_follow_pass(entt::registry& registry, Context* ctx, float /*dt*/) {
     auto& gs = registry.ctx().get<GlobalState>();
     if (gs.camera_follow_conv < 0) return;
 
-    int lw = 960, lh = 640;
+    int lw = DISPLAY_WINDOW_W, lh = DISPLAY_DESIGN_H;
     if (ctx && ctx->r2d) {
         r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
         if (lw <= 0 || lh <= 0) r2d_get_size(ctx->r2d, &lw, &lh);

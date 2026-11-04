@@ -188,7 +188,7 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
     bool valid = (index >= 0 && index < LEVEL_META_COUNT);
     bool ready = (valid && index < LEVEL_SLOT_MAX) ? level_ready[index] : false;
 
-    // 面板按剩余宽度拉伸：设计稿(960x640)下与 PANEL_W 一致，宽屏时铺满右侧
+    // 面板按剩余宽度拉伸：设计稿(480x320)下与 PANEL_W 一致，宽屏时铺满右侧
     float px = PANEL_X * s, py = PANEL_Y * s;
     float pw = (float)lw - px - 12.0f * s;
     if (pw < PANEL_W * s) pw = PANEL_W * s;   // 极窄兜底
@@ -365,15 +365,15 @@ void LevelSelectScene::Load() {
         }
     }
 
-    // 选关页改用自适应逻辑宽度：高度固定 640，宽度跟随窗口宽高比，
+    // 选关页改用自适应逻辑宽度：高度固定 320，宽度跟随窗口宽高比，
     // 背景铺满整屏、没有左右黑边（与游戏场景一致）。
     presentation_set_adaptive(ctx->r2d);
 
     int lw = 0, lh = 0;
     r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
     const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
-    const float LW = (float)((lw > 0) ? lw : 960);
-    const float LH = (float)((lh > 0) ? lh : 640);
+    const float LW = (float)((lw > 0) ? lw : DISPLAY_WINDOW_W);
+    const float LH = (float)((lh > 0) ? lh : DISPLAY_DESIGN_H);
 
     // 左侧列表：scrollview 纵向滚动（定宽靠左）
     self->level_view = scrollview_create(ctx->r2d, 0.0f, 0.0f, 1.0f, 1.0f);

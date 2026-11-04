@@ -3,7 +3,7 @@
 
 #include <cmath>
 #include <joy/joy.h>
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include "../systems/map_def.h"
 #include "../protocol.h"
 #include "../asset_manager.h"

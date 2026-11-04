@@ -166,8 +166,8 @@ void SettingsScene::Render() {
     int rlw = 0, rlh = 0;
     r2d_get_logical_presentation(r2d, &rlw, &rlh, NULL);
     const float s  = (rlh > 0) ? ((float)rlh / 320.0f) : 1.0f;
-    const float LW = (float)((rlw > 0) ? rlw : 960);
-    const float LH = (float)((rlh > 0) ? rlh : 640);
+    const float LW = (float)((rlw > 0) ? rlw : DISPLAY_WINDOW_W);
+    const float LH = (float)((rlh > 0) ? rlh : DISPLAY_DESIGN_H);
     float cols[2] = { 0.30f, 0.70f };
     jlayout_grid_t* g = jlayout_grid_create(24.0f * s, 48.0f * s,
             LW - 48.0f * s, 36.0f * s, 2, cols, 6.0f * s);
@@ -235,13 +235,13 @@ void SettingsScene::Load() {
 
     // 两列栅格：左标签 / 右控件，按逻辑像素铺满宽度（左右各留 24*s）。
     // 宽屏下表单拉伸到右边界，右侧不再有大块留白；列宽比固定，标签长短不影响控件位置。
-    // 行高 36*s、pad 6*s → 输入框内容高约 48px（640 逻辑高、s=2 时），给 24px 字留足上下内白，
+    // 行高 36*s、pad 6*s → 输入框内容高约 36px（320 逻辑高、s=1 时），给 14px 字留足上下内白，
     // 不再挤到边框；6 行底部仍落在返回按钮上方，不重叠。
     int rlw = 0, rlh = 0;
     r2d_get_logical_presentation(ctx->r2d, &rlw, &rlh, NULL);
     const float s  = (rlh > 0) ? ((float)rlh / 320.0f) : 1.0f;
-    const float LW = (float)((rlw > 0) ? rlw : 960);
-    const float LH = (float)((rlh > 0) ? rlh : 640);
+    const float LW = (float)((rlw > 0) ? rlw : DISPLAY_WINDOW_W);
+    const float LH = (float)((rlh > 0) ? rlh : DISPLAY_DESIGN_H);
     float cols[2] = { 0.30f, 0.70f };
     jlayout_grid_t* g = jlayout_grid_create(24.0f * s, 48.0f * s,
             LW - 48.0f * s, 36.0f * s, 2, cols, 6.0f * s);

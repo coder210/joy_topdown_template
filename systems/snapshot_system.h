@@ -54,13 +54,9 @@ static void snapshot_system(entt::registry& registry, Context* ctx, float dt) {
 
         auto& gs = ctx->ecs.ctx().get<GlobalState>();
         int frame_id = gs.next_frame_id - 1;
-        net_session(ctx).world_snapshots[frame_id] = pack_world(gs.next_entity_id, net_session(ctx).entities, game_runtime(ctx).num_entities);
-
-        // 只保留最近 300 帧快照（≈15s @20Hz），防止无玩家时内存线性增长。
-        // std::map 按帧号有序，begin() 即最旧帧；新玩家对齐用 lower_bound 命中
-        // 最近帧即可，因此 300 帧缓冲完全够用。
-        if (net_session(ctx).world_snapshots.size() > 300)
-                net_session(ctx).world_snapshots.erase(net_session(ctx).world_snapshots.begin());
+        // 帧流缓冲内部负责容量裁剪（保留最近 300 帧）
+        net_session(ctx).frames.StoreSnapshot(frame_id,
+            pack_world(gs.next_entity_id, net_session(ctx).entities, game_runtime(ctx).num_entities));
 }
 
 #endif

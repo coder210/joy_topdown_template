@@ -24,8 +24,8 @@ void VictoryScene::Load() {
     int w = 0, h = 0;
     r2d_get_logical_presentation(ctx->r2d, &w, &h, NULL);
     const float s = (h > 0) ? ((float)h / 320.0f) : 1.0f;
-    const float LW = (float)((w > 0) ? w : 960);
-    const float LH = (float)((h > 0) ? h : 640);
+    const float LW = (float)((w > 0) ? w : DISPLAY_WINDOW_W);
+    const float LH = (float)((h > 0) ? h : DISPLAY_DESIGN_H);
 
     // 按钮尺寸用高度基准，宽屏下不被横向拉宽；设计稿 center：(150,275) / (330,275)
     self->btn_replay = button_create(ctx->r2d,

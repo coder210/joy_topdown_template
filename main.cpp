@@ -8,6 +8,7 @@
 #include "asset_manager.h"
 #include "scenes/scene.h"
 #include "scenes/scene_manager.h"
+#include "config/display_config.h"
 #include "logical_presentation.h"
 #include "scenes/main_scene.h"
 #include "scenes/splash_scene.h"
@@ -28,7 +29,7 @@
 static Context* ctx;
 static SceneManager* g_mgr = nullptr;
 
-// 所有场景统一使用自适应逻辑宽度（高度固定 640、宽度跟随窗口宽高比），
+// 所有场景统一使用自适应逻辑宽度（高度固定 320、宽度跟随窗口宽高比），
 // 与游戏场景一致：逻辑宽高比 = 窗口宽高比 → 铺满、左右无黑边。
 // 场景内元素尺寸按高度基准（h/320）换算、位置居中，宽屏下不会被横向拉宽。
 static void apply_presentation_for_current_scene()
@@ -130,11 +131,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 #endif
 
-        // 窗口与逻辑分辨率同为 960x640（480x320 的 2 倍，仍保持 3:2）。
-        // 配套 PIXELS_PER_METER=100（见 CMakeLists）：PPM 同步翻倍，
-        //   所以可视世界仍是 9.6x6.4 米、角色显示大小不变，只是渲染更精细、
-        //   文字按 48px 原生烘焙更锐利。UI 全部为比例坐标，自动适配。
-        ctx->window = create_window("Joy Topdown", 960, 640);
+        // 窗口尺寸由 config/display_config.h 的 DISPLAY_WINDOW_* 决定；
+        // 它与逻辑高度(DISPLAY_DESIGN_H)、PPM、字号统一由 CMake 的 DISPLAY_SCALE 推导。
+        // 当前基准 480x320 + PPM=50 → 垂直可视 6.4 米、水平可视 9.6 米。
+        ctx->window = create_window("Joy Topdown", DISPLAY_WINDOW_W, DISPLAY_WINDOW_H);
         ctx->r2d = r2d_create(ctx->window);
         // 2D 形状（矩形/线段）的 alpha 由“绘制混合模式”控制；引擎默认是 NONE，
         // 导致半透明 HUD 底色被画成不透明。这里全局开启 BLEND：

@@ -1,6 +1,7 @@
 #ifndef UI_STYLE_H
 #define UI_STYLE_H
 #include <joy/joy.h>
+#include "config/display_config.h"   // DISPLAY_* 宏（各 UI 文件经此获得，无需逐个引入）
 
 // 跨 layer / scene 共享的按钮配色。
 // 原先 setup_button_style 自由函数在 menu_layer / gameplay_controls_layer /

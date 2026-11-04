@@ -177,7 +177,7 @@ void CharacterSelectScene::draw_preview_panel(Context* ctx, int index) {
     font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
     font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
 
-    // 面板按剩余宽度拉伸：设计稿(960x640)下与 PANEL_W 一致，宽屏时铺满右侧
+    // 面板按剩余宽度拉伸：设计稿(480x320)下与 PANEL_W 一致，宽屏时铺满右侧
     float px = PANEL_X * s, py = PANEL_Y * s;
     float pw = (float)lw - px - 12.0f * s;
     if (pw < PANEL_W * s) pw = PANEL_W * s;   // 极窄兜底
@@ -265,14 +265,14 @@ void CharacterSelectScene::Load() {
     const int n = (int)g_characterCatalog.size();
     const int nn = (n < MAX_CHARACTERS) ? n : MAX_CHARACTERS;
 
-    // 选角页改用自适应逻辑宽度：高度固定 640，宽度跟随窗口宽高比，铺满无黑边。
+    // 选角页改用自适应逻辑宽度：高度固定 320，宽度跟随窗口宽高比，铺满无黑边。
     presentation_set_adaptive(ctx->r2d);
 
     int lw = 0, lh = 0;
     r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
     const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
-    const float LW = (float)((lw > 0) ? lw : 960);
-    const float LH = (float)((lh > 0) ? lh : 640);
+    const float LW = (float)((lw > 0) ? lw : DISPLAY_WINDOW_W);
+    const float LH = (float)((lh > 0) ? lh : DISPLAY_DESIGN_H);
 
     // 左侧角色列表：纵向滚动（定宽靠左）
     self->card_view = scrollview_create(ctx->r2d, 0.0f, 0.0f, 1.0f, 1.0f);

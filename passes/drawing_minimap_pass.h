@@ -2,7 +2,7 @@
 #define DRAWING_MINIMAP_PASS_H
 
 #include <joy/joy.h>
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include "../components/enemy_component.h"
 #include "../components/player_component.h"
 #include "../components/health_component.h"

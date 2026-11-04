@@ -6,7 +6,7 @@
 #include <joy/joy.h>
 #include "../components/enemy_component.h"
 #include "../components/health_component.h"
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include "../systems/spawn_def.h"   // level_enemy_total
 
 // 右上角常驻 HUD：剩余敌人 / 本关总数。

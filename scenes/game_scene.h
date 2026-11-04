@@ -1,6 +1,5 @@
 #ifndef GAME_SCENE_H
 #define GAME_SCENE_H
-#include <map>
 #include <memory>
 #include <joy/joy.h>
 #include "../context.h"
@@ -26,24 +25,17 @@ public:
     void Render() override;
     void Destroy() override;
 
-    // 消费一条命令帧（通用解包 + 写 NetComponent；模式特定的跳过/校验经虚函数）
+    // 消费一条命令帧（通用解包 + 写 FrameCommandBuffer；模式特定的跳过/校验经虚函数）
     bool consumeCommandFrame();
 
-    // ---- 原 game_scene struct 字段（集中到 GameScene，供 this->xxx 访问）----
+    // ---- 本类只保留"装配 + 驱动"所需的对象引用 ----
     GameplayControlsLayer* gcl = NULL;       // 操作层（纯 button，不依赖 joy scene_node）
     PauseMenuLayer* pause_layer = NULL;      // 暂停菜单（继续/设置/返回主菜单/退出）
     DebugLayer* debug_layer = NULL;          // 调试 overlay（纯绘制，不依赖 joy scene_node）
-    float step_timer = 0;
-    uint32_t fps_measure_time = 0;
-    int      fps_measure_frame = 0;
-    bool game_started = false;   // 敌人生成完毕、关卡正式开始
-    float victory_delay = 0.0f;  // 全部肃清后进入胜利场景前的延时累积
-    bool victory_started = false;// 已触发胜利切换（防重复）
-    std::map<int, int> server_inputs;
-    uint64_t lastTime = get_ticks();   // 固定逻辑步时间戳
-    float heartbeatTimer = 0.0f;
-    float accumulator = 0.0f;          // 固定步长累加器
-    float render_dt_ = 0.0f;           // 渲染期动画推进用的每帧 dt（Update 写入，Render 读取）
+
+    // 世界运行时态（帧时钟 / 关卡进度 / 本地输入 / 瞄准锁存）统一放在 GameRuntime，
+    // 随 registry 重建而重置；本类不再持有玩法运行态，只保留一个绑定引用。
+    GameRuntime* rt_ = nullptr;
 
     NetworkManager net_;   // 网络收发/帧同步辅助（持有 ctx_，供 this->net_ 调用）
 

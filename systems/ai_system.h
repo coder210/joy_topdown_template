@@ -12,7 +12,7 @@
 #include "../components/player_event_input.h"
 #include "../components/pathfinding_component.h"
 #include "../components/health_component.h"
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include <cmath>
 
 // 本模板为纯近战：敌人不再发射子弹，故无 spawn_enemy_bullet / BulletComponent 相关逻辑。

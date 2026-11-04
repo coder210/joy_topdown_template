@@ -23,8 +23,8 @@ void MenuLayer::load_menu_buttons()
 {
         int lw, lh;
         r2d_get_logical_presentation(ctx_->r2d, &lw, &lh, NULL);
-        const float LW = (lw > 0) ? (float)lw : 960.0f;
-        const float LH = (lh > 0) ? (float)lh : 640.0f;
+        const float LW = (lw > 0) ? (float)lw : (float)DISPLAY_WINDOW_W;
+        const float LH = (lh > 0) ? (float)lh : (float)DISPLAY_DESIGN_H;
         const float s  = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
         font_p simhei_font = AssetManager::GetInstance()->GetSimheiFont24();
 

@@ -35,8 +35,6 @@ void GameSceneCommon::playKeyPressed(const char* key, int scancode, bool repeat,
 
     if (key_mask) {
         game_runtime(self->ctx()).current_input_mask |= key_mask;
-        if (key_mask & INPUT_DIR_MASK)
-            game_runtime(self->ctx()).local_dir = input_to_dir(key_mask);
     }
 }
 

@@ -3,7 +3,8 @@
 #include <math.h>
 #include <joy/joy.h>
 #include "protocol.h"
-#include "components/global_state_component.h"
+#include "world/global_state.h"
+#include "world/entity_factory.h"
 #include "components/action_state_component.h"
 #include "components/ai_component.h"
 #include "components/connection_component.h"
@@ -39,57 +40,30 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
                 auto& entity = entities[i];
                 // 地图(S2C_TYPE_NORMAL)由客户端本地 map_spawn_system 生成，不通过网络同步
                 if (entity.type == S2C_TYPE_NORMAL) continue;
-                auto e = ctx_->ecs.create();
-                ctx_->ecs.emplace<IdComponent>(e, entity.id);
-                ctx_->ecs.emplace<LogicRectComponent>(e, entity.width, entity.height);
-                ctx_->ecs.emplace<LogicPositionComponent>(e, entity.position_x, entity.position_y);
-                // 快照 position 是碰撞盒左上角，Transform 取碰撞盒中心（与 server 端一致）
-                ctx_->ecs.emplace<TransformComponent>(e,
-                                                   fp_to_float(entity.position_x) + fp_to_float(entity.width) * 0.5f,
-                                                   fp_to_float(entity.position_y) + fp_to_float(entity.height) * 0.5f,
-                                                   0.0f, 1.0f, 1.0f);
+
+                // 实体装配统一走 world/entity_factory.h（唯一构造入口）：
+                // 快照恢复与正常 join / 敌人出生共用同一套组件字段，不再各自 emplace。
                 if (entity.type == S2C_TYPE_PLAYER) {
-                        ctx_->ecs.emplace<LogicVelocityComponent>(e, fp_from_float(0), fp_from_float(0));
-                        ctx_->ecs.emplace<PlayerComponent>(e, entity.player_conv, entity.player_char_id);
-                        // 动作状态组件：几何渲染的朝向 / 攻击表现依赖它
-                        ctx_->ecs.emplace<ActionStateComponent>(e);
-                        // 血量组件：从快照恢复（服务端子弹伤害结算结果）
-                        ctx_->ecs.emplace<HealthComponent>(e,
-                            (int)entity.hp, PLAYER_MAX_HP, false, 0, SPAWN_INVULN_TICKS);
-                        // 出生点：与 server 端 join 位置一致（当前关卡 'P' 格）
-                        fp_t sp_x, sp_y;
-                        map_player_spawn(ctx_->ecs.ctx().get<GlobalState>().level, &sp_x, &sp_y);
-                        ctx_->ecs.emplace<SpawnPointComponent>(e, sp_x, sp_y);
+                        spawn_player_from_snapshot(ctx_->ecs, ctx_,
+                            entity.id, entity.player_conv, entity.player_char_id,
+                            entity.position_x, entity.position_y,
+                            entity.width, entity.height, (int)entity.hp);
                 }
                 else if (entity.type == S2C_TYPE_ENEMY) {
-                        ctx_->ecs.emplace<EnemyComponent>(e);
-                        ctx_->ecs.emplace<ActionStateComponent>(e);
-                        // 使用服务端打包的 ai_type 作为 SpawnDef 索引（按当前关卡 'E' 格确定性派生）
+                        // 使用服务端打包的 ai_type 作为 SpawnDef 索引（按当前关卡 'E' 格确定性派生）；
+                        // 索引非法时 def=nullptr，工厂退化为最小装配（与原行为一致）。
                         int si = (int)entity.ai_type;
                         int e_cnt = 0;
                         const SpawnDef* e_defs = level_enemy_defs(
                             ctx_->ecs.ctx().get<GlobalState>().level, e_cnt);
-                        if (si >= 0 && si < e_cnt) {
-                            auto& sd = e_defs[si];
-                            // 血量组件：从快照恢复（近战伤害结算结果）
-                            ctx_->ecs.emplace<HealthComponent>(e,
-                                (int)entity.hp, ENEMY_MAX_HP);
-                            // 出生点：从 SpawnDef 恢复（死亡重生传送目标）
-                            ctx_->ecs.emplace<SpawnPointComponent>(e,
-                                fp_from_float(sd.x), fp_from_float(sd.y));
-                            ctx_->ecs.emplace<AIComponent>(e,
-                                fp_from_float(sd.x), fp_from_float(sd.y),
-                                fp_from_float(sd.patrol_radius),
-                                fp_from_float(sd.detect_radius),
-                                fp_from_float(sd.attack_radius));
-                            // 恢复服务端下发的 AI 运行时状态（timer/state/target），
-                            // 否则这些持续累积的状态从 0/出生点开始，与服务端接入时值不同步
-                            auto& ai = ctx_->ecs.get<AIComponent>(e);
-                            ai.timer          = entity.ai_timer;
-                            ai.state          = entity.ai_state;
-                            ai.target_x       = (fp_t)entity.ai_target_x;
-                            ai.target_y       = (fp_t)entity.ai_target_y;
-                        }
+                        const SpawnDef* def = (si >= 0 && si < e_cnt) ? &e_defs[si] : nullptr;
+
+                        spawn_enemy_from_snapshot(ctx_->ecs, ctx_,
+                            entity.id, def, si,
+                            entity.position_x, entity.position_y,
+                            entity.width, entity.height, (int)entity.hp,
+                            entity.ai_timer, entity.ai_state,
+                            (fp_t)entity.ai_target_x, (fp_t)entity.ai_target_y);
                 }
         }
 
@@ -107,7 +81,7 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
         fp_t sx_j, sy_j;
         map_player_spawn(ctx_->ecs.ctx().get<GlobalState>().level, &sx_j, &sy_j);
         std::string data = pack_c2s(CMD_PLAYER_JOIN, sx_j, sy_j, 0, 0, ctx_->selected_char_id);
-        netclient_send(ctx_->netclient, data.c_str(), (int)data.size());
+        if (ctx_->transport) ctx_->transport->Send(data.c_str(), (int)data.size());
 }
 
 // ===== 本地瞄准角（量化后随输入上传，供所有端同步"武器指向"的表现）=====
@@ -120,9 +94,11 @@ static int collect_aim_yaw_q(Context* ctx)
 {
     if (!ctx) return kAimYawInvalid;
 
+    auto& rt = game_runtime(ctx);
+
     // 1) 键盘方向（八向）：按 dx/dy 符号合成方向向量，atan2 求角；斜向(如左上)即指向斜角，
     //    武器随之 8 向旋转。松手后锁存上一次方向（仍可向该方向开火）。
-    int kb_mask = game_runtime(ctx).current_input_mask & INPUT_DIR_MASK;
+    int kb_mask = rt.current_input_mask & INPUT_DIR_MASK;
     if (has_dir(kb_mask)) {
         float dx = 0.0f, dy = 0.0f;
         if (kb_mask & INPUT_RIGHT) dx += 1.0f;
@@ -131,13 +107,13 @@ static int collect_aim_yaw_q(Context* ctx)
         if (kb_mask & INPUT_UP)    dy -= 1.0f;
         // 屏幕 y 向下，与鼠标/摇杆同约定；dx/dy ∈ {-1,0,1}，斜向成 8 个方向
         float deg = atan2f(dy, dx) * 180.0f / 3.1415926f;
-        ctx->aim_keyboard_yaw_q = aim_yaw_quantize(deg);
-        return ctx->aim_keyboard_yaw_q;
+        rt.aim_keyboard_yaw_q = aim_yaw_quantize(deg);
+        return rt.aim_keyboard_yaw_q;
     }
-    if (ctx->aim_keyboard_yaw_q >= 0) return ctx->aim_keyboard_yaw_q;   // 锁存：停步后仍朝最后方向
+    if (rt.aim_keyboard_yaw_q >= 0) return rt.aim_keyboard_yaw_q;   // 锁存：停步后仍朝最后方向
 
     // 2) 移动端（无键盘）：用摇杆锁存的瞄准角
-    if (ctx->aim_stick_yaw_q >= 0) return ctx->aim_stick_yaw_q;
+    if (rt.aim_stick_yaw_q >= 0) return rt.aim_stick_yaw_q;
 
     return kAimYawInvalid;
 }
@@ -145,7 +121,7 @@ static int collect_aim_yaw_q(Context* ctx)
 // ========== 发送输入（客户端）==========
 void NetworkManager::SendInput()
 {
-    if (!ctx_->netclient) return;
+    if (!ctx_->transport) return;
     int dir = game_runtime(ctx_).current_input_mask & INPUT_DIR_MASK;
     int attack = (game_runtime(ctx_).current_input_mask & INPUT_ATTACK) ? 1 : 0;
     if (game_runtime(ctx_).attack_triggered) { attack = 1; game_runtime(ctx_).attack_triggered = false; }
@@ -153,7 +129,7 @@ void NetworkManager::SendInput()
     const int yaw = collect_aim_yaw_q(ctx_);
     if (dir || attack || yaw != game_runtime(ctx_).last_aim_yaw_sent) {
         auto data = pack_c2s(CMD_PLAYER_INPUT, 0, 0, dir, attack, 0, yaw);
-        netclient_send(ctx_->netclient, data.c_str(), (int)data.size());
+        ctx_->transport->Send(data.c_str(), (int)data.size());
         game_runtime(ctx_).last_aim_yaw_sent = yaw;
     }
 }
@@ -161,21 +137,22 @@ void NetworkManager::SendInput()
 // ========== 网络消息接收（客户端）==========
 void NetworkManager::ClientReceive()
 {
-        net_message_t msg;
-        if (netclient_poll_message(ctx_->netclient, &msg)) {
-            if (msg.type == NET_TYPE_CONNECTED) {
+        if (!ctx_->transport) return;
+        NetTransportEvent ev;
+        if (ctx_->transport->Poll(ev)) {
+            if (ev.type == NetTransportEvent::Connected) {
                 auto d = pack_c2s(CMD_LOADING, 0, 0, 0, 0);
-                netclient_send(ctx_->netclient, d.c_str(), (int)d.size());
+                ctx_->transport->Send(d.c_str(), (int)d.size());
             }
-            else if (msg.type == NET_TYPE_DISCONNECTED) {
-                log_info("disconnected=%d", msg.conv);
+            else if (ev.type == NetTransportEvent::Disconnected) {
+                log_info("disconnected=%d", ev.conv);
             }
-            else if (msg.type == NET_TYPE_MESSAGE) {
+            else if (ev.type == NetTransportEvent::Message) {
                 jmsgpack_unpacked_t r;
                 jmsgpack_unpacked_init(&r);
                 size_t off = 0;
                 int is_loading = 0;
-                if (jmsgpack_unpack_next(&r, (const char*)msg.data, (int)msg.len, &off) >= 0) {
+                if (jmsgpack_unpack_next(&r, ev.data, ev.len, &off) >= 0) {
                     const jmsgpack_object_t* root = jmsgpack_unpacked_data(&r);
                     if (root && jmsgpack_object_type(root) == JMSGPACK_OBJECT_ARRAY
                             && jmsgpack_object_array_size(root) >= 2) {
@@ -190,7 +167,7 @@ void NetworkManager::ClientReceive()
                     int conv, frame_id, eid, seed;
                     int64_t random_state = 0;
                     S2CEntity entities[512];
-                    int ec = unpack_loading((const char*)msg.data, (int)msg.len, &conv, &frame_id, &eid, &seed,
+                    int ec = unpack_loading(ev.data, ev.len, &conv, &frame_id, &eid, &seed,
                                             &random_state, entities, 512);
                     if (ec >= 0) {
                         // 用服务端下发的 seed 创建确定性随机序列，再用服务端当前单状态恢复，
@@ -204,11 +181,10 @@ void NetworkManager::ClientReceive()
                     }
                 }
                 else {
-                    game_runtime(ctx_).command_queue.push(std::string(msg.data, msg.len));
+                    game_runtime(ctx_).command_queue.push(std::string(ev.data, ev.len));
                 }
             }
-            if (msg.type == NET_TYPE_MESSAGE && msg.data)
-                netmessage_free_data(&msg);
+            ctx_->transport->Release(ev);
         }
 }
 
@@ -281,41 +257,40 @@ void NetworkManager::HandleCmdHeartbeat(int conv)
 // ========== 网络接收（服务端/Host）==========
 void NetworkManager::ServerReceive()
 {
-        net_message_t msg;
-        while (netserver_poll_message(ctx_->net_server, &msg)) {
-                if (msg.type == NET_TYPE_CONNECTED) {
-                        log_info("connected=%d", msg.conv);
+        if (!ctx_->transport) return;
+        NetTransportEvent ev;
+        while (ctx_->transport->Poll(ev)) {
+                if (ev.type == NetTransportEvent::Connected) {
+                        log_info("connected=%d", ev.conv);
                 }
-                else if (msg.type == NET_TYPE_DISCONNECTED) {
-                        log_info("disconnected=%d", msg.conv);
-                        S2CPlayerLeave l = { msg.conv };
+                else if (ev.type == NetTransportEvent::Disconnected) {
+                        log_info("disconnected=%d", ev.conv);
+                        S2CPlayerLeave l = { ev.conv };
                         net_session(ctx_).player_leaves.push_back(l);
                 }
-                else if (msg.type == NET_TYPE_MESSAGE) {
+                else if (ev.type == NetTransportEvent::Message) {
                         int cmd, input_dir = 0, input_attack = 0, char_id = 0, input_yaw = kAimYawInvalid; int64_t join_x = 0, join_y = 0;
-                        if (unpack_c2s((const char*)msg.data, (int)msg.len, &cmd, &join_x, &join_y, &input_dir, &input_attack, &char_id, &input_yaw)) {
+                        if (unpack_c2s(ev.data, ev.len, &cmd, &join_x, &join_y, &input_dir, &input_attack, &char_id, &input_yaw)) {
                                 switch (cmd) {
-                                case CMD_LOADING:       HandleCmdLoading(msg.conv); break;
-                                case CMD_PLAYER_JOIN:   HandleCmdPlayerJoin(msg.conv, join_x, join_y, char_id); break;
-                                case CMD_PLAYER_LEAVE:  HandleCmdPlayerLeave(msg.conv); break;
-                                case CMD_PLAYER_INPUT:  HandleCmdPlayerInput(msg.conv, 0, input_dir, input_attack, input_yaw); break;
-                                case CMD_PLAYER_HEART:  HandleCmdHeartbeat(msg.conv); break;
+                                case CMD_LOADING:       HandleCmdLoading(ev.conv); break;
+                                case CMD_PLAYER_JOIN:   HandleCmdPlayerJoin(ev.conv, join_x, join_y, char_id); break;
+                                case CMD_PLAYER_LEAVE:  HandleCmdPlayerLeave(ev.conv); break;
+                                case CMD_PLAYER_INPUT:  HandleCmdPlayerInput(ev.conv, 0, input_dir, input_attack, input_yaw); break;
+                                case CMD_PLAYER_HEART:  HandleCmdHeartbeat(ev.conv); break;
                                 }
                         }
                         else {
-                                log_info("Failed to parse message from conv=%d", msg.conv);
+                                log_info("Failed to parse message from conv=%d", ev.conv);
                         }
                 }
-                if (msg.type == NET_TYPE_MESSAGE && msg.data) {
-                        netmessage_free_data(&msg);
-                }
+                ctx_->transport->Release(ev);
         }
 }
 
 void NetworkManager::ServerTick()
 {
-        if (ctx_->net_server) {
-                netserver_update(ctx_->net_server);
+        if (ctx_->transport) {
+                ctx_->transport->Update();
                 ServerReceive();
         }
 }
@@ -347,7 +322,7 @@ void NetworkManager::CollectInput(int frame_id)
         compute_full_md5(entries, checksum, sizeof(checksum));
 
         auto command_data = pack_s2c(S2C_CMD_COMMAND, frame_id, joins, num_joins, leaves, num_leaves, inputs, num_inputs, checksum);
-        net_session(ctx_).commands[frame_id] = command_data;
+        net_session(ctx_).frames.StoreCommand(frame_id, command_data);
         game_runtime(ctx_).command_queue.push(command_data);
 
         // 缓存本帧校验记录（退出时落盘 checksum_log_server.txt，与客户端对称）：
@@ -372,28 +347,20 @@ void NetworkManager::CollectInput(int frame_id)
         net_session(ctx_).player_joins.clear();
         net_session(ctx_).player_leaves.clear();
         net_session(ctx_).player_inputs.clear();
-
-        // 只保留最近 300 帧命令（≈15s @20Hz），防止无玩家时内存线性增长。
-        // std::map 按帧号有序，begin() 即最旧帧；补帧最多追 2 帧、新玩家对齐
-        // 用 lower_bound 命中最近帧即可，因此 300 帧缓冲完全够用。
-        if (net_session(ctx_).commands.size() > 300)
-                net_session(ctx_).commands.erase(net_session(ctx_).commands.begin());
+        // 命令帧容量裁剪由 FrameCommandStream::StoreCommand 统一处理
 }
 
 // ========== 帧同步辅助 ==========
 int NetworkManager::GetTargetFrameId(int curr_frameid, int context_frameid)
 {
-    int diff = context_frameid - curr_frameid;
-    if (diff >= 50)      return curr_frameid + 9;
-    if (diff >= 30)      return curr_frameid;
-    if (diff >= 10)      return curr_frameid + 4;
-    if (diff >= 2)       return curr_frameid + 2;
-    return curr_frameid;
+    // 追帧策略统一由帧流缓冲提供（网络策略，不属于玩法）
+    return FrameCommandStream::TargetFrameId(curr_frameid, context_frameid);
 }
 
 // ========== 转发命令帧给客户端 ==========
 void NetworkManager::InputForwarding()
 {
+        if (!ctx_->transport) return;
         auto view = ctx_->ecs.view<ConnectionComponent>();
         for (auto e : view) {
                 auto& comp = view.get<ConnectionComponent>(e);
@@ -401,9 +368,9 @@ void NetworkManager::InputForwarding()
                         int taget_frameid = GetTargetFrameId(comp.frameid,
                             ctx_->ecs.ctx().get<GlobalState>().next_frame_id);
                         for (int i = comp.frameid; i < taget_frameid; i++) {
-                            auto it = net_session(ctx_).commands.find(i);
-                            if (it != net_session(ctx_).commands.end()) {
-                                netserver_send(ctx_->net_server, comp.conv, it->second.c_str(), it->second.size());
+                            const std::string* cmd = net_session(ctx_).frames.FindCommand(i);
+                            if (cmd) {
+                                ctx_->transport->SendTo(comp.conv, cmd->c_str(), (int)cmd->size());
                             }
                             else {
                                 log_error("Frame %d not found in commands, skip sending.", i);
@@ -412,36 +379,34 @@ void NetworkManager::InputForwarding()
                         comp.frameid = taget_frameid;
                 }
                 else {
-                        auto it = net_session(ctx_).world_snapshots.lower_bound(comp.frameid);
-                        if (it == net_session(ctx_).world_snapshots.end() || it->first > comp.frameid) {
-                                if (it == net_session(ctx_).world_snapshots.begin()) {
-                                        log_info("WARNING: no snapshot cache found for frame %d (client %d), sending empty loading", comp.frameid, comp.conv);
-                                        auto& gs = ctx_->ecs.ctx().get<GlobalState>();
-                                        uint64_t lcg_state = 0;
-                                        lcg_random_get_state(gs.random, &lcg_state);
-                                        auto data = pack_s2c_loading(comp.conv, comp.frameid,
-                                                gs.next_entity_id, nullptr, 0,
-                                                (int32_t)gs.random_seed, (int64_t)lcg_state);
-                                        netserver_send(ctx_->net_server, comp.conv, data.c_str(), data.size());
-                                        return;
-                                }
-                                --it;
-                                }
-                                S2CEntity entities[512];
-                                int ec = 0, eid = 0;
-                                ec = unpack_world(it->second.c_str(), (int)it->second.size(), &eid, entities, 512);
+                        int snap_frame = 0;
+                        const std::string* snap = net_session(ctx_).frames.FindSnapshotAtOrBefore(comp.frameid, &snap_frame);
+                        if (!snap) {
+                                log_info("WARNING: no snapshot cache found for frame %d (client %d), sending empty loading", comp.frameid, comp.conv);
                                 auto& gs = ctx_->ecs.ctx().get<GlobalState>();
                                 uint64_t lcg_state = 0;
                                 lcg_random_get_state(gs.random, &lcg_state);
-                                // 关键：loading 快照是帧 it->first 的，上报的 frame_id 必须也是 it->first，
-                                // 客户端才能用它精确初始化 AI 状态并从 it->first+1 开始演算。
-                                // 之前误用 comp.frameid 导致"快照帧 ≠ 上报帧"，AI 状态初始化错位。
-                                int snap_frame = it->first;
-                                auto data = pack_s2c_loading(comp.conv, snap_frame, eid, entities, ec,
-                                (int32_t)gs.random_seed, (int64_t)lcg_state);
-                                netserver_send(ctx_->net_server, comp.conv, data.c_str(), data.size());
-                                comp.frameid = snap_frame + 1;   // 客户端已初始化到 snap_frame，下一个要发的是 snap_frame+1
-                                comp.is_loaded = true;
+                                auto data = pack_s2c_loading(comp.conv, comp.frameid,
+                                        gs.next_entity_id, nullptr, 0,
+                                        (int32_t)gs.random_seed, (int64_t)lcg_state);
+                                ctx_->transport->SendTo(comp.conv, data.c_str(), data.size());
+                                return;
+                        }
+
+                        S2CEntity entities[512];
+                        int ec = 0, eid = 0;
+                        ec = unpack_world(snap->c_str(), (int)snap->size(), &eid, entities, 512);
+                        auto& gs = ctx_->ecs.ctx().get<GlobalState>();
+                        uint64_t lcg_state = 0;
+                        lcg_random_get_state(gs.random, &lcg_state);
+                        // 关键：loading 快照是帧 snap_frame 的，上报的 frame_id 必须也是 snap_frame，
+                        // 客户端才能用它精确初始化 AI 状态并从 snap_frame+1 开始演算。
+                        // 之前误用 comp.frameid 导致"快照帧 ≠ 上报帧"，AI 状态初始化错位。
+                        auto data = pack_s2c_loading(comp.conv, snap_frame, eid, entities, ec,
+                        (int32_t)gs.random_seed, (int64_t)lcg_state);
+                        ctx_->transport->SendTo(comp.conv, data.c_str(), data.size());
+                        comp.frameid = snap_frame + 1;   // 客户端已初始化到 snap_frame，下一个要发的是 snap_frame+1
+                        comp.is_loaded = true;
                 }
         }
 }

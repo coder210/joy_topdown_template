@@ -14,7 +14,7 @@
 #include "../components/ai_component.h"
 #include "../systems/spawn_def.h"
 #include "../systems/spawn_enemy_system.h"   // spawn_one_enemy
-#include "../components/global_state_component.h"  // GlobalState（next_enemy_spawn_idx）
+#include "../world/global_state.h"  // GlobalState（next_enemy_spawn_idx）
 
 // 维持场上存活敌人数 = MAINTAIN_ENEMY_COUNT：每 tick（仅权威端运行）
 // player_death_system 已销毁死亡敌人，这里统计存活数，不足目标则从 Enemy 层

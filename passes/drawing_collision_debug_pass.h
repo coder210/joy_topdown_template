@@ -7,7 +7,7 @@
 #include "../components/local_only_component.h"
 #include "../components/enemy_component.h"
 #include "../components/bullet_component.h"
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include "../protocol.h"
 #include "../context.h"
 

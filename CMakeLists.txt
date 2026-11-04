@@ -53,17 +53,35 @@ else()
     # build/Release/<exename>.html（web-build.yml 按此查找）。
 endif()
 
-# 逻辑分辨率 960x640（480x320 的 2 倍）：PPM 同步翻倍 50 → 100。
-# 目的：渲染/文字更精细（字号按 2 倍烘焙），但"可视世界范围 + 角色显示大小"与原来完全一致。
-# 若不改 PPM，可视范围会变成 2 倍(19.2x12.8 米)、角色看起来小一半。
-# 见 joy/joy.h 中 PIXELS_PER_METER 的覆盖说明；默认 50，仅本项目覆盖。
-target_compile_definitions(${EXECUTABLE_NAME} PRIVATE PIXELS_PER_METER=100)
+# ---- 显示配置：唯一配置点 ----
+# DISPLAY_SCALE=1 → 480x320（设计基准）；2 → 960x640。
+# 窗口 / 逻辑高度 / PPM / 字号全部由它推导；业务代码只引用 config/display_config.h 的宏。
+# 例：cmake -DDISPLAY_SCALE=2 .. 即整体放大到 960x640（可视世界仍为 9.6x6.4 米）。
+set(DISPLAY_SCALE 1 CACHE STRING "渲染倍率：1=480x320, 2=960x640")
+math(EXPR DISPLAY_W          "480 * ${DISPLAY_SCALE}")
+math(EXPR DISPLAY_H          "320 * ${DISPLAY_SCALE}")
+math(EXPR DISPLAY_PPM        "50  * ${DISPLAY_SCALE}")
+math(EXPR DISPLAY_FONT_MAIN  "24  * ${DISPLAY_SCALE}")
+math(EXPR DISPLAY_FONT_SMALL "14  * ${DISPLAY_SCALE}")
+math(EXPR DISPLAY_FONT_LARGE "28  * ${DISPLAY_SCALE}")
+
+target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
+    PIXELS_PER_METER=${DISPLAY_PPM}
+    DISPLAY_WINDOW_W=${DISPLAY_W}
+    DISPLAY_WINDOW_H=${DISPLAY_H}
+    DISPLAY_DESIGN_H=${DISPLAY_H}
+    DISPLAY_FONT_MAIN=${DISPLAY_FONT_MAIN}
+    DISPLAY_FONT_SMALL=${DISPLAY_FONT_SMALL}
+    DISPLAY_FONT_LARGE=${DISPLAY_FONT_LARGE}
+)
 
 # 源文件与头文件显式列出（不依赖 GLOB）：重命名/删除某文件时若漏改此列表，
 # configure 阶段即报错，不会出现"忘了重新 cmake 导致 vcxproj 仍指向已删文件"的静默失败；
 # 头文件列入后也会出现在 IDE 工程树中（systems 等纯头文件实现亦可浏览）。
 # 新增文件时请在此手动追加。entt.hpp 为第三方大文件，不列入以免 IDE 卡顿。
 set(PROJECT_FILES
+    # ---- config（显示配置：唯一事实源）----
+    config/display_config.h
     # ---- 根目录 ----
     main.cpp
     asset_manager.cpp
@@ -76,30 +94,31 @@ set(PROJECT_FILES
     protocol.h
     settings.h
     ui_style.h
-    # ---- components ----
+    # ---- components（实体组件）----
     components/action_state_component.h
     components/ai_component.h
     components/anim_state_component.h
+    components/bullet_component.h
     components/connection_component.h
     components/enemy_component.h
-    components/game_runtime_component.h
-    components/global_state_component.h
     components/health_component.h
     components/id_component.h
     components/local_only_component.h
     components/logic_position_component.h
     components/logic_rect_component.h
     components/logic_velocity_component.h
-    components/net_component.h
-    components/net_session_component.h
     components/pathfinding_component.h
     components/player_component.h
     components/player_event_input.h
     components/player_state_input.h
     components/spawn_point_component.h
-    components/system_registry_component.h
     components/transform_component.h
-    components/bullet_component.h
+    # ---- world（世界级资源，非实体组件）----
+    world/entity_factory.h
+    world/frame_command_buffer.h
+    world/game_runtime.h
+    world/global_state.h
+    world/system_registry.h
     # ---- layers ----
     layers/debug_layer.cpp
     layers/gameplay_controls_layer.cpp
@@ -110,6 +129,12 @@ set(PROJECT_FILES
     layers/layer.h
     layers/menu_layer.h
     layers/pause_menu_layer.h
+    # ---- net（传输抽象 + 帧同步基础设施）----
+    net/net_session.h
+    net/sync/frame_command_stream.h
+    net/transport/i_transport.h
+    net/transport/joy_transport.cpp
+    net/transport/joy_transport.h
     # ---- network ----
     network/lan_discovery.h
     network/network_manager.cpp
@@ -218,7 +243,40 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/joy_add.cmake")
 else()
     include(${CMAKE_SOURCE_DIR}/joy_add.cmake)
 endif()
-joy_add_sources(${EXECUTABLE_NAME})
+# ---- C# (Mono) 脚本运行时 ----
+# 默认探测 Windows 上 Mono 的安装位置（winget install Mono.Mono）；
+# 其它平台/自定义安装用 -DMONO_INCLUDE_DIR=... -DMONO_LIBRARIES=... 覆盖。
+if(WIN32 AND NOT DEFINED MONO_INCLUDE_DIR)
+    foreach(_mono_root "C:/Program Files/Mono" "C:/Program Files (x86)/Mono")
+        if(EXISTS "${_mono_root}/include/mono-2.0/mono/jit/jit.h")
+            set(MONO_INCLUDE_DIR "${_mono_root}/include/mono-2.0" CACHE PATH "Mono 头文件目录")
+            set(MONO_LIBRARIES   "${_mono_root}/lib/mono-2.0-sgen.lib" CACHE FILEPATH "Mono 导入库")
+            break()
+        endif()
+    endforeach()
+endif()
+
+# C# 脚本后端只在桌面平台默认启用；Android/iOS/WASM 的 Mono 集成方案不同（见 README/规划），
+# 暂不启用，避免移动端构建因找不到桌面 Mono 而失败。
+set(_joy_script_modules "")
+if(NOT ANDROID AND NOT IOS AND NOT EMSCRIPTEN)
+    set(_joy_script_modules csharp)
+endif()
+
+joy_add_sources(${EXECUTABLE_NAME} MODULES ${_joy_script_modules})
+
+# Mono 运行时 DLL 随构建产物复制（Windows）。BCL（mscorlib 等）由 Mono 安装目录提供；
+# 发行时需连同 Mono 运行时一起打包，或要求目标机安装 Mono。
+if(WIN32 AND MONO_INCLUDE_DIR AND MONO_LIBRARIES)
+    get_filename_component(_mono_root "${MONO_INCLUDE_DIR}/../.." ABSOLUTE)
+    if(EXISTS "${_mono_root}/bin/mono-2.0-sgen.dll")
+        add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${_mono_root}/bin/mono-2.0-sgen.dll"
+                    "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>"
+            COMMENT "Copying mono-2.0-sgen.dll to output dir")
+    endif()
+endif()
 
 # 添加项目自身目录为头文件搜索路径
 target_include_directories(${EXECUTABLE_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")

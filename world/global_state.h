@@ -1,9 +1,11 @@
-#ifndef GLOBAL_STATE_COMPONENT_H
-#define GLOBAL_STATE_COMPONENT_H
+#ifndef WORLD_GLOBAL_STATE_H
+#define WORLD_GLOBAL_STATE_H
 #include <joy/jmath.h>
 #include <joy/joy.h>
 
-// 全局单例状态（通过 registry.ctx().get<GlobalState>() 访问）
+// 世界级单例状态（通过 registry.ctx().get<GlobalState>() 访问）。
+// 注意：这是"每个世界一份的资源"，不是挂在某个实体上的组件。
+// 本目录（world/）专门存放这类资源；实体组件仍放在 components/。
 struct GlobalState {
     // 帧同步
     int next_entity_id = 1;

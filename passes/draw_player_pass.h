@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <cstring>
 #include <cmath>
-#include "../components/global_state_component.h"
-#include "../components/net_session_component.h"
+#include "../world/global_state.h"
+#include "../net/net_session.h"
 #include "../components/id_component.h"
 #include "../components/player_component.h"
 #include "../components/action_state_component.h"

@@ -2,7 +2,7 @@
 #define DRAW_ENEMY_PASS_H
 #include <math.h>
 #include <joy/joy.h>
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include "../components/enemy_component.h"
 #include "../components/transform_component.h"
 #include "../components/action_state_component.h"

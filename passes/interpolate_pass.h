@@ -6,7 +6,7 @@
 #include "../components/logic_rect_component.h"
 #include "../components/transform_component.h"
 #include "../components/id_component.h"
-#include "../components/global_state_component.h"
+#include "../world/global_state.h"
 #include "../components/enemy_component.h"
 #include "../components/action_state_component.h"
 #include "../components/bullet_component.h"

@@ -9,7 +9,7 @@
 #include "game_scene.h"
 #include "game_scene_common.h"
 #include "../protocol.h"
-#include "../components/net_component.h"
+#include "../world/frame_command_buffer.h"
 #include "../passes/interpolate_pass.h"
 #include "../passes/draw_player_pass.h"
 #include "../passes/draw_enemy_pass.h"
@@ -29,6 +29,7 @@
 #include "../layers/debug_layer.h"
 #include "../asset_manager.h"
 #include "../network/network_manager.h"
+#include "../net/transport/joy_transport.h"
 #include "../passes/camera_follow_pass.h"
 #include "../systems/ai_system.h"
 #include "../systems/melee_attack_system.h"
@@ -64,7 +65,7 @@ void GameScene::Load()
     this->debug_layer = new DebugLayer(ctx);
 
     // 注册全局单例
-    ctx->ecs.ctx().emplace<NetComponent>();
+    ctx->ecs.ctx().emplace<FrameCommandBuffer>();
     auto& gs = ctx->ecs.ctx().emplace<GlobalState>();
     gs.level = ctx->selected_level;   // 应用选关页选定的固定地图关卡
     map_load_level(gs.level);         // 装入当前关卡 64x64 ASCII 网格（墙+出生）
@@ -76,7 +77,7 @@ void GameScene::Load()
     // 游戏场景共享运行量（默认构造）：
     // GameRuntime / NetSession 原本内嵌于 Context(game/ net)，现按引擎的
     // GlobalState 模式存入 registry.ctx()，供仅持有 Context* 的 system/pass/network 读取。
-    ctx->ecs.ctx().emplace<GameRuntime>();
+    rt_ = &ctx->ecs.ctx().emplace<GameRuntime>();
     ctx->ecs.ctx().emplace<NetSession>();
 
     // System 调度注册表（registry.ctx() 组件）：随后 add_system 写入、run_phase 读取。
@@ -123,7 +124,7 @@ void GameScene::HandleEvent(const void* ev)
     if (this->gcl) this->gcl->HandleEvent(ev);
 }
 
-// 消费一条命令帧：从 command_queue 取一条，解包后写入 NetComponent（模拟前），
+// 消费一条命令帧：从 command_queue 取一条，解包后写入 FrameCommandBuffer（模拟前），
 // 客户端/单机模式下做帧同步 checksum 校验。返回是否拿到可模拟的命令帧。
 bool GameScene::consumeCommandFrame()
 {
@@ -147,7 +148,7 @@ bool GameScene::consumeCommandFrame()
                 // 跳过，不模拟
             } else {
                 got_command = true;
-                auto& cmd = ctx->ecs.ctx().get<NetComponent>();
+                auto& cmd = ctx->ecs.ctx().get<FrameCommandBuffer>();
                 cmd.frame_id = frame_id;
                 cmd.num_joins = jn;  memcpy(cmd.joins, joins, jn * sizeof(S2CPlayerJoin));
                 cmd.num_leaves = ln; memcpy(cmd.leaves, leaves, ln * sizeof(S2CPlayerLeave));
@@ -178,7 +179,7 @@ void GameScene::Update(float dt)
         uint64_t now_ms = get_ticks();
         if (now_ms - s_last_lan_ms >= 200) {
             s_last_lan_ms = now_ms;
-            int n = ctx->net_server ? netserver_connection_count(ctx->net_server) : 0;
+            int n = ctx->transport ? ctx->transport->ConnectionCount() : 0;
             if (cfg_.localPlayer) n += 1;
             LanDiscovery::Get().set_beacon_players(n);
             LanDiscovery::Get().update();
@@ -188,12 +189,12 @@ void GameScene::Update(float dt)
     // 单机暂停：跳过固定步模拟；联机不暂停（本地暂停会让双端帧同步发散）。
     // 暂停期间不累积时间，恢复后也不会补跑一串 tick。
     const bool sim_paused = (this->pause_layer && this->pause_layer->should_pause_sim());
-    if (sim_paused) this->accumulator = 0.0f;
-    else            this->accumulator += dt;
+    if (sim_paused) rt_->accumulator = 0.0f;
+    else            rt_->accumulator += dt;
     auto& gs = ctx->ecs.ctx().get<GlobalState>();
     // ---- 临时诊断：每秒打点 dt 累计 / 渲染帧数 / 实际逻辑 tick 数 ----
     if (get_ticks() - s_diag_t0 >= 1000) {
-        auto& nc = ctx->ecs.ctx().get<NetComponent>();
+        auto& nc = ctx->ecs.ctx().get<FrameCommandBuffer>();
         log_info("[diag] framerate=%d dt_sum=%.4f ticks=%d logic=%d | mode=%d auth=%d local=%d conv=%u net_frame=%d joins=%d inputs=%d players=%d char_id=%d",
             s_diag_frames, s_diag_dtsum, s_diag_ticks, gs.logic_fps,
             (int)ctx->mode, (int)cfg_.authoritative, (int)cfg_.localPlayer,
@@ -202,21 +203,21 @@ void GameScene::Update(float dt)
         s_diag_frames = 0; s_diag_dtsum = 0; s_diag_ticks = 0; s_diag_t0 = get_ticks();
     }
     s_diag_frames++; s_diag_dtsum += dt;
-    while (this->accumulator >= game_runtime(ctx).FIXED_TIMESTEP) {
-        this->accumulator -= game_runtime(ctx).FIXED_TIMESTEP;
+    while (rt_->accumulator >= rt_->FIXED_TIMESTEP) {
+        rt_->accumulator -= rt_->FIXED_TIMESTEP;
         s_diag_ticks++;
 
         // 模式特有 tick：帧号分配、输入收集、命令打包/转发、输入发送
         tick();
 
-        // 消费一条命令帧（模拟前先写 NetComponent）
+        // 消费一条命令帧（模拟前先写 FrameCommandBuffer）
         bool got_command = consumeCommandFrame();
 
         // 模拟推进（是否推进由模式决定，经虚函数）
         if (shouldSimulate(got_command)) {
-            run_phase(ctx, PreUpdate, game_runtime(ctx).FIXED_TIMESTEP);
-            run_phase(ctx, OnUpdate, game_runtime(ctx).FIXED_TIMESTEP);
-            run_phase(ctx, PostUpdate, game_runtime(ctx).FIXED_TIMESTEP);
+            run_phase(ctx, PreUpdate, rt_->FIXED_TIMESTEP);
+            run_phase(ctx, OnUpdate, rt_->FIXED_TIMESTEP);
+            run_phase(ctx, PostUpdate, rt_->FIXED_TIMESTEP);
         }
     }
 
@@ -224,23 +225,23 @@ void GameScene::Update(float dt)
     //（指数平滑：既把 20Hz 逻辑步进补成 60Hz 平滑移动，又把敌人拐弯直角磨圆）。
     if (ctx->ecs.ctx().contains<GlobalState>()) {
         auto& gs = ctx->ecs.ctx().get<GlobalState>();
-        gs.fixed_timestep = game_runtime(ctx).FIXED_TIMESTEP;
+        gs.fixed_timestep = rt_->FIXED_TIMESTEP;
     }
 
     // 逻辑帧率测量
-    // 客户端（MODE_CLIENT）本端 gs.next_frame_id 不递增（由服务器权威帧号 NetComponent.frame_id 驱动），
-    // 直接用它度量会恒为 0；因此客户端改用 NetComponent.frame_id，其余模式仍用本端 next_frame_id。
+    // 客户端（MODE_CLIENT）本端 gs.next_frame_id 不递增（由服务器权威帧号 FrameCommandBuffer.frame_id 驱动），
+    // 直接用它度量会恒为 0；因此客户端改用 FrameCommandBuffer.frame_id，其余模式仍用本端 next_frame_id。
     uint32_t now_ms = get_ticks();
     int cur_logic_frame = currentLogicFrame();
-    if (this->fps_measure_time == 0) {
-        this->fps_measure_time  = now_ms;
-        this->fps_measure_frame = cur_logic_frame;
-    } else if (now_ms - this->fps_measure_time >= 1000) {
-        int elapsed_frames = cur_logic_frame - this->fps_measure_frame;
+    if (rt_->fps_measure_time == 0) {
+        rt_->fps_measure_time  = now_ms;
+        rt_->fps_measure_frame = cur_logic_frame;
+    } else if (now_ms - rt_->fps_measure_time >= 1000) {
+        int elapsed_frames = cur_logic_frame - rt_->fps_measure_frame;
         if (elapsed_frames < 0) elapsed_frames = 0;
-        gs.logic_fps = (int)(elapsed_frames * 1000 / (now_ms - this->fps_measure_time));
-        this->fps_measure_time  = now_ms;
-        this->fps_measure_frame = cur_logic_frame;
+        gs.logic_fps = (int)(elapsed_frames * 1000 / (now_ms - rt_->fps_measure_time));
+        rt_->fps_measure_time  = now_ms;
+        rt_->fps_measure_frame = cur_logic_frame;
     }
 
     // 视觉相关 pass 用实时 dt 每帧更新（子弹已不参与插值，由 draw_bullet_pass 直接按逻辑位置绘制）
@@ -248,23 +249,23 @@ void GameScene::Update(float dt)
     camera_follow_pass(ctx->ecs, ctx, dt);
     // 玩家动画推进已并入 Render 阶段的 player_render_pass（纯渲染、不参与帧同步），
     // 这里仅把本帧 dt 存下供渲染期推进动画使用。
-    this->render_dt_ = dt;
+    rt_->render_dt = dt;
 
     // 视觉时间推进
-    game_runtime(ctx).visual_time += dt;
+    rt_->visual_time += dt;
 
     // ---- 通关判定（与 3D game_scene 业务逻辑对齐）----
     // 关卡开始后，检测全部敌人被肃清则延时切入胜利场景（非服务端）。
     // 优先取权威字段 level_cleared；兜底用本地实体状态推导（帧同步实体同步，跨端确定性一致）。
-    if (!this->game_started) {
+    if (!rt_->game_started) {
         auto en0 = ctx->ecs.view<EnemyComponent>();
-        if (en0.begin() != en0.end()) this->game_started = true;
+        if (en0.begin() != en0.end()) rt_->game_started = true;
     }
-    if (!this->victory_started && shouldCheckVictory() &&
+    if (!rt_->victory_started && shouldCheckVictory() &&
         ctx->ecs.ctx().contains<GlobalState>()) {
         auto& gsv = ctx->ecs.ctx().get<GlobalState>();
         bool cleared = gsv.level_cleared;
-        if (!cleared && this->game_started) {
+        if (!cleared && rt_->game_started) {
             cleared = true;
             auto ev2 = ctx->ecs.view<EnemyComponent, HealthComponent>();
             for (auto e : ev2) {
@@ -276,9 +277,9 @@ void GameScene::Update(float dt)
         }
         if (cleared) {
             gsv.level_cleared = true;
-            if (!sim_paused) this->victory_delay += dt;
-            if (this->victory_delay >= 1.2f) {
-                this->victory_started = true;
+            if (!sim_paused) rt_->victory_delay += dt;
+            if (rt_->victory_delay >= 1.2f) {
+                rt_->victory_started = true;
                 ctx->scene_mgr->setPending(new VictoryScene(ctx));
                 push_user_event(VICTORY_EVENT, VICTORY_EVENT_TRIGGERED);
             }
@@ -298,7 +299,7 @@ void GameScene::Render()
     // 按对象分 pass 渲染（每个 pass 只负责一类实体的绘制，职责清晰）
     draw_enemy_pass(ctx);              // 敌人：墨色方块占位
 
-    player_render_pass(ctx->ecs, ctx, this->render_dt_);   // 玩家：动画推进 + 绘制（characters.json 序列帧）
+    player_render_pass(ctx->ecs, ctx, rt_->render_dt);   // 玩家：动画推进 + 绘制（characters.json 序列帧）
 
     draw_bullet_pass(ctx);              // 飞行中的箭/子弹（tilesheet.png col7，按速度旋转）
 
@@ -331,7 +332,7 @@ void GameScene::Render()
         // 当前逻辑帧号 + 实测逻辑帧率 + 敌人数量 + 全局实体 id
         int frame_id = (ctx->mode == MODE_SERVER || ctx->mode == MODE_HOST)
             ? ctx->ecs.ctx().get<GlobalState>().next_frame_id - 1
-            : ctx->ecs.ctx().get<NetComponent>().frame_id;
+            : ctx->ecs.ctx().get<FrameCommandBuffer>().frame_id;
         int logic_fps = ctx->ecs.ctx().get<GlobalState>().logic_fps;
         int enemy_count = (int)ctx->ecs.view<EnemyComponent>().size();
         int entity_id = ctx->ecs.ctx().get<GlobalState>().next_entity_id;
@@ -355,14 +356,10 @@ void GameScene::Destroy()
     // 停止局域网广播（房主/专用服）
     LanDiscovery::Get().stop_beacon();
 
-    // 网络清理
-    if (ctx->netclient) {
-        netclient_destroy(ctx->netclient);
-        ctx->netclient = NULL;
-    }
-    if (ctx->net_server) {
-        netserver_destroy(ctx->net_server);
-        ctx->net_server = NULL;
+    // 网络清理（JoyTransport 析构时释放底层句柄）
+    if (ctx->transport) {
+        delete ctx->transport;
+        ctx->transport = nullptr;
     }
     AssetManager::GetInstance()->ClearTexCache();
     player_anim_cache_clear();   // 释放玩家动画定义缓存
@@ -405,13 +402,15 @@ void GameScene::init()
     if (cfg_.authoritative)
         GameSceneCommon::initAuthoritative(ctx);
 
-    // 建链：Host/Server 起服务端，Client 连服务端，单机无网络
-    if (cfg_.transport == Transport::Server)
-        ctx->net_server = netserver_create(NET_SERVER_WEBSOCKET,
-                                           ctx->settings.server_ip, ctx->settings.server_port);
-    else if (cfg_.transport == Transport::Client)
-        ctx->netclient = netclient_create(NET_CLIENT_WEBSOCKET,
-                                          ctx->settings.server_ip, ctx->settings.server_port);
+    // 建链：Host/Server 起服务端，Client 连服务端，单机无网络（transport 为 null）。
+    // 具体协议实现由 JoyTransport 封装，上层只依赖 ITransport。
+    if (cfg_.transport == Transport::Server) {
+        ctx->transport = new JoyTransport();
+        ctx->transport->StartServer(ctx->settings.server_ip, ctx->settings.server_port);
+    } else if (cfg_.transport == Transport::Client) {
+        ctx->transport = new JoyTransport();
+        ctx->transport->StartClient(ctx->settings.server_ip, ctx->settings.server_port);
+    }
 
     // 房主/专用服：开始局域网广播，让大厅能发现本房间
     if (cfg_.transport == Transport::Server) {
@@ -449,13 +448,14 @@ void GameScene::handleEvent(const void* ev)
 void GameScene::networkUpdate()
 {
     Context* ctx = this->ctx();
+    if (!ctx->transport) return;   // Transport::None（单机）：无网络
+
     if (cfg_.transport == Transport::Server) {
-        this->net_.ServerTick();
-    } else if (cfg_.transport == Transport::Client && ctx->netclient) {
-        netclient_update(ctx->netclient);
+        this->net_.ServerTick();   // transport->Update() + ServerReceive()
+    } else if (cfg_.transport == Transport::Client) {
+        ctx->transport->Update();
         this->net_.ClientReceive();
     }
-    // Transport::None（单机）：无网络
 }
 
 void GameScene::tick()

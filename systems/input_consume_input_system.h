@@ -1,6 +1,7 @@
 #ifndef INPUT_CONSUME_INPUT_SYSTEM_H
 #define INPUT_CONSUME_INPUT_SYSTEM_H
 
+#include "../world/frame_command_buffer.h"
 #include "../components/action_state_component.h"
 #include "../components/health_component.h"
 #include "../components/player_state_input.h"
@@ -10,7 +11,7 @@
 struct Context;
 
 static void input_consume_input_system(entt::registry& registry, Context* ctx, float /*dt*/) {
-	auto& net = registry.ctx().get<NetComponent>();
+	auto& net = registry.ctx().get<FrameCommandBuffer>();
 	if (net.frame_id < 0) return;
 
 	// 攻击计时每逻辑 tick 无条件递减（与 ai_system 敌人部分对齐）。
