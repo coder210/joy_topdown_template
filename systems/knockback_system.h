@@ -13,28 +13,28 @@
 static void knockback_system(entt::registry& registry, Context* ctx, float /*dt*/)
 {
     auto view = registry.view<KnockbackComponent, LogicPositionComponent>();
-    const fp_t tick  = fp_from_float(game_runtime(ctx).FIXED_TIMESTEP);
-    const fp_t decay = fp_from_float(KNOCKBACK_DECAY);
+    const joy_fp_t tick  = fp_from_float(game_runtime(ctx).FIXED_TIMESTEP);
+    const joy_fp_t decay = fp_from_float(KNOCKBACK_DECAY);
     for (auto e : view) {
         auto& kb = view.get<KnockbackComponent>(e);
         auto& p  = view.get<LogicPositionComponent>(e);
-        fp_t dx = fp_mul(kb.vx, tick);
-        fp_t dy = fp_mul(kb.vy, tick);
+        joy_fp_t dx = fp_mul(kb.vx, tick);
+        joy_fp_t dy = fp_mul(kb.vy, tick);
 
         // 有碰撞盒：逐轴位移，撞墙即停（与 movement_system 同款 4 参数盒查表）；否则直接位移
         if (registry.all_of<LogicRectComponent>(e)) {
-            const fp_t w = registry.get<LogicRectComponent>(e).width;
-            const fp_t h = registry.get<LogicRectComponent>(e).height;
+            const joy_fp_t w = registry.get<LogicRectComponent>(e).width;
+            const joy_fp_t h = registry.get<LogicRectComponent>(e).height;
             // X 轴
             if (dx != 0) {
-                fp_t cand = fp_add(p.x, dx);
+                joy_fp_t cand = fp_add(p.x, dx);
                 int dir = (dx < 0) ? -1 : 1;
                 if (!movement_box_blocked(cand, p.y, w, h)) p.x = cand;
                 else p.x = movement_snap_axis(p.x, w, cand, dir);
             }
             // Y 轴
             if (dy != 0) {
-                fp_t cand = fp_add(p.y, dy);
+                joy_fp_t cand = fp_add(p.y, dy);
                 int dir = (dy < 0) ? -1 : 1;
                 if (!movement_box_blocked(p.x, cand, w, h)) p.y = cand;
                 else p.y = movement_snap_axis(p.y, h, cand, dir);

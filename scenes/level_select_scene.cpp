@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #include <cstring>
 #include <cstdio>
 #include "level_select_scene.h"
@@ -53,21 +54,21 @@ static void request_scene(Context* ctx, Scene* s) {
 // 用该关真实玩法网格画迷你地图（墙=墨块，出生点=朱砂块）。零美术资源。
 void LevelSelectScene::draw_mini_map(Context* ctx, int i, float mx, float my,
                                      float mw, float mh, float s, bool ready) {
-    jr2d_p r2d = ctx->r2d;
+    joy_r2d_p r2d = ctx->r2d;
     (void)s;
 
-    r2d_set_color(r2d, 232, 230, 224, 255);
-    shape_draw_rectangle(r2d, "fill", { mx, my, mw, mh });
+    joy_r2d_set_color(r2d, 232, 230, 224, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", { mx, my, mw, mh });
 
     if (!ready || !preview_has_[i] || preview_w_[i] <= 0 || preview_h_[i] <= 0) {
-        font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
+        joy_font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
         char q = '?';
         int tw = 0, th = 0;
-        if (font24 && jtext_measurex(r2d, font24, &q, 1, { 150, 150, 156, 255 }, &tw, &th))
-            jtext_printx(r2d, font24, &q, 1, { 150, 150, 156, 255 },
+        if (font24 && joy_r2d_text_measurex(r2d, font24, &q, 1, { 150, 150, 156, 255 }, &tw, &th))
+            joy_r2d_text_printx(r2d, font24, &q, 1, { 150, 150, 156, 255 },
                          mx + mw * 0.5f - (float)tw * 0.5f, my + mh * 0.5f - (float)th * 0.5f);
-        r2d_set_color(r2d, 190, 188, 182, 255);
-        shape_draw_rectangle(r2d, "line", { mx, my, mw, mh });
+        joy_r2d_set_color(r2d, 190, 188, 182, 255);
+        joy_r2d_shape_draw_rectangle(r2d, "line", { mx, my, mw, mh });
         return;
     }
 
@@ -80,8 +81,8 @@ void LevelSelectScene::draw_mini_map(Context* ctx, int i, float mx, float my,
     for (int yy = 0; yy < H; yy++) {
         for (int xx = 0; xx < W; xx++) {
             if (preview_grid_[i][yy * W + xx] == '#') {
-                r2d_set_color(r2d, 60, 60, 68, 255);
-                shape_draw_rectangle(r2d, "fill",
+                joy_r2d_set_color(r2d, 60, 60, 68, 255);
+                joy_r2d_shape_draw_rectangle(r2d, "fill",
                     { ox + (float)xx * cell, oy + (float)yy * cell, cell + 0.5f, cell + 0.5f });
             }
         }
@@ -90,38 +91,38 @@ void LevelSelectScene::draw_mini_map(Context* ctx, int i, float mx, float my,
     if (pc >= 0 && pc < W * H) {
         int px = pc % W, py = pc / W;
         float sz = cell * 0.6f;
-        r2d_set_color(r2d, 200, 60, 50, 255);
-        shape_draw_rectangle(r2d, "fill",
+        joy_r2d_set_color(r2d, 200, 60, 50, 255);
+        joy_r2d_shape_draw_rectangle(r2d, "fill",
             { ox + (float)px * cell + (cell - sz) * 0.5f,
               oy + (float)py * cell + (cell - sz) * 0.5f, sz, sz });
     }
-    r2d_set_color(r2d, 150, 148, 142, 255);
-    shape_draw_rectangle(r2d, "line", { mx, my, mw, mh });
+    joy_r2d_set_color(r2d, 150, 148, 142, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "line", { mx, my, mw, mh });
 }
 
 // 难度：5 格方块，从 start_x 起向右排，前 diff 个填充金色
 void LevelSelectScene::draw_difficulty(Context* ctx, int i, float start_x, float y, float s) {
-    jr2d_p r2d = ctx->r2d;
+    joy_r2d_p r2d = ctx->r2d;
     int diff = 1 + i / 2; if (diff > 5) diff = 5;
     const int n = 5;
     float pip = 9.0f * s, gap = 4.0f * s;
     for (int k = 0; k < n; k++) {
         float px = start_x + (float)k * (pip + gap);
-        if (k < diff) r2d_set_color(r2d, 210, 150, 60, 255);
-        else          r2d_set_color(r2d, 200, 200, 206, 255);
-        shape_draw_rectangle(r2d, "fill", { px, y, pip, pip });
+        if (k < diff) joy_r2d_set_color(r2d, 210, 150, 60, 255);
+        else          joy_r2d_set_color(r2d, 200, 200, 206, 255);
+        joy_r2d_shape_draw_rectangle(r2d, "fill", { px, y, pip, pip });
     }
 }
 
 // 左侧列表中的一行：序号 + 名称 + 状态
 void LevelSelectScene::draw_level(int i) {
     Context* ctx = this->ctx();
-    jr2d_p r2d = ctx->r2d;
-    button_p btn = btn_levels[i];
+    joy_r2d_p r2d = ctx->r2d;
+    joy_button_p btn = btn_levels[i];
     if (!btn) return;
-    vec2_t p = button_get_position(btn);
+    joy_vec2_t p = joy_r2d_button_get_position(btn);
     int lw = 0, lh = 0;
-    r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
+    joy_r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
     (void)lw;
     const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     float x = p.x, y = p.y, w = LIST_W * s, h = ROW_H * s;
@@ -129,61 +130,61 @@ void LevelSelectScene::draw_level(int i) {
     bool hov = (hovered_ == i);
     const bool ready = (i < LEVEL_SLOT_MAX) ? level_ready[i] : false;
 
-    font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
-    font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
+    joy_font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
+    joy_font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
 
     if (sel) {
-        r2d_set_color(r2d, 0, 0, 0, 40);
-        shape_draw_rectangle(r2d, "fill", { x + 3.0f * s, y + 3.0f * s, w, h });
+        joy_r2d_set_color(r2d, 0, 0, 0, 40);
+        joy_r2d_shape_draw_rectangle(r2d, "fill", { x + 3.0f * s, y + 3.0f * s, w, h });
     }
 
     // 边框 + 底
-    jcolor_t bc = sel ? jcolor_t{ 38, 38, 46, 255 }
-                      : (hov ? jcolor_t{ 120, 120, 128, 255 } : jcolor_t{ 176, 172, 164, 255 });
-    r2d_set_color(r2d, bc.r, bc.g, bc.b, 255);
-    shape_draw_rectangle(r2d, "fill", { x, y, w, h });
-    jcolor_t card = ready ? jcolor_t{ 252, 250, 244, 255 } : jcolor_t{ 214, 212, 206, 255 };
+    joy_color_t bc = sel ? joy_color_t{ 38, 38, 46, 255 }
+                      : (hov ? joy_color_t{ 120, 120, 128, 255 } : joy_color_t{ 176, 172, 164, 255 });
+    joy_r2d_set_color(r2d, bc.r, bc.g, bc.b, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", { x, y, w, h });
+    joy_color_t card = ready ? joy_color_t{ 252, 250, 244, 255 } : joy_color_t{ 214, 212, 206, 255 };
     float bt = sel ? 2.5f * s : (hov ? 1.5f * s : 1.0f * s);
-    r2d_set_color(r2d, card.r, card.g, card.b, 255);
-    shape_draw_rectangle(r2d, "fill", { x + bt, y + bt, w - 2 * bt, h - 2 * bt });
+    joy_r2d_set_color(r2d, card.r, card.g, card.b, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", { x + bt, y + bt, w - 2 * bt, h - 2 * bt });
 
     // 选中朱砂左边条
     if (sel) {
-        r2d_set_color(r2d, 200, 60, 50, 255);
-        shape_draw_rectangle(r2d, "fill", { x + bt, y + bt, 4.0f * s, h - 2 * bt });
+        joy_r2d_set_color(r2d, 200, 60, 50, 255);
+        joy_r2d_shape_draw_rectangle(r2d, "fill", { x + bt, y + bt, 4.0f * s, h - 2 * bt });
     }
 
     // 序号
     char num[8]; snprintf(num, sizeof(num), "%02d", i + 1);
-    jcolor_t numc = sel ? jcolor_t{ 200, 60, 50, 255 } : jcolor_t{ 130, 130, 138, 255 };
-    jtext_printx(r2d, font12, num, (int)strlen(num), numc, x + 12.0f * s, y + 16.0f * s);
+    joy_color_t numc = sel ? joy_color_t{ 200, 60, 50, 255 } : joy_color_t{ 130, 130, 138, 255 };
+    joy_r2d_text_printx(r2d, font12, num, (int)strlen(num), numc, x + 12.0f * s, y + 16.0f * s);
 
     // 名称
-    jcolor_t namec = !ready ? jcolor_t{ 150, 150, 156, 255 }
-                            : (sel ? jcolor_t{ 28, 28, 32, 255 } : jcolor_t{ 40, 40, 45, 255 });
-    jtext_printx(r2d, font24, LEVEL_META[i].name, (int)strlen(LEVEL_META[i].name),
+    joy_color_t namec = !ready ? joy_color_t{ 150, 150, 156, 255 }
+                            : (sel ? joy_color_t{ 28, 28, 32, 255 } : joy_color_t{ 40, 40, 45, 255 });
+    joy_r2d_text_printx(r2d, font24, LEVEL_META[i].name, (int)strlen(LEVEL_META[i].name),
                  namec, x + 40.0f * s, y + 8.0f * s);
 
     // 右侧状态
     if (!ready) {
-        jtext_printx(r2d, font12, "制作中", (int)strlen("制作中"), { 200, 60, 50, 255 },
+        joy_r2d_text_printx(r2d, font12, "制作中", (int)strlen("制作中"), { 200, 60, 50, 255 },
                      x + w - 46.0f * s, y + 17.0f * s);
     } else {
-        r2d_set_color(r2d, 120, 150, 110, 255);
-        shape_draw_rectangle(r2d, "fill",
+        joy_r2d_set_color(r2d, 120, 150, 110, 255);
+        joy_r2d_shape_draw_rectangle(r2d, "fill",
             { x + w - 15.0f * s, y + h * 0.5f - 2.5f * s, 5.0f * s, 5.0f * s });
     }
 }
 
 // 右侧面板：大缩略图 + 名称/简介/难度/敌人数
 void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
-    jr2d_p r2d = ctx->r2d;
+    joy_r2d_p r2d = ctx->r2d;
     int lw = 0, lh = 0;
-    r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
+    joy_r2d_get_logical_presentation(r2d, &lw, &lh, NULL);
     const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
 
-    font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
-    font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
+    joy_font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
+    joy_font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
 
     bool valid = (index >= 0 && index < LEVEL_META_COUNT);
     bool ready = (valid && index < LEVEL_SLOT_MAX) ? level_ready[index] : false;
@@ -195,12 +196,12 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
     float ph = PANEL_H * s;
 
     // 面板底 + 阴影 + 描边
-    r2d_set_color(r2d, 0, 0, 0, 26);
-    shape_draw_rectangle(r2d, "fill", { px + 3.0f * s, py + 3.0f * s, pw, ph });
-    r2d_set_color(r2d, 250, 248, 242, 255);
-    shape_draw_rectangle(r2d, "fill", { px, py, pw, ph });
-    r2d_set_color(r2d, 150, 146, 138, 255);
-    shape_draw_rectangle(r2d, "line", { px, py, pw, ph });
+    joy_r2d_set_color(r2d, 0, 0, 0, 26);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", { px + 3.0f * s, py + 3.0f * s, pw, ph });
+    joy_r2d_set_color(r2d, 250, 248, 242, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", { px, py, pw, ph });
+    joy_r2d_set_color(r2d, 150, 146, 138, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "line", { px, py, pw, ph });
 
     // 预览框
     // 预览框跟随面板宽度拉伸，左右各留 8*s
@@ -211,30 +212,30 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
     if (ready) {
         draw_mini_map(ctx, index, vx, vy, vw, vh, s, true);
     } else {
-        r2d_set_color(r2d, 232, 230, 224, 255);
-        shape_draw_rectangle(r2d, "fill", { vx, vy, vw, vh });
-        r2d_set_color(r2d, 190, 188, 182, 255);
-        shape_draw_rectangle(r2d, "line", { vx, vy, vw, vh });
-        r2d_set_color(r2d, 20, 20, 26, 140);
-        shape_draw_rectangle(r2d, "fill", { vx, vy, vw, vh });
+        joy_r2d_set_color(r2d, 232, 230, 224, 255);
+        joy_r2d_shape_draw_rectangle(r2d, "fill", { vx, vy, vw, vh });
+        joy_r2d_set_color(r2d, 190, 188, 182, 255);
+        joy_r2d_shape_draw_rectangle(r2d, "line", { vx, vy, vw, vh });
+        joy_r2d_set_color(r2d, 20, 20, 26, 140);
+        joy_r2d_shape_draw_rectangle(r2d, "fill", { vx, vy, vw, vh });
         const char* t = "地图制作中";
         int tn = 0;
         for (const unsigned char* q = (const unsigned char*)t; *q; ++q)
             if ((*q & 0xC0) != 0x80) tn++;
-        jtext_printx(r2d, font24, t, (int)strlen(t), { 245, 243, 237, 255 },
+        joy_r2d_text_printx(r2d, font24, t, (int)strlen(t), { 245, 243, 237, 255 },
                      vx + (vw - tn * 24.0f * s) * 0.5f, vy + vh * 0.5f - 12.0f * s);
     }
 
     if (!valid) return;
 
     // 名称
-    jcolor_t namec = ready ? jcolor_t{ 28, 28, 32, 255 } : jcolor_t{ 150, 150, 156, 255 };
-    jtext_printx(r2d, font24, LEVEL_META[index].name, (int)strlen(LEVEL_META[index].name),
+    joy_color_t namec = ready ? joy_color_t{ 28, 28, 32, 255 } : joy_color_t{ 150, 150, 156, 255 };
+    joy_r2d_text_printx(r2d, font24, LEVEL_META[index].name, (int)strlen(LEVEL_META[index].name),
                  namec, PANEL_X * s + 8.0f * s, 200.0f * s);
 
     // 简介
-    jcolor_t descc = ready ? jcolor_t{ 90, 90, 98, 255 } : jcolor_t{ 168, 168, 174, 255 };
-    jtext_printx(r2d, font12, LEVEL_META[index].desc, (int)strlen(LEVEL_META[index].desc),
+    joy_color_t descc = ready ? joy_color_t{ 90, 90, 98, 255 } : joy_color_t{ 168, 168, 174, 255 };
+    joy_r2d_text_printx(r2d, font12, LEVEL_META[index].desc, (int)strlen(LEVEL_META[index].desc),
                  descc, PANEL_X * s + 8.0f * s, 226.0f * s);
 
     // 元信息：难度 + 敌人数 + 状态
@@ -245,10 +246,10 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
         // 显示本关真正要击杀的敌人总数（LEVEL_ENEMY_TOTALS，默认 100）。
         // 地图 Enemy 层出生点数只是刷怪位置数量，对玩家没有意义，不再展示。
         snprintf(meta, sizeof(meta), "敌人 %d", level_enemy_total(index + 1));
-        jtext_printx(r2d, font12, meta, (int)strlen(meta), { 110, 110, 118, 255 },
+        joy_r2d_text_printx(r2d, font12, meta, (int)strlen(meta), { 110, 110, 118, 255 },
                      metaX + 70.0f * s, 244.0f * s);
     } else {
-        jtext_printx(r2d, font12, "地图制作中，暂不可进入", (int)strlen("地图制作中，暂不可进入"),
+        joy_r2d_text_printx(r2d, font12, "地图制作中，暂不可进入", (int)strlen("地图制作中，暂不可进入"),
                      { 200, 60, 50, 255 }, metaX, 245.0f * s);
     }
 }
@@ -256,70 +257,70 @@ void LevelSelectScene::draw_preview_panel(Context* ctx, int index) {
 // 按 scrollview 的当前偏移刷新所有关卡行按钮位置（绘制与命中都基于按钮位置）
 void LevelSelectScene::apply_level_scroll() {
     if (!level_view) return;
-    const float oy = scrollview_get_offset_y(level_view);
+    const float oy = joy_r2d_scrollview_get_offset_y(level_view);
     int lw = 0, lh = 0;
-    r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
+    joy_r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
     (void)lw;
     const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     for (int i = 0; i < LEVEL_META_COUNT && i < LEVEL_SLOT_MAX; i++)
         if (btn_levels[i])
-            button_set_position(btn_levels[i], LIST_X * s, level_base_y[i] * s + oy);
+            joy_r2d_button_set_position(btn_levels[i], LIST_X * s, level_base_y[i] * s + oy);
 }
 
 // 键盘上下换关时，把选中行滚进左侧列表视口
 void LevelSelectScene::ensure_selected_visible() {
     if (!level_view || selected < 0 || selected >= LEVEL_META_COUNT) return;
     int lw = 0, lh = 0;
-    r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
+    joy_r2d_get_logical_presentation(this->ctx()->r2d, &lw, &lh, NULL);
     (void)lw;
     const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
-    float off = scrollview_get_offset_y(level_view);
+    float off = joy_r2d_scrollview_get_offset_y(level_view);
     const float view_top = LIST_Y * s;
     const float view_bot = (LIST_Y + LIST_H) * s;
     float row_top = level_base_y[selected] * s + off;
     float row_bot = row_top + ROW_H * s;
     if (row_top < view_top)      off += (view_top - row_top);
     else if (row_bot > view_bot) off -= (row_bot - view_bot);
-    scrollview_set_offset(level_view, scrollview_get_offset_x(level_view), off);
+    joy_r2d_scrollview_set_offset(level_view, joy_r2d_scrollview_get_offset_x(level_view), off);
     apply_level_scroll();
 }
 
 // 画"此关正在制作中"模态提示：半透明遮罩 + 居中的宣纸底提示框
 void LevelSelectScene::draw_tip() {
     Context* ctx = this->ctx();
-    jr2d_p r2d = ctx->r2d;
-    font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
-    font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
+    joy_r2d_p r2d = ctx->r2d;
+    joy_font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
+    joy_font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
 
     int w, h;
-    r2d_get_logical_presentation(r2d, &w, &h, NULL);
+    joy_r2d_get_logical_presentation(r2d, &w, &h, NULL);
 
-    r2d_set_color(r2d, 20, 20, 26, 120);
-    shape_draw_rectangle(r2d, "fill", jrect_t{ 0, 0, (float)w, (float)h });
+    joy_r2d_set_color(r2d, 20, 20, 26, 120);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", joy_rect_t{ 0, 0, (float)w, (float)h });
 
     const float s = (h > 0) ? ((float)h / 320.0f) : 1.0f;
     const float bw = 230.0f * s, bh = 86.0f * s;
     const float bx = ((float)w - bw) * 0.5f;
     const float by = ((float)h - bh) * 0.5f;
-    r2d_set_color(r2d, 248, 246, 240, 255);
-    shape_draw_rectangle(r2d, "fill", jrect_t{ bx, by, bw, bh });
-    r2d_set_color(r2d, 40, 40, 45, 255);
-    shape_draw_rectangle(r2d, "line", jrect_t{ bx, by, bw, bh });
+    joy_r2d_set_color(r2d, 248, 246, 240, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", joy_rect_t{ bx, by, bw, bh });
+    joy_r2d_set_color(r2d, 40, 40, 45, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "line", joy_rect_t{ bx, by, bw, bh });
 
     const char* title = "此关正在制作中";
     int tc_n = 0;
     for (const unsigned char* p = (const unsigned char*)title; *p; ++p)
         if ((*p & 0xC0) != 0x80) tc_n++;
-    jcolor_t title_c = { 200, 60, 50, 255 };
-    jtext_printx(r2d, font24, title, (int)strlen(title), title_c,
+    joy_color_t title_c = { 200, 60, 50, 255 };
+    joy_r2d_text_printx(r2d, font24, title, (int)strlen(title), title_c,
                  bx + (bw - tc_n * 24.0f * s) * 0.5f, by + 22.0f * s);
 
     const char* sub = "请改选其他关卡，或稍后再来";
     int sc_n = 0;
     for (const unsigned char* p = (const unsigned char*)sub; *p; ++p)
         if ((*p & 0xC0) != 0x80) sc_n++;
-    jcolor_t sub_c = { 110, 110, 118, 255 };
-    jtext_printx(r2d, font12, sub, (int)strlen(sub), sub_c,
+    joy_color_t sub_c = { 110, 110, 118, 255 };
+    joy_r2d_text_printx(r2d, font12, sub, (int)strlen(sub), sub_c,
                  bx + (bw - sc_n * 12.0f * s) * 0.5f, by + 56.0f * s);
 }
 
@@ -330,8 +331,8 @@ LevelSelectScene::LevelSelectScene(Context* ctx, GameModeKind mode) : Scene(ctx,
 void LevelSelectScene::Load() {
     auto* self = this;
     Context* ctx = self->ctx();
-    log_info("[level select scene] start...");
-    font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
+    joy_core_log_info("[level select scene] start...");
+    joy_font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
 
     self->selected = (ctx->selected_level >= 1 && ctx->selected_level <= LEVEL_META_COUNT)
         ? ctx->selected_level - 1 : 0;
@@ -370,16 +371,16 @@ void LevelSelectScene::Load() {
     presentation_set_adaptive(ctx->r2d);
 
     int lw = 0, lh = 0;
-    r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
+    joy_r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
     const float s = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
     const float LW = (float)((lw > 0) ? lw : DISPLAY_WINDOW_W);
     const float LH = (float)((lh > 0) ? lh : DISPLAY_DESIGN_H);
 
     // 左侧列表：scrollview 纵向滚动（定宽靠左）
-    self->level_view = scrollview_create(ctx->r2d, 0.0f, 0.0f, 1.0f, 1.0f);
+    self->level_view = joy_r2d_scrollview_create(ctx->r2d, 0.0f, 0.0f, 1.0f, 1.0f);
     if (self->level_view) {
-        scrollview_set_view_px(self->level_view, LIST_X * s, LIST_Y * s, LIST_W * s, LIST_H * s);
-        scrollview_set_content(self->level_view, LIST_W * s,
+        joy_r2d_scrollview_set_view_px(self->level_view, LIST_X * s, LIST_Y * s, LIST_W * s, LIST_H * s);
+        joy_r2d_scrollview_set_content(self->level_view, LIST_W * s,
                 (LIST_Y + 4.0f + (float)LEVEL_META_COUNT * ROW_SPACING + 8.0f) * s);
     }
 
@@ -389,7 +390,7 @@ void LevelSelectScene::Load() {
         self->level_base_y[i] = LIST_Y + 4.0f + (float)i * ROW_SPACING;
         const float cx_px = (LIST_X + LIST_W * 0.5f) * s;
         const float cy_px = (self->level_base_y[i] + ROW_H * 0.5f) * s;
-        self->btn_levels[i] = button_create(ctx->r2d,
+        self->btn_levels[i] = joy_r2d_button_create(ctx->r2d,
                 cx_px / LW, cy_px / LH,
                 (LIST_W * s) / LW, (ROW_H * s) / LH);
         UIStyle::applyPaperButton(self->btn_levels[i]);
@@ -400,24 +401,24 @@ void LevelSelectScene::Load() {
     {
         const float cx_px = LW - 82.0f * s;
         const float cy_px = 286.0f * s;
-        self->btn_confirm = button_create(ctx->r2d,
+        self->btn_confirm = joy_r2d_button_create(ctx->r2d,
                 cx_px / LW, cy_px / LH,
                 (116.0f * s) / LW, (32.0f * s) / LH);
         UIStyle::applyPaperButton(self->btn_confirm);
-        button_set_text_offset(self->btn_confirm, 0, 2.0f);
-        button_set_textx(self->btn_confirm, font24, "开始", (int)strlen("开始"), { 0, 0, 0, 255 });
+        joy_r2d_button_set_text_offset(self->btn_confirm, 0, 2.0f);
+        joy_r2d_button_set_textx(self->btn_confirm, font24, "开始", (int)strlen("开始"), { 0, 0, 0, 255 });
     }
 
     // 左下「返回」：锚定面板左边界（宽屏不变；设计稿下等于 232+48）
     {
         const float cx_px = 280.0f * s;
         const float cy_px = 286.0f * s;
-        self->btn_back = button_create(ctx->r2d,
+        self->btn_back = joy_r2d_button_create(ctx->r2d,
                 cx_px / LW, cy_px / LH,
                 (96.0f * s) / LW, (32.0f * s) / LH);
         UIStyle::applyPaperButton(self->btn_back);
-        button_set_text_offset(self->btn_back, 0, 2.0f);
-        button_set_textx(self->btn_back, font24, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
+        joy_r2d_button_set_text_offset(self->btn_back, 0, 2.0f);
+        joy_r2d_button_set_textx(self->btn_back, font24, "返回", (int)strlen("返回"), { 0, 0, 0, 255 });
     }
 }
 
@@ -428,12 +429,12 @@ void LevelSelectScene::HandleUiEvent(const void* e) {
     // "此关正在制作中"提示为模态：任意按键/点击关闭
     if (self->tip_active) {
         if (ev->type == SDL_EVENT_KEY_DOWN) { self->tip_active = false; return; }
-        jevent_callbacks_t tcbs = {};
+        joy_event_callbacks_t tcbs = {};
         tcbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
             (void)x; (void)y; (void)btn;
             ((LevelSelectScene*)arg)->tip_active = false;
         };
-        dispatch_event(tcbs, e, self);
+        joy_core_dispatch_event(tcbs, e, self);
         return;
     }
 
@@ -466,9 +467,9 @@ void LevelSelectScene::HandleUiEvent(const void* e) {
         }
     }
 
-    if (self->level_view && scrollview_process_event(self->level_view, e)) return;
+    if (self->level_view && joy_r2d_scrollview_process_event(self->level_view, e)) return;
 
-    jevent_callbacks_t cbs = {};
+    joy_event_callbacks_t cbs = {};
     cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
         (void)btn;
         LevelSelectScene* self = (LevelSelectScene*)arg;
@@ -478,7 +479,7 @@ void LevelSelectScene::HandleUiEvent(const void* e) {
         self->press_x_ = x;
         self->press_y_ = y;
         for (int i = 0; i < LEVEL_META_COUNT; i++) {
-            if (self->btn_levels[i] && button_is_hovered(self->btn_levels[i], x, y)) {
+            if (self->btn_levels[i] && joy_r2d_button_is_hovered(self->btn_levels[i], x, y)) {
                 self->press_row_ = i;
                 break;
             }
@@ -501,72 +502,72 @@ void LevelSelectScene::HandleUiEvent(const void* e) {
         // 拖动列表时 scrollview 已把松手事件消费掉，这里不会执行；
         // 能走到这里说明是点击，且松手仍在按下的那一行上才选中。
         if (self->press_row_ >= 0) {
-            button_p b = self->btn_levels[self->press_row_];
-            if (b && button_is_hovered(b, x, y)) {
+            joy_button_p b = self->btn_levels[self->press_row_];
+            if (b && joy_r2d_button_is_hovered(b, x, y)) {
                 UiSfx::Get().play(UiSfx::kClick);
                 self->selected = self->press_row_;
             }
         }
         self->press_row_ = -1;
         for (int i = 0; i < LEVEL_META_COUNT; i++)
-            if (self->btn_levels[i]) button_set_pressed(self->btn_levels[i], false);
-        if (self->btn_confirm) button_set_pressed(self->btn_confirm, false);
-        if (self->btn_back)    button_set_pressed(self->btn_back, false);
+            if (self->btn_levels[i]) joy_r2d_button_set_pressed(self->btn_levels[i], false);
+        if (self->btn_confirm) joy_r2d_button_set_pressed(self->btn_confirm, false);
+        if (self->btn_back)    joy_r2d_button_set_pressed(self->btn_back, false);
     };
     cbs.on_mousemoved = [](float x, float y, float dx, float dy, void* arg) {
         (void)dx; (void)dy;
         LevelSelectScene* self = (LevelSelectScene*)arg;
         self->hovered_ = -1;
         for (int i = 0; i < LEVEL_META_COUNT; i++)
-            if (self->btn_levels[i] && button_is_hovered(self->btn_levels[i], x, y))
+            if (self->btn_levels[i] && joy_r2d_button_is_hovered(self->btn_levels[i], x, y))
                 self->hovered_ = i;
-        if (self->btn_confirm) button_is_hovered(self->btn_confirm, x, y);
-        if (self->btn_back)    button_is_hovered(self->btn_back, x, y);
+        if (self->btn_confirm) joy_r2d_button_is_hovered(self->btn_confirm, x, y);
+        if (self->btn_back)    joy_r2d_button_is_hovered(self->btn_back, x, y);
     };
-    dispatch_event(cbs, e, self);
+    joy_core_dispatch_event(cbs, e, self);
 }
 
 void LevelSelectScene::Render() {
     auto* self = this;
     Context* ctx = self->ctx();
-    jr2d_p r2d = ctx->r2d;
-    font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
-    font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
+    joy_r2d_p r2d = ctx->r2d;
+    joy_font_p font24 = AssetManager::GetInstance()->GetSimheiFont24();
+    joy_font_p font12 = AssetManager::GetInstance()->GetSimheiFont12();
 
     int w, h;
-    r2d_get_logical_presentation(r2d, &w, &h, NULL);
+    joy_r2d_get_logical_presentation(r2d, &w, &h, NULL);
 
     // 米色纸底
-    r2d_set_color(r2d, 238, 234, 226, 255);
-    shape_draw_rectangle(r2d, "fill", { 0, 0, (float)w, (float)h });
+    joy_r2d_set_color(r2d, 238, 234, 226, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", { 0, 0, (float)w, (float)h });
 
     const float s = (h > 0) ? ((float)h / 320.0f) : 1.0f;
 
     // 顶部墨色标题带
-    r2d_set_color(r2d, 40, 40, 48, 255);
-    shape_draw_rectangle(r2d, "fill", { 0, 0, (float)w, BAND_H * s });
-    jtext_printx(r2d, font24, "选择关卡", (int)strlen("选择关卡"),
+    joy_r2d_set_color(r2d, 40, 40, 48, 255);
+    joy_r2d_shape_draw_rectangle(r2d, "fill", { 0, 0, (float)w, BAND_H * s });
+    joy_r2d_text_printx(r2d, font24, "选择关卡", (int)strlen("选择关卡"),
                  { 245, 243, 237, 255 }, 16.0f * s, 6.0f * s);
 
     char chBuf[64];
     snprintf(chBuf, sizeof(chBuf), "当前角色：%s",
              g_characterCatalog.get(self->ctx()->selected_char_id).name.c_str());
     int cw = 0;
-    if (jtext_measurex(r2d, font12, chBuf, (int)strlen(chBuf), { 200, 200, 208, 255 }, &cw, NULL))
-        jtext_printx(r2d, font12, chBuf, (int)strlen(chBuf), { 200, 200, 208, 255 },
+    if (joy_r2d_text_measurex(r2d, font12, chBuf, (int)strlen(chBuf), { 200, 200, 208, 255 }, &cw, NULL))
+        joy_r2d_text_printx(r2d, font12, chBuf, (int)strlen(chBuf), { 200, 200, 208, 255 },
                      (float)w - (float)cw - 16.0f * s, 11.0f * s);
 
     // 左侧列表（裁剪 + 滚动条）
     self->apply_level_scroll();
-    if (self->level_view) scrollview_begin(self->level_view);
+    if (self->level_view) joy_r2d_scrollview_begin(self->level_view);
     for (int i = 0; i < LEVEL_META_COUNT; i++) draw_level(i);
-    if (self->level_view) scrollview_end(self->level_view);
+    if (self->level_view) joy_r2d_scrollview_end(self->level_view);
 
     // 右侧详情面板（不滚动）
     self->draw_preview_panel(ctx, self->selected);
 
-    if (self->btn_confirm) button_draw(self->btn_confirm);
-    if (self->btn_back)    button_draw(self->btn_back);
+    if (self->btn_confirm) joy_r2d_button_draw(self->btn_confirm);
+    if (self->btn_back)    joy_r2d_button_draw(self->btn_back);
 
     if (self->tip_active) self->draw_tip();
 }
@@ -574,8 +575,8 @@ void LevelSelectScene::Render() {
 void LevelSelectScene::Destroy() {
     auto* self = this;
     for (int i = 0; i < LEVEL_META_COUNT; i++)
-        if (self->btn_levels[i]) { button_destroy(self->btn_levels[i]); self->btn_levels[i] = NULL; }
-    if (self->level_view) { scrollview_destroy(self->level_view); self->level_view = NULL; }
-    if (self->btn_confirm) { button_destroy(self->btn_confirm); self->btn_confirm = NULL; }
-    if (self->btn_back)    { button_destroy(self->btn_back);    self->btn_back = NULL; }
+        if (self->btn_levels[i]) { joy_r2d_button_destroy(self->btn_levels[i]); self->btn_levels[i] = NULL; }
+    if (self->level_view) { joy_r2d_scrollview_destroy(self->level_view); self->level_view = NULL; }
+    if (self->btn_confirm) { joy_r2d_button_destroy(self->btn_confirm); self->btn_confirm = NULL; }
+    if (self->btn_back)    { joy_r2d_button_destroy(self->btn_back);    self->btn_back = NULL; }
 }

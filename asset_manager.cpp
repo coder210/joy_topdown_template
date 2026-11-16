@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #include "asset_manager.h"
 #include "config/display_config.h"
 #include <joy/external/cJSON.h>
@@ -35,29 +36,29 @@ AssetManager::AssetManager()
 	// 字体：按 ID 查表取路径（路径不再硬编码在本文件）
 	const char* font_path = GetResourcePath(kCatFonts, "simhei");
 	// 字号由 config/display_config.h 的 DISPLAY_FONT_* 决定（随 DISPLAY_SCALE 推导）。
-	simhei_font24_ = font_create(font_path, DISPLAY_FONT_MAIN);
-	simhei_font12_ = font_create(font_path, DISPLAY_FONT_SMALL);   // 注意基准不是 12
-	simhei_font28_ = font_create(font_path, DISPLAY_FONT_LARGE);
+	simhei_font24_ = joy_r2d_font_create(font_path, DISPLAY_FONT_MAIN);
+	simhei_font12_ = joy_r2d_font_create(font_path, DISPLAY_FONT_SMALL);   // 注意基准不是 12
+	simhei_font28_ = joy_r2d_font_create(font_path, DISPLAY_FONT_LARGE);
 }
 
 AssetManager::~AssetManager()
 {
 	if (simhei_font24_)
-		font_destroy(simhei_font24_);
+		joy_r2d_font_destroy(simhei_font24_);
 	if (simhei_font12_)
-		font_destroy(simhei_font12_);
+		joy_r2d_font_destroy(simhei_font12_);
 	if (simhei_font28_)
-		font_destroy(simhei_font28_);
+		joy_r2d_font_destroy(simhei_font28_);
 	ClearTexCache();
 }
 
 void AssetManager::load_resources_json()
 {
-	// 走 joy 的 utils_read_file（SDL_LoadFile）：安卓资源在 APK 内，fopen 读不到
+	// 走 joy 的 joy_core_utils_read_file（SDL_LoadFile）：安卓资源在 APK 内，fopen 读不到
 	size_t file_sz = 0;
-	char* file_data = utils_read_file(RESOURCES_JSON_PATH, &file_sz);
+	char* file_data = joy_core_utils_read_file(RESOURCES_JSON_PATH, &file_sz);
 	if (!file_data) {
-		log_info("[asset] %s not found, using built-in defaults", RESOURCES_JSON_PATH);
+		joy_core_log_info("[asset] %s not found, using built-in defaults", RESOURCES_JSON_PATH);
 		return;
 	}
 	std::string text(file_data, file_sz);
@@ -65,7 +66,7 @@ void AssetManager::load_resources_json()
 
 	cJSON* root = cJSON_Parse(text.c_str());
 	if (!root) {
-		log_error("[asset] parse %s failed, using built-in defaults", RESOURCES_JSON_PATH);
+		joy_core_log_error("[asset] parse %s failed, using built-in defaults", RESOURCES_JSON_PATH);
 		return;
 	}
 
@@ -80,7 +81,7 @@ void AssetManager::load_resources_json()
 		}
 	}
 	cJSON_Delete(root);
-	log_info("[asset] loaded %s: %d entries", RESOURCES_JSON_PATH, (int)resource_paths_.size());
+	joy_core_log_info("[asset] loaded %s: %d entries", RESOURCES_JSON_PATH, (int)resource_paths_.size());
 }
 
 void AssetManager::Init()
@@ -111,17 +112,17 @@ const char* AssetManager::GetResourcePath(const char* category, const char* id) 
 	return (it == resource_paths_.end()) ? nullptr : it->second.c_str();
 }
 
-font_p AssetManager::GetSimheiFont24()
+joy_font_p AssetManager::GetSimheiFont24()
 {
 	return simhei_font24_;
 }
 
-font_p AssetManager::GetSimheiFont12()
+joy_font_p AssetManager::GetSimheiFont12()
 {
 	return simhei_font12_;
 }
 
-font_p AssetManager::GetSimheiFont28()
+joy_font_p AssetManager::GetSimheiFont28()
 {
 	return simhei_font28_;
 }
@@ -130,18 +131,18 @@ font_p AssetManager::GetSimheiFont28()
 void AssetManager::ClearTexCache()
 {
 	for (auto& kv : tex_cache_)
-		if (kv.second) image_destroy(kv.second);
+		if (kv.second) joy_r2d_image_destroy(kv.second);
 	tex_cache_.clear();
 }
 
-image_p AssetManager::GetImage(jr2d_p r2d, const char* path)
+joy_image_p AssetManager::GetImage(joy_r2d_p r2d, const char* path)
 {
 	if (!path || !path[0]) return nullptr;
 	std::string key(path);
 	auto it = tex_cache_.find(key);
 	if (it != tex_cache_.end()) return it->second;
-	image_p img = image_create(r2d, path);   // 纹理依赖 r2d，调用方须已初始化渲染上下文
-	if (!img) log_error("[asset] image load failed: %s", path);
+	joy_image_p img = joy_r2d_image_create(r2d, path);   // 纹理依赖 r2d，调用方须已初始化渲染上下文
+	if (!img) joy_core_log_error("[asset] image load failed: %s", path);
 	tex_cache_[key] = img;   // 失败也缓存，避免每帧重试同一坏路径
 	return img;
 }

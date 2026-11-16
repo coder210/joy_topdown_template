@@ -1,7 +1,20 @@
 # ============================================================
+# joy_topdown_template —— 薄宿主 + cpp 脚本插件（native plugin）
+#
+#   joy_topdown_template(.exe)  宿主：只链接 SDL3，负责 SDL 主回调、加载插件、
+#                               转发事件与每帧驱动（host.cpp，无游戏逻辑）
+#   game(.dll/.so/.dylib)       游戏插件（cpp 脚本）：窗口/场景/物理/网络/绘制
+#                               全在这里，自身链接 joy::all（引擎只有这一份）
+#
+# 静态形态（GAME_STATIC，iOS / wasm / Android 默认开启）把游戏插件直接编进
+# 宿主，链接期解析 joy_game_get_hooks()，避开代码签名 / 动态链接配置。
+#
+# 与 joy examples/cpp 的差别：官方示例的游戏库只链接 JoyApi 函数指针表，因此
+# 只能用 IDL 里 status:on 的 API；本模板是完整游戏，用到日志 / 文件 IO / 控件 /
+# msgpack / tilemap 等 vtable 未覆盖能力，所以游戏库自链接 joy::all。
+#
 # 独立仓库模式：本文件直接作为仓库根 CMakeLists 使用（拆仓后）。
-# 单仓模式（被上层根 CMake add_subdirectory）下整段跳过，行为不变。
-# 引擎以 submodule 形式位于 third_party/joy（引擎源码在仓库根，另含 SDL/ msgpack/ spine/）。
+# 单仓模式（被上层根 CMake add_subdirectory）下跳过顶层块，行为不变。
 # ============================================================
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     cmake_minimum_required(VERSION 3.16)
@@ -26,32 +39,27 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     endif()
 
+    # 第三方源码：引擎以 submodule 形式位于 third_party/joy（含 SDL / msgpack / spine）
     set(JOY_REPO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy")
     add_subdirectory("${JOY_REPO_DIR}/msgpack" "${CMAKE_BINARY_DIR}/msgpack")
     add_subdirectory("${JOY_REPO_DIR}/spine"   "${CMAKE_BINARY_DIR}/spine")
     add_subdirectory("${JOY_REPO_DIR}/SDL"     "${CMAKE_BINARY_DIR}/SDL")
+
+    enable_testing()
 endif()
 
-# 可执行文件名（单二进制：单机/Host/客户端/独立服务端，运行时 --mode 切换）
+# 引擎注入入口：joy::all 是 INTERFACE 源码注入 target，谁链接它、joy 的 .c 就
+# 编进谁。只有游戏插件链接它；宿主不链接，否则同一进程会有两套引擎状态和
+# 两套 joy_obj 句柄表。
+if(NOT TARGET joy_all)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy"
+                     "${CMAKE_BINARY_DIR}/joy")
+endif()
+
+# 可执行文件名（宿主：单机/Host/客户端/独立服务端，运行时 --mode 切换）
 set(EXECUTABLE_NAME "joy_topdown_template")
-message(STATUS "EXECUTABLE_NAME = '${EXECUTABLE_NAME}'")
-
-
-# 如果是 Android，必须命名为 main
-if (ANDROID)
-    set(MOBILE_ASSETS_DIR "${MOBILE_MAIN_DIR}/assets")
-    message(STATUS "MOBILE_ASSETS_DIR = '${MOBILE_ASSETS_DIR}'")
-    set(EXECUTABLE_NAME main)
-    add_library(${EXECUTABLE_NAME} SHARED)
-    # 移动端（触屏模拟成鼠标）下，禁止用触屏位置覆盖鼠标瞄准，避免无鼠标时瞄准错乱
-    target_compile_definitions(${EXECUTABLE_NAME} PRIVATE MOBILE_TOUCH)
-else()
-    add_executable(${EXECUTABLE_NAME})
-    # 资产已从 assets/joy_topdown_template/ 上移到 assets/ 根目录（audio/、levels/ 等），
-    # 不再带与可执行文件同名的命名空间前缀，故 Linux 无后缀 exe 与资产目录撞名的问题
-    # 已根治，无需再把 exe 塞进同名子目录。Emscripten(Web) 同上，产物直接落在
-    # build/Release/<exename>.html（web-build.yml 按此查找）。
-endif()
+set(GAME_TARGET "game")
+message(STATUS "EXECUTABLE_NAME = '${EXECUTABLE_NAME}', game plugin = '${GAME_TARGET}'")
 
 # ---- 显示配置：唯一配置点 ----
 # DISPLAY_SCALE=1 → 480x320（设计基准）；2 → 960x640。
@@ -65,7 +73,7 @@ math(EXPR DISPLAY_FONT_MAIN  "24  * ${DISPLAY_SCALE}")
 math(EXPR DISPLAY_FONT_SMALL "14  * ${DISPLAY_SCALE}")
 math(EXPR DISPLAY_FONT_LARGE "28  * ${DISPLAY_SCALE}")
 
-target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
+set(DISPLAY_DEFS
     PIXELS_PER_METER=${DISPLAY_PPM}
     DISPLAY_WINDOW_W=${DISPLAY_W}
     DISPLAY_WINDOW_H=${DISPLAY_H}
@@ -75,15 +83,30 @@ target_compile_definitions(${EXECUTABLE_NAME} PRIVATE
     DISPLAY_FONT_LARGE=${DISPLAY_FONT_LARGE}
 )
 
+# ---- 构建形态：iOS / wasm / Android 默认静态（插件编进宿主）----
+set(_game_static_default OFF)
+if(IOS OR EMSCRIPTEN OR ANDROID)
+    set(_game_static_default ON)
+endif()
+option(JOY_GAME_STATIC
+       "把游戏插件编进宿主（iOS / wasm / Android 默认开启）" ${_game_static_default})
+
+# ---- 宿主源码（不含任何游戏逻辑）----
+set(HOST_FILES
+    host.cpp
+    game_hooks.h
+)
+
+# ---- 游戏插件源码（cpp 脚本）----
 # 源文件与头文件显式列出（不依赖 GLOB）：重命名/删除某文件时若漏改此列表，
-# configure 阶段即报错，不会出现"忘了重新 cmake 导致 vcxproj 仍指向已删文件"的静默失败；
-# 头文件列入后也会出现在 IDE 工程树中（systems 等纯头文件实现亦可浏览）。
-# 新增文件时请在此手动追加。entt.hpp 为第三方大文件，不列入以免 IDE 卡顿。
-set(PROJECT_FILES
+# configure 阶段即报错，不会出现"忘了重新 cmake 导致 vcxproj 仍指向已删文件"
+# 的静默失败；头文件列入后也会出现在 IDE 工程树中。entt.hpp 为第三方大文件，
+# 不列入以免 IDE 卡顿。
+set(GAME_FILES
     # ---- config（显示配置：唯一事实源）----
     config/display_config.h
-    # ---- 根目录 ----
-    main.cpp
+    # ---- 根部 ----
+    game.cpp
     asset_manager.cpp
     settings.cpp
     asset_manager.h
@@ -93,6 +116,7 @@ set(PROJECT_FILES
     profiler.h
     protocol.h
     settings.h
+    ui_sfx.h
     ui_style.h
     # ---- components（实体组件）----
     components/action_state_component.h
@@ -103,6 +127,7 @@ set(PROJECT_FILES
     components/enemy_component.h
     components/health_component.h
     components/id_component.h
+    components/knockback_component.h
     components/local_only_component.h
     components/logic_position_component.h
     components/logic_rect_component.h
@@ -145,15 +170,18 @@ set(PROJECT_FILES
     passes/drawing_collision_debug_pass.h
     passes/drawing_map_pass.h
     passes/drawing_minimap_pass.h
+    passes/draw_bullet_pass.h
     passes/draw_enemy_pass.h
     passes/draw_fps_pass.h
     passes/draw_player_pass.h
     passes/enemy_counter_hud_pass.h
     passes/fog_pass_2d.h
     passes/frame_display_pass.h
+    passes/hpbar.h
     passes/interpolate_pass.h
     passes/player_status_hud_pass.h
     passes/render_math.h
+    passes/sprite_anim.h
     # ---- scenes ----
     scenes/character_select_scene.cpp
     scenes/game_scene.cpp
@@ -184,51 +212,81 @@ set(PROJECT_FILES
     systems/map_def.cpp
     systems/weapon_catalog.cpp
     systems/ai_system.h
+    systems/bullet_system.h
     systems/character_catalog.h
-    systems/weapon_catalog.h
     systems/cleanup_system.h
     systems/collision_system.h
+    systems/enemy_maintain_system.h
     systems/input_consume_input_system.h
     systems/input_consume_join_system.h
     systems/input_consume_leave_system.h
+    systems/knockback_system.h
     systems/map_def.h
     systems/map_spawn_system.h
     systems/melee_attack_system.h
-    systems/player_shoot_system.h
-    systems/bullet_system.h
     systems/movement_system.h
-    systems/separation_system.h
     systems/pathfinding_system.h
     systems/player_death_system.h
+    systems/player_shoot_system.h
+    systems/separation_system.h
     systems/snapshot_system.h
     systems/spawn_def.h
     systems/spawn_enemy_system.h
     systems/state_checksum.h
+    systems/weapon_catalog.h
 )
 
-# 添加源文件到目标
-target_sources(${EXECUTABLE_NAME}
-    PRIVATE
-        ${PROJECT_FILES}
-        iosLaunchScreen.storyboard   # 直接使用文件名，已在当前目录
-)
-
-# Apple 平台额外图标
-if(APPLE)
-    # 核心已不含 Lua，原先的 -DLUA_USE_IOS 不再需要
-    target_sources(${EXECUTABLE_NAME} PRIVATE logo.png)
+# ------------------- 目标组织 -------------------
+if(ANDROID)
+    # SDL3 Android 由 SDLActivity dlopen libmain.so 再 dlsym("SDL_main")，不是
+    # 独立可执行文件；插件在 Android 默认静态编入，只产出一个 libmain.so。
+    add_library(${EXECUTABLE_NAME} SHARED ${HOST_FILES})
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES OUTPUT_NAME "main")
+else()
+    add_executable(${EXECUTABLE_NAME} ${HOST_FILES})
 endif()
 
-# 设置语言标准：编译标准保持 C++17（entt.hpp 等第三方库依赖 C++17 特性，无法降级）。
-# 但项目自身业务代码约定只用 C++11 语法与库（见 map_def/protocol 等文件），便于阅读维护。
+# 宿主只依赖 SDL（主回调 / 事件 / 加载器）
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE SDL3::SDL3)
+target_include_directories(${EXECUTABLE_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+
+if(JOY_GAME_STATIC)
+    target_sources(${EXECUTABLE_NAME} PRIVATE ${GAME_FILES})
+    target_compile_definitions(${EXECUTABLE_NAME} PRIVATE GAME_STATIC=1 ${DISPLAY_DEFS})
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE joy::all)
+    set(GAME_DEP_TARGET ${EXECUTABLE_NAME})
+else()
+    add_library(${GAME_TARGET} SHARED ${GAME_FILES})
+    set_target_properties(${GAME_TARGET} PROPERTIES OUTPUT_NAME "game")
+    target_link_libraries(${GAME_TARGET} PRIVATE joy::all)
+    target_compile_definitions(${GAME_TARGET} PRIVATE ${DISPLAY_DEFS})
+    target_include_directories(${GAME_TARGET} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    # 插件与宿主演进绑定：构建宿主时先构建插件，产物同目录（见输出目录设置）
+    add_dependencies(${EXECUTABLE_NAME} ${GAME_TARGET})
+    set(GAME_DEP_TARGET ${GAME_TARGET})
+endif()
+
+# 注入的 joy 引擎源码在 IDE 里收进 joy\... 筛选器（须在定义 target 的目录调用）
+joy_ide_source_groups()
+
+# 设置语言标准：保持 C++17（entt.hpp 等第三方库依赖 C++17 特性，无法降级）。
 set_target_properties(${EXECUTABLE_NAME} PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
 )
+if(TARGET ${GAME_TARGET})
+    set_target_properties(${GAME_TARGET} PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+    )
+endif()
 
 # MSVC 下源文件按 UTF-8 解析（项目文件为 UTF-8 无 BOM，避免 GBK 代码页误读中文注释吞行）
 if(MSVC)
     target_compile_options(${EXECUTABLE_NAME} PRIVATE /utf-8)
+    if(TARGET ${GAME_TARGET})
+        target_compile_options(${GAME_TARGET} PRIVATE /utf-8)
+    endif()
 endif()
 
 # Web 平台输出 HTML
@@ -236,54 +294,8 @@ if(EMSCRIPTEN)
     set(CMAKE_EXECUTABLE_SUFFIX ".html" CACHE INTERNAL "")
 endif()
 
-# 引入 joy 框架源码（纯文件引入，不再构建独立库 target）
-# 单仓：<仓库根>/joy_add.cmake；拆仓后：third_party/joy/joy_add.cmake
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/joy_add.cmake")
-    include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/joy/joy_add.cmake")
-else()
-    include(${CMAKE_SOURCE_DIR}/joy_add.cmake)
-endif()
-# ---- C# (Mono) 脚本运行时 ----
-# 默认探测 Windows 上 Mono 的安装位置（winget install Mono.Mono）；
-# 其它平台/自定义安装用 -DMONO_INCLUDE_DIR=... -DMONO_LIBRARIES=... 覆盖。
-if(WIN32 AND NOT DEFINED MONO_INCLUDE_DIR)
-    foreach(_mono_root "C:/Program Files/Mono" "C:/Program Files (x86)/Mono")
-        if(EXISTS "${_mono_root}/include/mono-2.0/mono/jit/jit.h")
-            set(MONO_INCLUDE_DIR "${_mono_root}/include/mono-2.0" CACHE PATH "Mono 头文件目录")
-            set(MONO_LIBRARIES   "${_mono_root}/lib/mono-2.0-sgen.lib" CACHE FILEPATH "Mono 导入库")
-            break()
-        endif()
-    endforeach()
-endif()
-
-# C# 脚本后端只在桌面平台默认启用；Android/iOS/WASM 的 Mono 集成方案不同（见 README/规划），
-# 暂不启用，避免移动端构建因找不到桌面 Mono 而失败。
-set(_joy_script_modules "")
-if(NOT ANDROID AND NOT IOS AND NOT EMSCRIPTEN)
-    set(_joy_script_modules csharp)
-endif()
-
-joy_add_sources(${EXECUTABLE_NAME} MODULES ${_joy_script_modules})
-
-# Mono 运行时 DLL 随构建产物复制（Windows）。BCL（mscorlib 等）由 Mono 安装目录提供；
-# 发行时需连同 Mono 运行时一起打包，或要求目标机安装 Mono。
-if(WIN32 AND MONO_INCLUDE_DIR AND MONO_LIBRARIES)
-    get_filename_component(_mono_root "${MONO_INCLUDE_DIR}/../.." ABSOLUTE)
-    if(EXISTS "${_mono_root}/bin/mono-2.0-sgen.dll")
-        add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${_mono_root}/bin/mono-2.0-sgen.dll"
-                    "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>"
-            COMMENT "Copying mono-2.0-sgen.dll to output dir")
-    endif()
-endif()
-
-# 添加项目自身目录为头文件搜索路径
-target_include_directories(${EXECUTABLE_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-
 # ------------------- 资产处理 -------------------
 # 资产目录位于根目录的 assets/，使用 PROJECT_SOURCE_DIR 定位
-# CMAKE_CURRENT_SOURCE_DIR换成项目目录
 set(ASSETS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
 # 递归搜索资产文件（排除版本控制目录）
@@ -296,16 +308,12 @@ foreach(file ${ALL_ASSET_FILES})
     endif()
 endforeach()
 
-# 根据不同平台处理资产
 if (APPLE)
     # macOS/iOS: 放入 Resources 目录
-    # 资产已上移到 assets/ 根目录（audio/、levels/ 等），不再带 joy_topdown_template/
-    # 命名空间前缀，故资源目录名绝不会等于同名可执行文件，扁平 Apple bundle
-    # (iOS/visionOS/tvOS) 也不会再撞名（原 ld: EISDIR 已根治）。
     macro(add_resource FILE)
         file(RELATIVE_PATH relpath "${ASSETS_ROOT}" "${FILE}")
         get_filename_component(dir "${relpath}" DIRECTORY)
-        target_sources(${EXECUTABLE_NAME} PRIVATE "${FILE}")
+        target_sources(${GAME_DEP_TARGET} PRIVATE "${FILE}")
         set_property(SOURCE "${FILE}" PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${dir}")
     endmacro()
     foreach(asset_file ${ASSET_FILES})
@@ -318,9 +326,7 @@ elseif(EMSCRIPTEN)
     foreach(asset_file ${ASSET_FILES})
         list(APPEND PRELOAD_FLAGS "--preload-file \"${ASSETS_ROOT}/${asset_file}@${asset_file}\"")
     endforeach()
-    message(STATUS "PRELOAD_FLAGS: ${PRELOAD_FLAGS}")
-    # Emscripten WebSocket 支持（使用浏览器原生 WebSocket API）
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE
         ${PRELOAD_FLAGS}
     )
 else()
@@ -341,7 +347,7 @@ else()
             # 其他桌面平台：复制到可执行文件同目录
             set(outname "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/${filename}")
         endif()
-        # 目标目录在部分 CMake 版本（如 3.22）下 copy_if_different 不会自动创建，
+        # 目标目录在部分 CMake 版本下 copy_if_different 不会自动创建，
         # 全新构建时父目录尚不存在会导致 copy 失败；显式 mkdir 保证跨版本一致。
         get_filename_component(_asset_rel_dir "${filename}" DIRECTORY)
         if (ANDROID)
@@ -358,7 +364,6 @@ else()
     # 关卡目录先清空再拷贝：copy_if_different 只增不删，若只靠下面的 foreach 拷贝，
     # 从 assets 删掉的旧关卡(levelN.tmj)会留在运行目录变成"幽灵关卡"——游戏会当它已制作并加载
     # （level_map_available 查的就是运行路径），导致选关页显示可进、进游戏却用到过期地图。
-    # 这里只清 levels/，不影响其他资产；随后 foreach 会立刻把现行关卡文件拷回来。
     add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E remove_directory
                 "${CMAKE_BINARY_DIR}/$<CONFIGURATION>/levels"
@@ -366,7 +371,6 @@ else()
     )
 
     foreach(asset_file ${ASSET_FILES})
-        message(STATUS "Copying asset: ${asset_file}")
         copy_helper("${asset_file}")
     endforeach()
 endif()
@@ -388,11 +392,20 @@ set_target_properties(${EXECUTABLE_NAME} PROPERTIES
 )
 if(MSVC)
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES
-		VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
-	)
+        VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>"
+    )
 endif()
 # Visual Studio 启动项目设置（作用于当前目录）
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT "${EXECUTABLE_NAME}")
+
+# macOS .app：游戏插件要落在 Contents/MacOS 才能被宿主按相对路径加载
+if(APPLE AND NOT IOS AND TARGET ${GAME_TARGET})
+    add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:${GAME_TARGET}>"
+                "$<TARGET_BUNDLE_CONTENT_DIR:${EXECUTABLE_NAME}>/MacOS/$<TARGET_FILE_NAME:${GAME_TARGET}>"
+        COMMENT "Deploying game plugin into the macOS bundle")
+endif()
 
 # macOS 非 Xcode 生成器时的 bundle 修复（可选）
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin" AND NOT CMAKE_GENERATOR MATCHES "Xcode")
@@ -410,7 +423,17 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin" AND NOT CMAKE_GENERATOR MATCHES "Xcode")
 endif()
 
 # 源文件分组（便于 IDE 显示）
-source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/.." FILES ${PROJECT_FILES})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${HOST_FILES})
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${GAME_FILES})
+
+# ------------------- 冒烟用例：无显示器跑 N 帧，验证宿主+插件能起来 -------------------
+if(NOT ANDROID AND NOT EMSCRIPTEN AND NOT CMAKE_CROSSCOMPILING)
+    add_test(NAME template_smoke
+             COMMAND ${EXECUTABLE_NAME} --frames=120
+             WORKING_DIRECTORY "$<TARGET_FILE_DIR:${EXECUTABLE_NAME}>")
+    set_tests_properties(template_smoke PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_RENDER_DRIVER=software")
+endif()
 
 # 调试信息（可选）
 message(STATUS "Project current dir: ${CMAKE_CURRENT_LIST_DIR}")

@@ -14,9 +14,9 @@
 struct Context;
 
 // 定点数向下取整转 int（算术右移即 floor(x/2^32)，负数向负无穷），纯整数运算，帧同步确定性。
-static inline int fp_floor_to_int(fp_t x)
+static inline int fp_floor_to_int(joy_fp_t x)
 {
-    return (int)(x >> FP_FRACTIONAL_PLACES);
+    return (int)(x >> JOY_FP_FRACTIONAL_PLACES);
 }
 
 /* ============================================================
@@ -157,8 +157,8 @@ static void pathfinding_system(entt::registry& registry, Context* ctx, float /*d
 {
     // 【临时测试-测完务必还原】步长置 0 → 敌人完全静止，当固定靶子用（便于观察箭的碰撞判定）。
     // 还原为：
-    //   fp_t step = fp_mul(fp_from_float(2.5f), fp_from_float(game_runtime(ctx).FIXED_TIMESTEP));
-    fp_t step = fp_zero();
+    //   joy_fp_t step = fp_mul(fp_from_float(2.5f), fp_from_float(game_runtime(ctx).FIXED_TIMESTEP));
+    joy_fp_t step = fp_zero();
 
     auto view = registry.view<EnemyComponent, AIComponent, PathComponent,
                               LogicPositionComponent, ActionStateComponent>();
@@ -199,11 +199,11 @@ static void pathfinding_system(entt::registry& registry, Context* ctx, float /*d
             int idx = pc.path[pc.next_idx];
             int gx = idx % MAP_W;
             int gy = idx / MAP_W;
-            fp_t tx = fp_from_float((float)gx);
-            fp_t ty = fp_from_float((float)gy);
+            joy_fp_t tx = fp_from_float((float)gx);
+            joy_fp_t ty = fp_from_float((float)gy);
 
-            fp_t dx = fp_sub(tx, pos.x);
-            fp_t dy = fp_sub(ty, pos.y);
+            joy_fp_t dx = fp_sub(tx, pos.x);
+            joy_fp_t dy = fp_sub(ty, pos.y);
 
             // 到达当前路径点：对齐并推进
             if (fp_abs(dx) <= step && fp_abs(dy) <= step) {

@@ -29,11 +29,11 @@ public:
     void HandleUiEvent(const void* e) override;
 
 private:
-    button_p btn_create = NULL, btn_join = NULL, btn_refresh = NULL, btn_back = NULL;
-    button_p btn_direct_open = NULL;                 // 标题带右上角「直连」
-    button_p btn_connect = NULL, btn_cancel = NULL;  // 直连弹窗按钮
-    inputbox_p ip_input = NULL;
-    inputbox_p port_input = NULL;
+    joy_button_p btn_create = NULL, btn_join = NULL, btn_refresh = NULL, btn_back = NULL;
+    joy_button_p btn_direct_open = NULL;                 // 标题带右上角「直连」
+    joy_button_p btn_connect = NULL, btn_cancel = NULL;  // 直连弹窗按钮
+    joy_inputbox_p ip_input = NULL;
+    joy_inputbox_p port_input = NULL;
     bool direct_open_ = false;                       // 直连弹窗是否打开
     int selected_ = -1;
 

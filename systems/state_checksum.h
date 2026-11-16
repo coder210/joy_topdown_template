@@ -13,14 +13,14 @@
 struct ChecksumEntry
 {
         int id;
-        fp_t x, y;
+        joy_fp_t x, y;
 };
 
 // 计算玩家状态 MD5（hex 32 字符 + '\0' 写入 out，out 需 >= 33 字节）。
 // 公式（两端必须逐字节一致）：
 //   1. 按 id 升序排序
 //   2. 拼接 "%d:%lld:%lld,"（坐标按 long long 取整）
-//   3. utils_md5x
+//   3. joy_core_utils_md5x
 // 注意：此函数在"模拟本帧之前"调用，与服务端 collect_input 的时机一致。
 static inline void compute_players_md5(std::vector<ChecksumEntry>& entries, char* out, int out_cap)
 {
@@ -39,7 +39,7 @@ static inline void compute_players_md5(std::vector<ChecksumEntry>& entries, char
 
         if (out_cap <= 0) return;
         memset(out, 0, out_cap);
-        utils_md5x(s.c_str(), s.size(), out);
+        joy_core_utils_md5x(s.c_str(), s.size(), out);
 }
 
 // 严格版状态指纹：把"所有带 IdComponent + LogicPositionComponent 的实体"（玩家 + 敌人）

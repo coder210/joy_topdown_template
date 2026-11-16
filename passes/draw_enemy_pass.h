@@ -28,21 +28,21 @@ static const float  kEnemyDrawH   = (float)PIXELS_PER_METER;
 static const int   EHBAR_W   = (int)((float)PIXELS_PER_METER * 0.56f);   // 0.56 米
 static const int   EHBAR_H   = (int)((float)PIXELS_PER_METER * 0.16f);   // 0.16 米
 static const int   EHBAR_PAD = (int)((float)PIXELS_PER_METER * 0.02f);   // 0.02 米（外描边）
-static image_p s_ehpbar_track = NULL;
-static image_p s_ehpbar_fill  = NULL;
+static joy_image_p s_ehpbar_track = NULL;
+static joy_image_p s_ehpbar_fill  = NULL;
 
 // 绘制旋转方块（几何占位：敌人尚未接入序列帧素材前的临时表现）
-static void draw_rotated_square(Context* ctx, vec2_t c, float half, float rot,
-        jcolor_t fill, jcolor_t stroke)
+static void draw_rotated_square(Context* ctx, joy_vec2_t c, float half, float rot,
+        joy_color_t fill, joy_color_t stroke)
 {
-    vec2_t pts[4];
+    joy_vec2_t pts[4];
     for (int i = 0; i < 4; i++) {
         float a = rot + i * (GD_PI * 0.5f);
         pts[i].x = c.x + cosf(a) * half;
         pts[i].y = c.y + sinf(a) * half;
     }
-    shape_draw_polygon(ctx->r2d, "fill", pts, 4, fill);
-    shape_draw_polygon(ctx->r2d, "line", pts, 4, stroke);
+    joy_r2d_shape_draw_polygon(ctx->r2d, "fill", pts, 4, fill);
+    joy_r2d_shape_draw_polygon(ctx->r2d, "line", pts, 4, stroke);
 }
 
 // 渲染所有敌人实体（imp.png 纹理 + 朝向线；纹理缺失时回退墨色占位方块）
@@ -53,7 +53,7 @@ static void draw_enemy_pass(Context* ctx)
         if (!ctx->ecs.valid(e)) continue;
         auto& t = view.get<TransformComponent>(e);
         auto& cam = ctx->ecs.ctx().get<GlobalState>().camera_position;
-        vec2_t c;
+        joy_vec2_t c;
         c.x = meters_to_pixels(t.position.x - cam.x);
         c.y = meters_to_pixels(t.position.y - cam.y);
 
@@ -64,19 +64,19 @@ static void draw_enemy_pass(Context* ctx)
         // 敌人本体：优先用纹理（与玩家同画风），按固定高度 50px 等比缩放、居中于实体位置。
         // 纹理加载失败时回退为墨色占位方块（接入素材前的旧表现，保证不会画丢）。
         auto* am = AssetManager::GetInstance();
-        image_p eimg = am ? am->GetImage(ctx->r2d, kEnemyImpPath) : NULL;
+        joy_image_p eimg = am ? am->GetImage(ctx->r2d, kEnemyImpPath) : NULL;
         if (eimg) {
                 float tw = 0.0f, th = 0.0f;
-                if (image_get_size(eimg, &tw, &th) && tw > 0.0f && th > 0.0f) {
+                if (joy_r2d_image_get_size(eimg, &tw, &th) && tw > 0.0f && th > 0.0f) {
                         float scl = kEnemyDrawH / th;
-                        jrect_t src = { 0.0f, 0.0f, tw, th };
-                        vec2_t pos = { c.x, c.y };
-                        vec2_t org = { tw * 0.5f, th * 0.5f };
-                        image_draw_ex(eimg, &src, pos, 0.0f, { scl, scl }, org);
+                        joy_rect_t src = { 0.0f, 0.0f, tw, th };
+                        joy_vec2_t pos = { c.x, c.y };
+                        joy_vec2_t org = { tw * 0.5f, th * 0.5f };
+                        joy_r2d_image_draw_ex(eimg, &src, pos, 0.0f, { scl, scl }, org);
                 }
         } else {
-                jcolor_t fill   = { 40, 40, 45, 255 };
-                jcolor_t stroke = { 120, 120, 128, 255 };
+                joy_color_t fill   = { 40, 40, 45, 255 };
+                joy_color_t stroke = { 120, 120, 128, 255 };
                 draw_rotated_square(ctx, c, half, 0.785398f, fill, stroke);
         }
 
@@ -104,9 +104,9 @@ static void draw_enemy_pass(Context* ctx)
         float dir_rad = t.rotation;
 
         // 朝向指示：淡朱砂红（敌人贴图对称，靠这条线读朝向）
-        r2d_set_color(ctx->r2d, 200, 60, 50, 220);
-        vec2_t tip = { c.x + cosf(dir_rad) * half * 0.8f, c.y + sinf(dir_rad) * half * 0.8f };
-        shape_draw_line(ctx->r2d, c.x, c.y, tip.x, tip.y);
+        joy_r2d_set_color(ctx->r2d, 200, 60, 50, 220);
+        joy_vec2_t tip = { c.x + cosf(dir_rad) * half * 0.8f, c.y + sinf(dir_rad) * half * 0.8f };
+        joy_r2d_shape_draw_line(ctx->r2d, c.x, c.y, tip.x, tip.y);
     }
 }
 

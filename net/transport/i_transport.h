@@ -5,7 +5,7 @@
 // 传输层抽象：把"网络怎么收发"与"帧同步怎么组织"解耦。
 //
 // 上层（帧同步 / NetworkManager）只依赖本接口，不出现 joy 的
-// netclient_* / netserver_* / net_message_t 等具体类型；
+// netclient_* / netserver_* / joy_net_message_t 等具体类型；
 // 具体实现见 joy_transport.h（包装 joy 现有 WebSocket 传输）。
 // 未来换 TCP/KCP/WebRTC 只需新增一个实现，不改上层。
 // ============================================================

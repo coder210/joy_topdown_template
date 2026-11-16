@@ -13,7 +13,7 @@ public:
     void Render() override;
     void Destroy() override;
 private:
-    image_p logo = NULL;
+    joy_image_p logo = NULL;
     float   elapsed = 0;
     float   alpha = 0;          // 透明度：0→1（淡入）→1→0（淡出）
     bool    faded_in = false;

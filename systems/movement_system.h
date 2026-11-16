@@ -13,21 +13,21 @@ struct Context;
 
 // 移速兜底：异常实体（无 PlayerComponent）时使用。
 // 正常玩家移速取自角色 stats.speed（characters.json），见 movement_system 内。
-static const fp_t MOVE_SPEED_FALLBACK = fp_from_float(2.4f);
+static const joy_fp_t MOVE_SPEED_FALLBACK = fp_from_float(2.4f);
 
 // 定点数向下取整转 int（算术右移即 floor，负向负无穷），与 collision_system 一致。
-static inline int movement_fp_floor_to_int(fp_t x)
+static inline int movement_fp_floor_to_int(joy_fp_t x)
 {
-    return (int)(x >> FP_FRACTIONAL_PLACES);
+    return (int)(x >> JOY_FP_FRACTIONAL_PLACES);
 }
 
 // 判断 AABB(x0,y0,w,h) 是否触碰不可通行格（含越界视为墙）。
 // 纯定点整数查 MAP_LAYOUT，帧同步确定性；与 collision_system 的网格覆盖规则保持一致。
-static inline bool movement_box_blocked(fp_t x0, fp_t y0, fp_t w, fp_t h)
+static inline bool movement_box_blocked(joy_fp_t x0, joy_fp_t y0, joy_fp_t w, joy_fp_t h)
 {
-    const fp_t x1 = fp_add(x0, w);
-    const fp_t y1 = fp_add(y0, h);
-    const fp_t EPS = fp_from_float(0.001f);
+    const joy_fp_t x1 = fp_add(x0, w);
+    const joy_fp_t y1 = fp_add(y0, h);
+    const joy_fp_t EPS = fp_from_float(0.001f);
 
     int gx0 = movement_fp_floor_to_int(x0);
     int gx1 = movement_fp_floor_to_int(fp_sub(x1, EPS));
@@ -49,9 +49,9 @@ static inline bool movement_box_blocked(fp_t x0, fp_t y0, fp_t w, fp_t h)
 // 纯定点/整数运算，帧同步确定性。
 // dir<0 表示向负轴移动（上/左），dir>0 表示向正轴移动（下/右）。
 // 前缘（负轴：pos；正轴：pos+size）撞到墙格 g 后，贴齐到该墙格的近侧边界。
-static inline fp_t movement_snap_axis(fp_t pos, fp_t size, fp_t cand, int dir)
+static inline joy_fp_t movement_snap_axis(joy_fp_t pos, joy_fp_t size, joy_fp_t cand, int dir)
 {
-    const fp_t EPS = fp_from_float(0.001f);
+    const joy_fp_t EPS = fp_from_float(0.001f);
     if (dir < 0) {
         // 上/左：前缘 = pos，贴齐到墙格 g 的下/右边界 g+1
         int g = movement_fp_floor_to_int(cand);
@@ -67,7 +67,7 @@ static inline fp_t movement_snap_axis(fp_t pos, fp_t size, fp_t cand, int dir)
 // 先沿 Y（上/下）移动，再沿 X（左/右），对角移动时被挡的轴停下、未挡的轴继续滑动。
 static void movement_system(entt::registry& registry, Context* ctx, float /*dt*/) {
     auto view = registry.view<PlayerStateInput, LogicPositionComponent>();
-    const fp_t tick = fp_from_float(game_runtime(ctx).FIXED_TIMESTEP);
+    const joy_fp_t tick = fp_from_float(game_runtime(ctx).FIXED_TIMESTEP);
 
     for (auto e : view) {
         if (registry.all_of<HealthComponent>(e) && registry.get<HealthComponent>(e).dead) { continue; }
@@ -80,16 +80,16 @@ static void movement_system(entt::registry& registry, Context* ctx, float /*dt*/
         // 移速按角色取（stats.speed，米/秒）。
         // 注意：不要把 PlayerComponent 加进 view —— 改变 view 组成会改变 entt 迭代顺序，
         // 帧同步下遍历顺序必须严格一致，故在循环内按需取。
-        fp_t speed = MOVE_SPEED_FALLBACK;
+        joy_fp_t speed = MOVE_SPEED_FALLBACK;
         if (registry.all_of<PlayerComponent>(e))
             speed = g_characterCatalog.get(registry.get<PlayerComponent>(e).char_id).move_speed;
-        const fp_t step = fp_mul(speed, tick);
+        const joy_fp_t step = fp_mul(speed, tick);
 
         // 斜向归一化：同时按 上下+左右 时，各轴位移乘以 1/√2，使斜向总速度与直线一致
         // （否则对角线速度=直线×√2≈1.41 倍，跑对角线明显更快）。双端同码，帧同步确定。
         const bool diagonal = ((bits & 0x3) != 0) && ((bits & 0xC) != 0);
-        const fp_t inv_sqrt2 = fp_from_float(0.70710678f);
-        const fp_t axis_step = diagonal ? fp_mul(step, inv_sqrt2) : step;
+        const joy_fp_t inv_sqrt2 = fp_from_float(0.70710678f);
+        const joy_fp_t axis_step = diagonal ? fp_mul(step, inv_sqrt2) : step;
 
         // 无碰撞盒（异常实体）时退化为直接位移，保持原有行为
         if (!registry.all_of<LogicRectComponent>(e)) {
@@ -100,12 +100,12 @@ static void movement_system(entt::registry& registry, Context* ctx, float /*dt*/
             continue;
         }
 
-        const fp_t w = registry.get<LogicRectComponent>(e).width;
-        const fp_t h = registry.get<LogicRectComponent>(e).height;
+        const joy_fp_t w = registry.get<LogicRectComponent>(e).width;
+        const joy_fp_t h = registry.get<LogicRectComponent>(e).height;
 
         // Y 轴
         if ((bits & 0x1) || (bits & 0x2)) {
-            fp_t cand = p.y;
+            joy_fp_t cand = p.y;
             int dy = 0;
             if (bits & 0x1) { cand = fp_sub(cand, axis_step); dy = -1; }   // 上
             if (bits & 0x2) { cand = fp_add(cand, axis_step); dy = +1; }   // 下
@@ -114,7 +114,7 @@ static void movement_system(entt::registry& registry, Context* ctx, float /*dt*/
         }
         // X 轴
         if ((bits & 0x4) || (bits & 0x8)) {
-            fp_t cand = p.x;
+            joy_fp_t cand = p.x;
             int dx = 0;
             if (bits & 0x4) { cand = fp_sub(cand, axis_step); dx = -1; }   // 左
             if (bits & 0x8) { cand = fp_add(cand, axis_step); dx = +1; }   // 右

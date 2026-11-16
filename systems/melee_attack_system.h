@@ -90,11 +90,11 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
         }
 
         // 攻击盒 = 自身碰撞盒沿 atk_dir 向前延伸 range（纯定点数，帧同步确定性）
-        const fp_t ax = apos.x, ay = apos.y;
-        const fp_t aw = arect.width, ah = arect.height;
-        const fp_t range = is_player ? fp_from_float(PLAYER_MELEE_RANGE)
+        const joy_fp_t ax = apos.x, ay = apos.y;
+        const joy_fp_t aw = arect.width, ah = arect.height;
+        const joy_fp_t range = is_player ? fp_from_float(PLAYER_MELEE_RANGE)
                                      : registry.get<AIComponent>(attacker).attack_radius;
-        fp_t hx = ax, hy = ay, hw = aw, hh = ah;
+        joy_fp_t hx = ax, hy = ay, hw = aw, hh = ah;
         switch (atk_dir) {
             case 0: hy = fp_add(ay, ah); hh = range; break;              // 下
             case 1: hx = fp_sub(ax, range); hw = range; break;           // 左
@@ -109,20 +109,20 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
                 if (h.dead) continue;
                 auto& tp  = enemy_view.get<LogicPositionComponent>(target);
                 auto& tr  = enemy_view.get<LogicRectComponent>(target);
-                const fp_t tx = tp.x, ty = tp.y;
-                const fp_t tw = tr.width, th = tr.height;
+                const joy_fp_t tx = tp.x, ty = tp.y;
+                const joy_fp_t tw = tr.width, th = tr.height;
                 // AABB 相交判定（纯定点数）
                 if (hx < fp_add(tx, tw) && fp_add(hx, hw) > tx &&
                     hy < fp_add(ty, th) && fp_add(hy, hh) > ty) {
                     h.hp -= damage; if (h.hp < 0) h.hp = 0;
                     {
                         // 击退：沿攻击方向把敌人推开（独立衰减通道，不被 AI/寻路覆盖）
-                        fp_t kbx = 0, kby = 0;
+                        joy_fp_t kbx = 0, kby = 0;
                         if (atk_dir == 2)      kbx = fp_from_float(1.0f);
                         else if (atk_dir == 1) kbx = fp_from_float(-1.0f);
                         else if (atk_dir == 0) kby = fp_from_float(1.0f);
                         else if (atk_dir == 3) kby = fp_from_float(-1.0f);
-                        fp_t ks = fp_from_float(KNOCKBACK_SPEED);
+                        joy_fp_t ks = fp_from_float(KNOCKBACK_SPEED);
                         auto& kb = registry.emplace_or_replace<KnockbackComponent>(target);
                         kb.vx = fp_mul(kbx, ks); kb.vy = fp_mul(kby, ks); kb.ticks = KNOCKBACK_TICKS;
                     }
@@ -136,8 +136,8 @@ static void melee_attack_system(entt::registry& registry, Context* ctx, float /*
                 if (h.spawn_invuln > 0) continue;   // 重生无敌期间免疫伤害
                 auto& tp  = player_view.get<LogicPositionComponent>(target);
                 auto& tr  = player_view.get<LogicRectComponent>(target);
-                const fp_t tx = tp.x, ty = tp.y;
-                const fp_t tw = tr.width, th = tr.height;
+                const joy_fp_t tx = tp.x, ty = tp.y;
+                const joy_fp_t tw = tr.width, th = tr.height;
                 // AABB 相交判定（纯定点数）
                 if (hx < fp_add(tx, tw) && fp_add(hx, hw) > tx &&
                     hy < fp_add(ty, th) && fp_add(hy, hh) > ty) {

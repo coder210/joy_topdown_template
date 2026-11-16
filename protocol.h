@@ -77,10 +77,10 @@ static inline int input_to_dir(int keycode) {
 static inline bool has_dir(int keycode) { return (keycode & INPUT_DIR_MASK) != 0; }
 
 /* 从 jmsgpack 对象中提取有符号整数 */
-static inline int64_t jmp_int(const jmsgpack_object_t* o) {
-    jmsgpack_object_type_t t = jmsgpack_object_type(o);
-    if (t == JMSGPACK_OBJECT_POSITIVE_INTEGER) return (int64_t)jmsgpack_object_u64(o);
-    if (t == JMSGPACK_OBJECT_NEGATIVE_INTEGER) return jmsgpack_object_i64(o);
+static inline int64_t jmp_int(const joy_msgpack_object_t* o) {
+    joy_msgpack_object_type_t t = joy_codec_msgpack_object_type(o);
+    if (t == JMSGPACK_OBJECT_POSITIVE_INTEGER) return (int64_t)joy_codec_msgpack_object_u64(o);
+    if (t == JMSGPACK_OBJECT_NEGATIVE_INTEGER) return joy_codec_msgpack_object_i64(o);
     return 0;
 }
 
@@ -109,56 +109,56 @@ static int mp_write_cb(void* data, const char* buf, size_t len) {
 }
 
 /* --- 子对象打包 --- */
-static inline void pack_entity(jmsgpack_packer_t* pk, const S2CEntity& e) {
-    jmsgpack_pack_array(pk, 15);
-    jmsgpack_pack_int(pk, e.id);    jmsgpack_pack_int(pk, e.type);
-    jmsgpack_pack_int64(pk, e.position_x); jmsgpack_pack_int64(pk, e.position_y);
-    jmsgpack_pack_int64(pk, e.width);      jmsgpack_pack_int64(pk, e.height);
-    jmsgpack_pack_int64(pk, e.hp);  jmsgpack_pack_int(pk, e.player_conv);
-    jmsgpack_pack_int(pk, e.player_char_id);
-    jmsgpack_pack_int64(pk, e.ai_type);
-    jmsgpack_pack_int(pk, e.ai_timer);  jmsgpack_pack_int(pk, e.ai_state);
-    jmsgpack_pack_int64(pk, e.ai_target_x); jmsgpack_pack_int64(pk, e.ai_target_y);
-    jmsgpack_pack_int(pk, e.ai_shoot_cooldown);
+static inline void pack_entity(joy_msgpack_packer_t* pk, const S2CEntity& e) {
+    joy_codec_msgpack_pack_array(pk, 15);
+    joy_codec_msgpack_pack_int(pk, e.id);    joy_codec_msgpack_pack_int(pk, e.type);
+    joy_codec_msgpack_pack_int64(pk, e.position_x); joy_codec_msgpack_pack_int64(pk, e.position_y);
+    joy_codec_msgpack_pack_int64(pk, e.width);      joy_codec_msgpack_pack_int64(pk, e.height);
+    joy_codec_msgpack_pack_int64(pk, e.hp);  joy_codec_msgpack_pack_int(pk, e.player_conv);
+    joy_codec_msgpack_pack_int(pk, e.player_char_id);
+    joy_codec_msgpack_pack_int64(pk, e.ai_type);
+    joy_codec_msgpack_pack_int(pk, e.ai_timer);  joy_codec_msgpack_pack_int(pk, e.ai_state);
+    joy_codec_msgpack_pack_int64(pk, e.ai_target_x); joy_codec_msgpack_pack_int64(pk, e.ai_target_y);
+    joy_codec_msgpack_pack_int(pk, e.ai_shoot_cooldown);
 }
-static inline void pack_join(jmsgpack_packer_t* pk, const S2CPlayerJoin& j) {
-    jmsgpack_pack_array(pk, 4);
-    jmsgpack_pack_int(pk, j.conv);
-    jmsgpack_pack_int64(pk, j.position_x);
-    jmsgpack_pack_int64(pk, j.position_y);
-    jmsgpack_pack_int(pk, j.char_id);
+static inline void pack_join(joy_msgpack_packer_t* pk, const S2CPlayerJoin& j) {
+    joy_codec_msgpack_pack_array(pk, 4);
+    joy_codec_msgpack_pack_int(pk, j.conv);
+    joy_codec_msgpack_pack_int64(pk, j.position_x);
+    joy_codec_msgpack_pack_int64(pk, j.position_y);
+    joy_codec_msgpack_pack_int(pk, j.char_id);
 }
-static inline void pack_leave(jmsgpack_packer_t* pk, const S2CPlayerLeave& l) {
-    jmsgpack_pack_array(pk, 1);
-    jmsgpack_pack_int(pk, l.conv);
+static inline void pack_leave(joy_msgpack_packer_t* pk, const S2CPlayerLeave& l) {
+    joy_codec_msgpack_pack_array(pk, 1);
+    joy_codec_msgpack_pack_int(pk, l.conv);
 }
-static inline void pack_input(jmsgpack_packer_t* pk, const S2CPlayerInput& i) {
-    jmsgpack_pack_array(pk, 4);
-    jmsgpack_pack_int(pk, i.conv);
-    jmsgpack_pack_int(pk, i.dir);
-    jmsgpack_pack_int(pk, i.attack);
-    jmsgpack_pack_int(pk, i.yaw_q);
+static inline void pack_input(joy_msgpack_packer_t* pk, const S2CPlayerInput& i) {
+    joy_codec_msgpack_pack_array(pk, 4);
+    joy_codec_msgpack_pack_int(pk, i.conv);
+    joy_codec_msgpack_pack_int(pk, i.dir);
+    joy_codec_msgpack_pack_int(pk, i.attack);
+    joy_codec_msgpack_pack_int(pk, i.yaw_q);
 }
 
 /* C2S 打包: [cmd, payload] */
 static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int input_dir, int input_attack, int char_id = 0, int input_yaw = kAimYawInvalid) {
     std::string out;
-    jmsgpack_packer_t pk;
-    jmsgpack_packer_init(&pk, &out, mp_write_cb);
-    jmsgpack_pack_array(&pk, 2);
-    jmsgpack_pack_int(&pk, cmd);
+    joy_msgpack_packer_t pk;
+    joy_codec_msgpack_packer_init(&pk, &out, mp_write_cb);
+    joy_codec_msgpack_pack_array(&pk, 2);
+    joy_codec_msgpack_pack_int(&pk, cmd);
     if (cmd == CMD_PLAYER_JOIN) {
-        jmsgpack_pack_array(&pk, 3);
-        jmsgpack_pack_int64(&pk, join_x);
-        jmsgpack_pack_int64(&pk, join_y);
-        jmsgpack_pack_int(&pk, char_id);
+        joy_codec_msgpack_pack_array(&pk, 3);
+        joy_codec_msgpack_pack_int64(&pk, join_x);
+        joy_codec_msgpack_pack_int64(&pk, join_y);
+        joy_codec_msgpack_pack_int(&pk, char_id);
     } else if (cmd == CMD_PLAYER_INPUT) {
-        jmsgpack_pack_array(&pk, 3);
-        jmsgpack_pack_int(&pk, input_dir);
-        jmsgpack_pack_int(&pk, input_attack);
-        jmsgpack_pack_int(&pk, input_yaw);
+        joy_codec_msgpack_pack_array(&pk, 3);
+        joy_codec_msgpack_pack_int(&pk, input_dir);
+        joy_codec_msgpack_pack_int(&pk, input_attack);
+        joy_codec_msgpack_pack_int(&pk, input_yaw);
     } else {
-        jmsgpack_pack_nil(&pk);
+        joy_codec_msgpack_pack_nil(&pk);
     }
     return out;
 }
@@ -166,11 +166,11 @@ static inline std::string pack_c2s(int cmd, int64_t join_x, int64_t join_y, int 
 /* S2C 世界快照打包: [world_eid, [entity...]] */
 static inline std::string pack_world(int entity_id, const S2CEntity* entities, int count) {
     std::string out;
-    jmsgpack_packer_t pk;
-    jmsgpack_packer_init(&pk, &out, mp_write_cb);
-    jmsgpack_pack_array(&pk, 2);
-    jmsgpack_pack_int(&pk, entity_id);
-    jmsgpack_pack_array(&pk, count);
+    joy_msgpack_packer_t pk;
+    joy_codec_msgpack_packer_init(&pk, &out, mp_write_cb);
+    joy_codec_msgpack_pack_array(&pk, 2);
+    joy_codec_msgpack_pack_int(&pk, entity_id);
+    joy_codec_msgpack_pack_array(&pk, count);
     for (int i = 0; i < count; i++)
         pack_entity(&pk, entities[i]);
     return out;
@@ -185,20 +185,20 @@ static inline std::string pack_s2c_loading(int32_t conv, int32_t frame_id, int32
     int64_t random_state)
 {
     std::string out;
-    jmsgpack_packer_t pk;
-    jmsgpack_packer_init(&pk, &out, mp_write_cb);
-    jmsgpack_pack_array(&pk, 2);
-    jmsgpack_pack_int(&pk, S2C_CMD_LOADING);
-    jmsgpack_pack_array(&pk, 5);
-    jmsgpack_pack_int(&pk, conv);
-    jmsgpack_pack_int(&pk, frame_id);
-    jmsgpack_pack_array(&pk, 2);
-    jmsgpack_pack_int(&pk, world_eid);
-    jmsgpack_pack_array(&pk, ec);
+    joy_msgpack_packer_t pk;
+    joy_codec_msgpack_packer_init(&pk, &out, mp_write_cb);
+    joy_codec_msgpack_pack_array(&pk, 2);
+    joy_codec_msgpack_pack_int(&pk, S2C_CMD_LOADING);
+    joy_codec_msgpack_pack_array(&pk, 5);
+    joy_codec_msgpack_pack_int(&pk, conv);
+    joy_codec_msgpack_pack_int(&pk, frame_id);
+    joy_codec_msgpack_pack_array(&pk, 2);
+    joy_codec_msgpack_pack_int(&pk, world_eid);
+    joy_codec_msgpack_pack_array(&pk, ec);
     for (int i = 0; i < ec; i++)
         pack_entity(&pk, entities[i]);
-    jmsgpack_pack_int(&pk, seed);
-    jmsgpack_pack_int64(&pk, random_state);
+    joy_codec_msgpack_pack_int(&pk, seed);
+    joy_codec_msgpack_pack_int64(&pk, random_state);
     return out;
 }
 
@@ -210,23 +210,23 @@ static inline std::string pack_s2c(int16_t cmd, int32_t frame_id,
     const char* checksum)
 {
     std::string out;
-    jmsgpack_packer_t pk;
-    jmsgpack_packer_init(&pk, &out, mp_write_cb);
-    jmsgpack_pack_array(&pk, 2);
-    jmsgpack_pack_int(&pk, cmd);
+    joy_msgpack_packer_t pk;
+    joy_codec_msgpack_packer_init(&pk, &out, mp_write_cb);
+    joy_codec_msgpack_pack_array(&pk, 2);
+    joy_codec_msgpack_pack_int(&pk, cmd);
     if (cmd == S2C_CMD_COMMAND) {
-        jmsgpack_pack_array(&pk, 5);
-        jmsgpack_pack_int(&pk, frame_id);
-        jmsgpack_pack_array(&pk, jn);
+        joy_codec_msgpack_pack_array(&pk, 5);
+        joy_codec_msgpack_pack_int(&pk, frame_id);
+        joy_codec_msgpack_pack_array(&pk, jn);
         for (int i = 0; i < jn; i++) pack_join(&pk, joins[i]);
-        jmsgpack_pack_array(&pk, ln);
+        joy_codec_msgpack_pack_array(&pk, ln);
         for (int i = 0; i < ln; i++) pack_leave(&pk, leaves[i]);
-        jmsgpack_pack_array(&pk, in);
+        joy_codec_msgpack_pack_array(&pk, in);
         for (int i = 0; i < in; i++) pack_input(&pk, inputs[i]);
-        jmsgpack_pack_str(&pk, checksum ? strlen(checksum) : 0);
-        if (checksum) jmsgpack_pack_str_body(&pk, checksum, strlen(checksum));
+        joy_codec_msgpack_pack_str(&pk, checksum ? strlen(checksum) : 0);
+        if (checksum) joy_codec_msgpack_pack_str_body(&pk, checksum, strlen(checksum));
     } else {
-        jmsgpack_pack_nil(&pk);
+        joy_codec_msgpack_pack_nil(&pk);
     }
     return out;
 }
@@ -234,40 +234,40 @@ static inline std::string pack_s2c(int16_t cmd, int32_t frame_id,
 /* ======================== msgpack 解包 ======================== */
 
 /* 解包单个实体 */
-static inline void unpack_entity(const jmsgpack_object_t* o, S2CEntity* e) {
-    if (!o || jmsgpack_object_type(o) != JMSGPACK_OBJECT_ARRAY || jmsgpack_object_array_size(o) < 10) return;
-    e->id         = (int)jmp_int(jmsgpack_object_array_at(o, 0));
-    e->type       = (int)jmp_int(jmsgpack_object_array_at(o, 1));
-    e->position_x = jmp_int(jmsgpack_object_array_at(o, 2));
-    e->position_y = jmp_int(jmsgpack_object_array_at(o, 3));
-    e->width      = jmp_int(jmsgpack_object_array_at(o, 4));
-    e->height     = jmp_int(jmsgpack_object_array_at(o, 5));
-    e->hp         = jmp_int(jmsgpack_object_array_at(o, 6));
-    e->player_conv = (int)jmp_int(jmsgpack_object_array_at(o, 7));
-    e->player_char_id = (int)jmp_int(jmsgpack_object_array_at(o, 8));
-    e->ai_type    = jmp_int(jmsgpack_object_array_at(o, 9));
-    e->ai_timer   = (int)jmp_int(jmsgpack_object_array_at(o, 10));
-    e->ai_state   = (int)jmp_int(jmsgpack_object_array_at(o, 11));
-    e->ai_target_x = jmp_int(jmsgpack_object_array_at(o, 12));
-    e->ai_target_y = jmp_int(jmsgpack_object_array_at(o, 13));
-    e->ai_shoot_cooldown = (int)jmp_int(jmsgpack_object_array_at(o, 14));
+static inline void unpack_entity(const joy_msgpack_object_t* o, S2CEntity* e) {
+    if (!o || joy_codec_msgpack_object_type(o) != JMSGPACK_OBJECT_ARRAY || joy_codec_msgpack_object_array_size(o) < 10) return;
+    e->id         = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 0));
+    e->type       = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 1));
+    e->position_x = jmp_int(joy_codec_msgpack_object_array_at(o, 2));
+    e->position_y = jmp_int(joy_codec_msgpack_object_array_at(o, 3));
+    e->width      = jmp_int(joy_codec_msgpack_object_array_at(o, 4));
+    e->height     = jmp_int(joy_codec_msgpack_object_array_at(o, 5));
+    e->hp         = jmp_int(joy_codec_msgpack_object_array_at(o, 6));
+    e->player_conv = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 7));
+    e->player_char_id = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 8));
+    e->ai_type    = jmp_int(joy_codec_msgpack_object_array_at(o, 9));
+    e->ai_timer   = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 10));
+    e->ai_state   = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 11));
+    e->ai_target_x = jmp_int(joy_codec_msgpack_object_array_at(o, 12));
+    e->ai_target_y = jmp_int(joy_codec_msgpack_object_array_at(o, 13));
+    e->ai_shoot_cooldown = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 14));
 }
 
 /* 解包 S2C 世界快照: [eid, [entity...]]，返回实体数 */
 static inline int unpack_world(const char* data, int len, int* eid, S2CEntity* entities, int max_ec) {
-    jmsgpack_unpacked_t r;
-    jmsgpack_unpacked_init(&r);
+    joy_msgpack_unpacked_t r;
+    joy_codec_msgpack_unpacked_init(&r);
     size_t off = 0;
-    if (jmsgpack_unpack_next(&r, data, len, &off) < 0) { jmsgpack_unpacked_destroy(&r); return 0; }
-    const jmsgpack_object_t* root = jmsgpack_unpacked_data(&r);
-    if (!root || jmsgpack_object_type(root) != JMSGPACK_OBJECT_ARRAY || jmsgpack_object_array_size(root) < 2) { jmsgpack_unpacked_destroy(&r); return 0; }
-    *eid = (int)jmp_int(jmsgpack_object_array_at(root, 0));
-    const jmsgpack_object_t* arr = jmsgpack_object_array_at(root, 1);
-    int n = (int)jmsgpack_object_array_size(arr);
+    if (joy_codec_msgpack_unpack_next(&r, data, len, &off) < 0) { joy_codec_msgpack_unpacked_destroy(&r); return 0; }
+    const joy_msgpack_object_t* root = joy_codec_msgpack_unpacked_data(&r);
+    if (!root || joy_codec_msgpack_object_type(root) != JMSGPACK_OBJECT_ARRAY || joy_codec_msgpack_object_array_size(root) < 2) { joy_codec_msgpack_unpacked_destroy(&r); return 0; }
+    *eid = (int)jmp_int(joy_codec_msgpack_object_array_at(root, 0));
+    const joy_msgpack_object_t* arr = joy_codec_msgpack_object_array_at(root, 1);
+    int n = (int)joy_codec_msgpack_object_array_size(arr);
     if (n > max_ec) n = max_ec;
     for (int i = 0; i < n; i++)
-        unpack_entity(jmsgpack_object_array_at(arr, (uint32_t)i), &entities[i]);
-    jmsgpack_unpacked_destroy(&r);
+        unpack_entity(joy_codec_msgpack_object_array_at(arr, (uint32_t)i), &entities[i]);
+    joy_codec_msgpack_unpacked_destroy(&r);
     return n;
 }
 
@@ -278,74 +278,74 @@ static inline int unpack_loading(const char* data, int len,
     int64_t* random_state,
     S2CEntity* entities, int max_ec)
 {
-    jmsgpack_unpacked_t r;
-    jmsgpack_unpacked_init(&r);
+    joy_msgpack_unpacked_t r;
+    joy_codec_msgpack_unpacked_init(&r);
     size_t off = 0;
-    if (jmsgpack_unpack_next(&r, data, len, &off) < 0) { jmsgpack_unpacked_destroy(&r); return -1; }
-    const jmsgpack_object_t* root = jmsgpack_unpacked_data(&r);
-    const jmsgpack_object_t* pl = jmsgpack_object_array_at(root, 1);
-    if (!pl || jmsgpack_object_type(pl) != JMSGPACK_OBJECT_ARRAY || jmsgpack_object_array_size(pl) < 4) { jmsgpack_unpacked_destroy(&r); return -1; }
-    if (conv)     *conv     = (int)jmp_int(jmsgpack_object_array_at(pl, 0));
-    if (frame_id) *frame_id = (int)jmp_int(jmsgpack_object_array_at(pl, 1));
-    const jmsgpack_object_t* w = jmsgpack_object_array_at(pl, 2);
-    if (!w || jmsgpack_object_type(w) != JMSGPACK_OBJECT_ARRAY || jmsgpack_object_array_size(w) < 2) { jmsgpack_unpacked_destroy(&r); return -1; }
-    if (eid) *eid = (int)jmp_int(jmsgpack_object_array_at(w, 0));
-    const jmsgpack_object_t* arr = jmsgpack_object_array_at(w, 1);
-    int n = (int)jmsgpack_object_array_size(arr);
+    if (joy_codec_msgpack_unpack_next(&r, data, len, &off) < 0) { joy_codec_msgpack_unpacked_destroy(&r); return -1; }
+    const joy_msgpack_object_t* root = joy_codec_msgpack_unpacked_data(&r);
+    const joy_msgpack_object_t* pl = joy_codec_msgpack_object_array_at(root, 1);
+    if (!pl || joy_codec_msgpack_object_type(pl) != JMSGPACK_OBJECT_ARRAY || joy_codec_msgpack_object_array_size(pl) < 4) { joy_codec_msgpack_unpacked_destroy(&r); return -1; }
+    if (conv)     *conv     = (int)jmp_int(joy_codec_msgpack_object_array_at(pl, 0));
+    if (frame_id) *frame_id = (int)jmp_int(joy_codec_msgpack_object_array_at(pl, 1));
+    const joy_msgpack_object_t* w = joy_codec_msgpack_object_array_at(pl, 2);
+    if (!w || joy_codec_msgpack_object_type(w) != JMSGPACK_OBJECT_ARRAY || joy_codec_msgpack_object_array_size(w) < 2) { joy_codec_msgpack_unpacked_destroy(&r); return -1; }
+    if (eid) *eid = (int)jmp_int(joy_codec_msgpack_object_array_at(w, 0));
+    const joy_msgpack_object_t* arr = joy_codec_msgpack_object_array_at(w, 1);
+    int n = (int)joy_codec_msgpack_object_array_size(arr);
     if (n > max_ec) n = max_ec;
     for (int i = 0; i < n; i++)
-        unpack_entity(jmsgpack_object_array_at(arr, (uint32_t)i), &entities[i]);
-    if (seed) *seed = (int)jmp_int(jmsgpack_object_array_at(pl, 3));
+        unpack_entity(joy_codec_msgpack_object_array_at(arr, (uint32_t)i), &entities[i]);
+    if (seed) *seed = (int)jmp_int(joy_codec_msgpack_object_array_at(pl, 3));
     // 第 5 个元素：random_state（LCG 单状态 int64）
-    if (random_state && jmsgpack_object_array_size(pl) >= 5)
-        *random_state = jmp_int(jmsgpack_object_array_at(pl, 4));
-    jmsgpack_unpacked_destroy(&r);
+    if (random_state && joy_codec_msgpack_object_array_size(pl) >= 5)
+        *random_state = jmp_int(joy_codec_msgpack_object_array_at(pl, 4));
+    joy_codec_msgpack_unpacked_destroy(&r);
     return n;
 }
 
 /* 读取一条 command payload 数组元素（C++11 重载分派，替代 C++14 泛型 lambda + C++17 if constexpr）
  * loader_type 仅用于模板分派；实际按 T 调用的重载读取字段。 */
 template <typename T>
-static inline void unpack_command_read_one(T& d, const jmsgpack_object_t* o);
+static inline void unpack_command_read_one(T& d, const joy_msgpack_object_t* o);
 
-static inline void unpack_command_read_one(S2CPlayerJoin& d, const jmsgpack_object_t* o) {
-    if (o && jmsgpack_object_type(o) == JMSGPACK_OBJECT_ARRAY && jmsgpack_object_array_size(o) >= 4) {
-        d.conv = (int)jmp_int(jmsgpack_object_array_at(o, 0));
-        d.position_x = jmp_int(jmsgpack_object_array_at(o, 1));
-        d.position_y = jmp_int(jmsgpack_object_array_at(o, 2));
-        d.char_id = (int)jmp_int(jmsgpack_object_array_at(o, 3));
+static inline void unpack_command_read_one(S2CPlayerJoin& d, const joy_msgpack_object_t* o) {
+    if (o && joy_codec_msgpack_object_type(o) == JMSGPACK_OBJECT_ARRAY && joy_codec_msgpack_object_array_size(o) >= 4) {
+        d.conv = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 0));
+        d.position_x = jmp_int(joy_codec_msgpack_object_array_at(o, 1));
+        d.position_y = jmp_int(joy_codec_msgpack_object_array_at(o, 2));
+        d.char_id = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 3));
     }
 }
-static inline void unpack_command_read_one(S2CPlayerLeave& d, const jmsgpack_object_t* o) {
-    if (o && jmsgpack_object_type(o) == JMSGPACK_OBJECT_ARRAY && jmsgpack_object_array_size(o) >= 1) {
-        d.conv = (int)jmp_int(jmsgpack_object_array_at(o, 0));
+static inline void unpack_command_read_one(S2CPlayerLeave& d, const joy_msgpack_object_t* o) {
+    if (o && joy_codec_msgpack_object_type(o) == JMSGPACK_OBJECT_ARRAY && joy_codec_msgpack_object_array_size(o) >= 1) {
+        d.conv = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 0));
     }
 }
-static inline void unpack_command_read_one(S2CPlayerInput& d, const jmsgpack_object_t* o) {
-    if (o && jmsgpack_object_type(o) == JMSGPACK_OBJECT_ARRAY && jmsgpack_object_array_size(o) >= 3) {
-        d.conv = (int)jmp_int(jmsgpack_object_array_at(o, 0));
-        d.dir = (int)jmp_int(jmsgpack_object_array_at(o, 1));
-        d.attack = (int8_t)jmp_int(jmsgpack_object_array_at(o, 2));
+static inline void unpack_command_read_one(S2CPlayerInput& d, const joy_msgpack_object_t* o) {
+    if (o && joy_codec_msgpack_object_type(o) == JMSGPACK_OBJECT_ARRAY && joy_codec_msgpack_object_array_size(o) >= 3) {
+        d.conv = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 0));
+        d.dir = (int)jmp_int(joy_codec_msgpack_object_array_at(o, 1));
+        d.attack = (int8_t)jmp_int(joy_codec_msgpack_object_array_at(o, 2));
         // 第 4 位是瞄准角；旧包/缺失时为"无瞄准数据"（渲染回退到朝向）
-        d.yaw_q = (jmsgpack_object_array_size(o) >= 4) ? (int)jmp_int(jmsgpack_object_array_at(o, 3))
+        d.yaw_q = (joy_codec_msgpack_object_array_size(o) >= 4) ? (int)jmp_int(joy_codec_msgpack_object_array_at(o, 3))
                                                        : kAimYawInvalid;
     }
 }
 
 /* 从 command payload 读取一个子数组（idx: joins=1 / leaves=2 / inputs=3） */
 template <typename T>
-static inline void read_command_payload(const jmsgpack_object_t* pl, int idx, T* out,
+static inline void read_command_payload(const joy_msgpack_object_t* pl, int idx, T* out,
         int max, int& cnt)
 {
-    if (!pl || idx >= (int)jmsgpack_object_array_size(pl)) return;
-    const jmsgpack_object_t* a = jmsgpack_object_array_at(pl, (uint32_t)idx);
-    if (!a || jmsgpack_object_type(a) != JMSGPACK_OBJECT_ARRAY) return;
-    int n = (int)jmsgpack_object_array_size(a);
+    if (!pl || idx >= (int)joy_codec_msgpack_object_array_size(pl)) return;
+    const joy_msgpack_object_t* a = joy_codec_msgpack_object_array_at(pl, (uint32_t)idx);
+    if (!a || joy_codec_msgpack_object_type(a) != JMSGPACK_OBJECT_ARRAY) return;
+    int n = (int)joy_codec_msgpack_object_array_size(a);
     if (n > max) n = max;
     cnt = n;
     for (int i = 0; i < n; i++) {
-        const jmsgpack_object_t* o = jmsgpack_object_array_at(a, (uint32_t)i);
-        if (!o || jmsgpack_object_type(o) != JMSGPACK_OBJECT_ARRAY) continue;
+        const joy_msgpack_object_t* o = joy_codec_msgpack_object_array_at(a, (uint32_t)i);
+        if (!o || joy_codec_msgpack_object_type(o) != JMSGPACK_OBJECT_ARRAY) continue;
         unpack_command_read_one(out[i], o);
     }
 }
@@ -367,16 +367,16 @@ static inline int unpack_command(const char* data, int len,
     if (ln)  *ln = 0;
     if (in)  *in = 0;
 
-    jmsgpack_unpacked_t r;
-    jmsgpack_unpacked_init(&r);
+    joy_msgpack_unpacked_t r;
+    joy_codec_msgpack_unpacked_init(&r);
     size_t off = 0;
-    if (jmsgpack_unpack_next(&r, data, len, &off) < 0) { jmsgpack_unpacked_destroy(&r); return 0; }
-    const jmsgpack_object_t* root = jmsgpack_unpacked_data(&r);
-    if (!root || jmsgpack_object_type(root) != JMSGPACK_OBJECT_ARRAY || jmsgpack_object_array_size(root) < 2) { jmsgpack_unpacked_destroy(&r); return 0; }
-    const jmsgpack_object_t* pl = jmsgpack_object_array_at(root, 1);
-    if (!pl || jmsgpack_object_type(pl) != JMSGPACK_OBJECT_ARRAY || jmsgpack_object_array_size(pl) < 5) { jmsgpack_unpacked_destroy(&r); return 0; }
+    if (joy_codec_msgpack_unpack_next(&r, data, len, &off) < 0) { joy_codec_msgpack_unpacked_destroy(&r); return 0; }
+    const joy_msgpack_object_t* root = joy_codec_msgpack_unpacked_data(&r);
+    if (!root || joy_codec_msgpack_object_type(root) != JMSGPACK_OBJECT_ARRAY || joy_codec_msgpack_object_array_size(root) < 2) { joy_codec_msgpack_unpacked_destroy(&r); return 0; }
+    const joy_msgpack_object_t* pl = joy_codec_msgpack_object_array_at(root, 1);
+    if (!pl || joy_codec_msgpack_object_type(pl) != JMSGPACK_OBJECT_ARRAY || joy_codec_msgpack_object_array_size(pl) < 5) { joy_codec_msgpack_unpacked_destroy(&r); return 0; }
 
-    if (frame_id) *frame_id = (int)jmp_int(jmsgpack_object_array_at(pl, 0));
+    if (frame_id) *frame_id = (int)jmp_int(joy_codec_msgpack_object_array_at(pl, 0));
 
     read_command_payload(pl, 1, joins,  max_jn, *jn);
     read_command_payload(pl, 2, leaves, max_ln, *ln);
@@ -385,10 +385,10 @@ static inline int unpack_command(const char* data, int len,
     // 第 5 个元素：状态指纹 checksum（服务端打包，客户端校验）
     if (checksum && checksum_cap > 0) {
         checksum[0] = '\0';
-        const jmsgpack_object_t* c = jmsgpack_object_array_at(pl, 4);
-        if (c && jmsgpack_object_type(c) == JMSGPACK_OBJECT_STR) {
-            const char* sp = jmsgpack_object_str_ptr(c);
-            int n = (int)jmsgpack_object_str_size(c);
+        const joy_msgpack_object_t* c = joy_codec_msgpack_object_array_at(pl, 4);
+        if (c && joy_codec_msgpack_object_type(c) == JMSGPACK_OBJECT_STR) {
+            const char* sp = joy_codec_msgpack_object_str_ptr(c);
+            int n = (int)joy_codec_msgpack_object_str_size(c);
             if (sp) {
                 if (n > checksum_cap - 1) n = checksum_cap - 1;
                 memcpy(checksum, sp, n);
@@ -397,7 +397,7 @@ static inline int unpack_command(const char* data, int len,
         }
     }
 
-    jmsgpack_unpacked_destroy(&r);
+    joy_codec_msgpack_unpacked_destroy(&r);
     return 1;
 }
 
@@ -408,37 +408,37 @@ static inline int unpack_c2s(const char* data, int len,
     int* cmd, int64_t* join_x, int64_t* join_y, int* input_dir, int* input_attack,
     int* char_id = nullptr, int* input_yaw = nullptr)
 {
-    jmsgpack_unpacked_t r;
-    jmsgpack_unpacked_init(&r);
+    joy_msgpack_unpacked_t r;
+    joy_codec_msgpack_unpacked_init(&r);
     size_t off = 0;
-    if (jmsgpack_unpack_next(&r, data, len, &off) < 0) { jmsgpack_unpacked_destroy(&r); return 0; }
-    const jmsgpack_object_t* root = jmsgpack_unpacked_data(&r);
-    if (!root || jmsgpack_object_type(root) != JMSGPACK_OBJECT_ARRAY || jmsgpack_object_array_size(root) < 2) { jmsgpack_unpacked_destroy(&r); return 0; }
-    *cmd = (int)jmp_int(jmsgpack_object_array_at(root, 0));
-    const jmsgpack_object_t* payload = jmsgpack_object_array_at(root, 1);
-    if (payload && jmsgpack_object_type(payload) == JMSGPACK_OBJECT_ARRAY) {
-        int psz = (int)jmsgpack_object_array_size(payload);
+    if (joy_codec_msgpack_unpack_next(&r, data, len, &off) < 0) { joy_codec_msgpack_unpacked_destroy(&r); return 0; }
+    const joy_msgpack_object_t* root = joy_codec_msgpack_unpacked_data(&r);
+    if (!root || joy_codec_msgpack_object_type(root) != JMSGPACK_OBJECT_ARRAY || joy_codec_msgpack_object_array_size(root) < 2) { joy_codec_msgpack_unpacked_destroy(&r); return 0; }
+    *cmd = (int)jmp_int(joy_codec_msgpack_object_array_at(root, 0));
+    const joy_msgpack_object_t* payload = joy_codec_msgpack_object_array_at(root, 1);
+    if (payload && joy_codec_msgpack_object_type(payload) == JMSGPACK_OBJECT_ARRAY) {
+        int psz = (int)joy_codec_msgpack_object_array_size(payload);
         switch (*cmd) {
         case CMD_PLAYER_JOIN:
             if (psz >= 2) {
-                *join_x = jmp_int(jmsgpack_object_array_at(payload, 0));
-                *join_y = jmp_int(jmsgpack_object_array_at(payload, 1));
+                *join_x = jmp_int(joy_codec_msgpack_object_array_at(payload, 0));
+                *join_y = jmp_int(joy_codec_msgpack_object_array_at(payload, 1));
             }
             if (psz >= 3 && char_id)
-                *char_id = (int)jmp_int(jmsgpack_object_array_at(payload, 2));
+                *char_id = (int)jmp_int(joy_codec_msgpack_object_array_at(payload, 2));
             break;
         case CMD_PLAYER_INPUT:
             if (psz >= 2) {
-                *input_dir = (int)jmp_int(jmsgpack_object_array_at(payload, 0));
-                *input_attack = (int)jmp_int(jmsgpack_object_array_at(payload, 1));
+                *input_dir = (int)jmp_int(joy_codec_msgpack_object_array_at(payload, 0));
+                *input_attack = (int)jmp_int(joy_codec_msgpack_object_array_at(payload, 1));
             }
             if (input_yaw)
                 *input_yaw = (psz >= 3)
-                        ? (int)jmp_int(jmsgpack_object_array_at(payload, 2)) : kAimYawInvalid;
+                        ? (int)jmp_int(joy_codec_msgpack_object_array_at(payload, 2)) : kAimYawInvalid;
             break;
         }
     }
-    jmsgpack_unpacked_destroy(&r);
+    joy_codec_msgpack_unpacked_destroy(&r);
     return 1;
 }
 

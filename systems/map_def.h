@@ -52,8 +52,8 @@ struct MapLevelInfo {
     int player_cell = -1;      // 'P' / spawn 点格子索引 (y*MAP_W + x)，-1=缺失
     int enemy_cells[256];      // 'E' / enemy 格子索引（行主序扫描，双端同序）
     int enemy_n = 0;
-    jtilemap_p  tilemap = nullptr;      // jtilemap 句柄，由 jtilemap_load_file 持有
-    jtilemap_render_p tilemap_render = nullptr; // 渲染句柄
+    joy_tilemap_p  tilemap = nullptr;      // jtilemap 句柄，由 jtilemap_load_file 持有
+    joy_tilemap_render_p tilemap_render = nullptr; // 渲染句柄
 };
 extern MapLevelInfo g_map_info;
 
@@ -74,7 +74,7 @@ struct map_collision_ctx_t {
 };
 
 // 把一个矩形碰撞对象按覆盖到的格子标为墙 '#'（行主序 g_map_grid[y*mw+x]）。
-static void map_rasterize_collision_rect(jtilemap_object_p obj, void* arg)
+static void map_rasterize_collision_rect(joy_tilemap_object_p obj, void* arg)
 {
     map_collision_ctx_t* c = (map_collision_ctx_t*)arg;
     int c0 = (int)floorf(obj->x / (float)c->tw);
@@ -89,11 +89,11 @@ static void map_rasterize_collision_rect(jtilemap_object_p obj, void* arg)
 }
 
 // 查找碰撞对象层：兼容常见命名（含 Tiled 里 "Collsion" 的拼写差异）。
-static jtilemap_object_layer_p map_find_collision_layer(jtilemap_p tm)
+static joy_tilemap_object_layer_p map_find_collision_layer(joy_tilemap_p tm)
 {
     static const char* names[] = { "Collision", "Collsion", "collision" };
     for (const char* n : names) {
-        jtilemap_object_layer_p ol = jtilemap_find_object_layer(tm, n);
+        joy_tilemap_object_layer_p ol = joy_scene_tilemap_find_object_layer(tm, n);
         if (ol) return ol;
     }
     return nullptr;
@@ -102,9 +102,9 @@ static jtilemap_object_layer_p map_find_collision_layer(jtilemap_p tm)
 // 探测给定路径的关卡 .tmj 是否可读（单点路径；候选前缀遍历已由资源索引取代）
 static bool map_tm_probe_path(const char* path)
 {
-        // 走 joy 的 utils_check_file（SDL IO）：安卓下关卡 lua 在 APK 里，
+        // 走 joy 的 joy_core_utils_check_file（SDL IO）：安卓下关卡 lua 在 APK 里，
         // fopen 探测不到会误判为"未制作"，进而关卡内容为空。
-        return utils_check_file(path);
+        return joy_core_utils_check_file(path);
 }
 
 // 本关是否"已制作"：resources.json 的 maps 段指向的 levelN.tmj 是否存在。
@@ -130,7 +130,7 @@ struct map_spawn_ctx_t {
     int enemy_cells[256];
     bool force_enemy = false;  // true 时该层内所有对象都视作敌人（用于独立的 Enemy 层）
 };
-static void map_parse_spawn_obj(jtilemap_object_p obj, void* arg)
+static void map_parse_spawn_obj(joy_tilemap_object_p obj, void* arg)
 {
     map_spawn_ctx_t* s = (map_spawn_ctx_t*)arg;
     float cx, cy;
@@ -150,21 +150,21 @@ static void map_parse_spawn_obj(jtilemap_object_p obj, void* arg)
     }
 }
 // 查找出生对象层：优先 Tiled 里新增的 "Player"，兼容旧名 "player"/"spawn"。
-static jtilemap_object_layer_p map_find_spawn_layer(jtilemap_p tm)
+static joy_tilemap_object_layer_p map_find_spawn_layer(joy_tilemap_p tm)
 {
     static const char* names[] = { "Player", "player", "spawn" };
     for (const char* n : names) {
-        jtilemap_object_layer_p ol = jtilemap_find_object_layer(tm, n);
+        joy_tilemap_object_layer_p ol = joy_scene_tilemap_find_object_layer(tm, n);
         if (ol) return ol;
     }
     return nullptr;
 }
 // 查找敌人对象层：优先 "Enemy"，兼容小写 "enemy" 与地图里误拼的 "Emeny"。
-static jtilemap_object_layer_p map_find_enemy_layer(jtilemap_p tm)
+static joy_tilemap_object_layer_p map_find_enemy_layer(joy_tilemap_p tm)
 {
     static const char* names[] = { "Enemy", "enemy", "Emeny" };
     for (const char* n : names) {
-        jtilemap_object_layer_p ol = jtilemap_find_object_layer(tm, n);
+        joy_tilemap_object_layer_p ol = joy_scene_tilemap_find_object_layer(tm, n);
         if (ol) return ol;
     }
     return nullptr;
@@ -191,38 +191,38 @@ static bool map_load_from_tilemap(int level)
     snprintf(path, sizeof(path), "%s", rel);
     if (!map_tm_probe_path(path)) return false;
 
-    jtilemap_p tm = jtilemap_load_file_json(path);
+    joy_tilemap_p tm = joy_scene_tilemap_load_file_json(path);
     if (!tm) return false;
 
     // 玩法网格尺寸以 tilemap 为准：小地图/碰撞/寻路/移动等系统共用这组动态宽高。
-    int w = jtilemap_get_width(tm);
-    int h = jtilemap_get_height(tm);
-    if (w <= 0 || h <= 0 || w * h > MAP_MAX_CELLS) { jtilemap_destroy(tm); return false; }
+    int w = joy_scene_tilemap_get_width(tm);
+    int h = joy_scene_tilemap_get_height(tm);
+    if (w <= 0 || h <= 0 || w * h > MAP_MAX_CELLS) { joy_scene_tilemap_destroy(tm); return false; }
 
     // 网格：先清为全通，再按碰撞对象层把墙格标为 '#'
     map_grid_clear(w, h);
-    jtilemap_object_layer_p col_layer = map_find_collision_layer(tm);
+    joy_tilemap_object_layer_p col_layer = map_find_collision_layer(tm);
     if (col_layer) {
-        int tw = jtilemap_get_tilewidth(tm);
-        int th = jtilemap_get_tileheight(tm);
+        int tw = joy_scene_tilemap_get_tilewidth(tm);
+        int th = joy_scene_tilemap_get_tileheight(tm);
         if (tw > 0 && th > 0) {
             map_collision_ctx_t cctx = { tw, th, MAP_W, MAP_H };
-            jtilemap_object_layer_foreach(col_layer, map_rasterize_collision_rect, &cctx);
+            joy_scene_tilemap_object_layer_foreach(col_layer, map_rasterize_collision_rect, &cctx);
         }
     }
 
     // 出生/敌人点：Player/spawn 对象层（对象坐标为 Tiled 像素，用 tilewidth 换算成格子）
-    const int tw = jtilemap_get_tilewidth(tm);
-    const int th = jtilemap_get_tileheight(tm);
+    const int tw = joy_scene_tilemap_get_tilewidth(tm);
+    const int th = joy_scene_tilemap_get_tileheight(tm);
     g_map_info.player_cell = -1;
     g_map_info.enemy_n = 0;
-    if (jtilemap_object_layer_p pl = map_find_spawn_layer(tm)) {
+    if (joy_tilemap_object_layer_p pl = map_find_spawn_layer(tm)) {
         map_spawn_ctx_t sctx;
         sctx.tw = (tw > 0) ? tw : 60;
         sctx.th = (th > 0) ? th : 60;
         sctx.mw = MAP_W;
         sctx.mh = MAP_H;
-        jtilemap_object_layer_foreach_all(pl, map_parse_spawn_obj, &sctx);
+        joy_scene_tilemap_object_layer_foreach_all(pl, map_parse_spawn_obj, &sctx);
         g_map_info.player_cell = sctx.player_cell;
         g_map_info.enemy_n = sctx.enemy_n;
         std::memcpy(g_map_info.enemy_cells, sctx.enemy_cells, (size_t)sctx.enemy_n * sizeof(int));
@@ -230,14 +230,14 @@ static bool map_load_from_tilemap(int level)
 
     // 敌人点：独立的 Enemy 层（地图里也可能误拼为 "Emeny"）。该层内所有对象都视作敌人，
     // 忽略对象自身 type（地图导出时 type 常为空），与上面 spawn 层里 type=="enemy" 的对象合并计入。
-    if (jtilemap_object_layer_p el = map_find_enemy_layer(tm)) {
+    if (joy_tilemap_object_layer_p el = map_find_enemy_layer(tm)) {
         map_spawn_ctx_t ectx;
         ectx.tw = (tw > 0) ? tw : 60;
         ectx.th = (th > 0) ? th : 60;
         ectx.mw = MAP_W;
         ectx.mh = MAP_H;
         ectx.force_enemy = true;
-        jtilemap_object_layer_foreach_all(el, map_parse_spawn_obj, &ectx);
+        joy_scene_tilemap_object_layer_foreach_all(el, map_parse_spawn_obj, &ectx);
         for (int i = 0; i < ectx.enemy_n && g_map_info.enemy_n < 256; ++i)
             g_map_info.enemy_cells[g_map_info.enemy_n++] = ectx.enemy_cells[i];
     }
@@ -252,9 +252,9 @@ static inline void map_load_level(int level)
     if (g_map_info.level == level) return;
 
     // 切关时释放上一关的 jtilemap
-    if (g_map_info.tilemap) { jtilemap_destroy(g_map_info.tilemap); g_map_info.tilemap = nullptr; }
+    if (g_map_info.tilemap) { joy_scene_tilemap_destroy(g_map_info.tilemap); g_map_info.tilemap = nullptr; }
 
-    if (g_map_info.tilemap_render) { jtilemap_render_destroy(g_map_info.tilemap_render); g_map_info.tilemap_render = nullptr; }
+    if (g_map_info.tilemap_render) { joy_scene_tilemap_render_destroy(g_map_info.tilemap_render); g_map_info.tilemap_render = nullptr; }
     g_map_info = {};                    // 清零（enemy_cells 归零）
     g_map_info.level = level;
 
@@ -312,7 +312,7 @@ static void map_log_load(const char* source, int level)
 }
 
 // 玩家出生点：'P' 格中心（世界米坐标），缺失回退 (0.5,0.5)
-static inline void map_player_spawn(int level, fp_t* fx, fp_t* fy)
+static inline void map_player_spawn(int level, joy_fp_t* fx, joy_fp_t* fy)
 {
     if (g_map_info.level != level) map_load_level(level);
     if (g_map_info.player_cell < 0) { *fx = fp_from_float(0.5f); *fy = fp_from_float(0.5f); return; }

@@ -22,7 +22,7 @@ public:
     void Destroy() override;
 
 private:
-    button_p btn_start = NULL, btn_online = NULL, btn_settings = NULL, btn_exit = NULL;
+    joy_button_p btn_start = NULL, btn_online = NULL, btn_settings = NULL, btn_exit = NULL;
     void load_menu_buttons();
 
     // ---- 实现辅助（原文件内 static 自由函数）----

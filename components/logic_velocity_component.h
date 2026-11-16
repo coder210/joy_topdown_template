@@ -4,8 +4,8 @@
 
 struct LogicVelocityComponent
 {
-        fp_t x;
-        fp_t y;
+        joy_fp_t x;
+        joy_fp_t y;
 };
 
 #endif

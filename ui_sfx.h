@@ -23,13 +23,13 @@ public:
         void setGain(float g) {
                 gain_ = g;
                 for (int i = 0; i < kCount; i++)
-                        if (shots_[i]) audio_shot_set_gain(shots_[i], gain_);
+                        if (shots_[i]) joy_audio_shot_set_gain(shots_[i], gain_);
         }
 
         void play(Kind k) {
                 if (k < 0 || k >= kCount) return;
                 if (!ensure()) return;
-                if (shots_[k]) audio_shot_play(shots_[k]);
+                if (shots_[k]) joy_audio_shot_play(shots_[k]);
         }
 
         // 预热：应用启动时调用一次。提前打开音频设备 + 解码三条音效，
@@ -39,9 +39,9 @@ public:
         // 释放三条 shot 与设备（AppQuit 时调用；析构也兜底调一次）
         void shutdown() {
                 for (int i = 0; i < kCount; i++) {
-                        if (shots_[i]) { audio_shot_destroy(shots_[i]); shots_[i] = NULL; }
+                        if (shots_[i]) { joy_audio_shot_destroy(shots_[i]); shots_[i] = NULL; }
                 }
-                if (dev_) { audio_close_device(dev_); dev_ = 0; }
+                if (dev_) { joy_audio_close_device(dev_); dev_ = 0; }
                 inited_ = false;
         }
 
@@ -67,13 +67,13 @@ private:
         bool ensure() {
                 if (inited_) return dev_ != 0;
                 inited_ = true;                       // 只尝试一次，失败即全程静音
-                dev_ = audio_open_device();
-                if (!dev_) { log_info("[ui_sfx] audio device unavailable, muted"); return false; }
+                dev_ = joy_audio_open_device();
+                if (!dev_) { joy_core_log_info("[ui_sfx] audio device unavailable, muted"); return false; }
                 for (int i = 0; i < kCount; i++) {
                         const char* p = pathFor((Kind)i);
-                        shots_[i] = audio_shot_create_ogg(p, dev_);
-                        if (shots_[i]) audio_shot_set_gain(shots_[i], gain_);
-                        else log_info("[ui_sfx] missing sound: %s", p);
+                        shots_[i] = joy_audio_shot_create_ogg(p, dev_);
+                        if (shots_[i]) joy_audio_shot_set_gain(shots_[i], gain_);
+                        else joy_core_log_info("[ui_sfx] missing sound: %s", p);
                 }
                 return true;
         }
@@ -81,14 +81,14 @@ private:
         uint32_t     dev_    = 0;
         float        gain_   = 1.0f;
         bool         inited_ = false;
-        audio_shot_p shots_[kCount] = {};
+        joy_audio_shot_p shots_[kCount] = {};
 };
 
-// 按钮命中并播放音效：替代裸 button_is_pressed 调用，避免各场景漏加音效。
-// 语义与 button_is_pressed 完全一致（命中返回 true），仅附带播一声。
-static inline bool ui_button_hit(button_p b, float x, float y, UiSfx::Kind kind = UiSfx::kClick)
+// 按钮命中并播放音效：替代裸 joy_r2d_button_is_pressed 调用，避免各场景漏加音效。
+// 语义与 joy_r2d_button_is_pressed 完全一致（命中返回 true），仅附带播一声。
+static inline bool ui_button_hit(joy_button_p b, float x, float y, UiSfx::Kind kind = UiSfx::kClick)
 {
-        if (!b || !button_is_pressed(b, x, y)) return false;
+        if (!b || !joy_r2d_button_is_pressed(b, x, y)) return false;
         UiSfx::Get().play(kind);
         return true;
 }

@@ -17,8 +17,8 @@ static void camera_follow_pass(entt::registry& registry, Context* ctx, float /*d
 
     int lw = DISPLAY_WINDOW_W, lh = DISPLAY_DESIGN_H;
     if (ctx && ctx->r2d) {
-        r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
-        if (lw <= 0 || lh <= 0) r2d_get_size(ctx->r2d, &lw, &lh);
+        joy_r2d_get_logical_presentation(ctx->r2d, &lw, &lh, NULL);
+        if (lw <= 0 || lh <= 0) joy_r2d_get_size(ctx->r2d, &lw, &lh);
     }
     const float half_w = (float)lw * 0.5f / (float)PIXELS_PER_METER;
     const float half_h = (float)lh * 0.5f / (float)PIXELS_PER_METER;

@@ -38,9 +38,9 @@ struct Context {
         Settings settings;   // 用户设置（切换模式/进出场景时保留）
 
         bool running;
-        game_timer_t game_timer;
-        jwindow_p window;
-        jr2d_p r2d;
+        joy_game_timer_t game_timer;
+        joy_window_p window;
+        joy_r2d_p r2d;
         SceneManager* scene_mgr = nullptr;  // 指向 main 创建的 SceneManager；场景经其 requestTransition/setPending 登记过渡目标（不拥有）
         // 网络传输（ITransport 抽象）：GameScene 按模式创建/销毁，单机为 null。
         // 上层不再直接接触 joy 的 netclient_*/netserver_*。
@@ -49,9 +49,9 @@ struct Context {
 
         // ---- 音频 ----
         uint32_t            audio_dev = 0;
-        audio_shot_p        step_sound = NULL;
-        audio_shot_p        bow_sound = NULL;   // 射箭音效（真正发射时播放）
-        audio_bgm_p         bgm = NULL;
+        joy_audio_shot_p        step_sound = NULL;
+        joy_audio_shot_p        bow_sound = NULL;   // 射箭音效（真正发射时播放）
+        joy_audio_bgm_p         bgm = NULL;
         // 远程玩家方向追踪
         //std::map<entt::entity, int>  remote_dirs;
 
@@ -100,7 +100,7 @@ inline void run_phase(Context* ctx, Phase phase, float dt)
         if (phase == OnUpdate) prof.record(ms);
     }
     if (phase == OnUpdate) {
-        // uint32_t now = get_ticks();
+        // uint32_t now = joy_core_get_ticks();
         // if (prof.due(now)) {
         //     int i = 0;
         //     for (auto& sys : ctx->ecs.ctx().get<SystemRegistry>().systems) {

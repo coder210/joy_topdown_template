@@ -5,11 +5,11 @@
 #include "../ui_sfx.h"
 #include "../asset_manager.h"
 
-// 白底黑框按钮：无贴图，白色填充 + 黑色描边（button_draw 自带线框）+ 黑色文字
+// 白底黑框按钮：无贴图，白色填充 + 黑色描边（joy_r2d_button_draw 自带线框）+ 黑色文字
 // 悬停和按下时平滑过渡到浅灰色
 void MenuLayer::sendMenuEvent(int event_code)
 {
-        push_user_event(MENU_EVENT, event_code);
+        joy_core_push_user_event(MENU_EVENT, event_code);
 }
 
 MenuLayer::MenuLayer(Context* ctx) : UILayer(ctx)
@@ -22,11 +22,11 @@ MenuLayer::~MenuLayer() = default;
 void MenuLayer::load_menu_buttons()
 {
         int lw, lh;
-        r2d_get_logical_presentation(ctx_->r2d, &lw, &lh, NULL);
+        joy_r2d_get_logical_presentation(ctx_->r2d, &lw, &lh, NULL);
         const float LW = (lw > 0) ? (float)lw : (float)DISPLAY_WINDOW_W;
         const float LH = (lh > 0) ? (float)lh : (float)DISPLAY_DESIGN_H;
         const float s  = (lh > 0) ? ((float)lh / 320.0f) : 1.0f;
-        font_p simhei_font = AssetManager::GetInstance()->GetSimheiFont24();
+        joy_font_p simhei_font = AssetManager::GetInstance()->GetSimheiFont24();
 
         // 按钮尺寸/间距按设计稿 480x320 换算（高度基准），分辨率改变观感不变。
         const float btn_w = 120.0f * s, btn_h = 44.0f * s, gap = 12.0f * s;
@@ -36,18 +36,18 @@ void MenuLayer::load_menu_buttons()
         // 1 列栅格：四枚按钮垂直居中堆叠（与原来手动坐标结果一致）。
         // pad=0 时单元格顶边即行顶，按钮在单元格内顶部对齐 → 与原先逐行偏移等价。
         float cols[1] = { 1.0f };
-        jlayout_grid_t* g = jlayout_grid_create((LW - btn_w) * 0.5f, start_y, btn_w, btn_h + gap, 1, cols, 0.0f);
+        joy_layout_grid_t* g = joy_r2d_layout_grid_create((LW - btn_w) * 0.5f, start_y, btn_w, btn_h + gap, 1, cols, 0.0f);
         float cx, cy, cw, ch;
 
-        auto make_btn = [&](const char* label, int len) -> button_p {
-                jlayout_grid_cell(g, 0, &cx, &cy, &cw, &ch);
-                button_p b = button_create(ctx_->r2d,
+        auto make_btn = [&](const char* label, int len) -> joy_button_p {
+                joy_r2d_layout_grid_cell(g, 0, &cx, &cy, &cw, &ch);
+                joy_button_p b = joy_r2d_button_create(ctx_->r2d,
                         (cx + cw * 0.5f) / LW, (cy + btn_h * 0.5f) / LH,
                         cw / LW, btn_h / LH);
                 UIStyle::applyPaperButton(b);
-                button_set_text_offset(b, 0, 3.0f * s);
-                button_set_textx(b, simhei_font, label, len, { 0, 0, 0, 255 });
-                jlayout_grid_next_row(g);
+                joy_r2d_button_set_text_offset(b, 0, 3.0f * s);
+                joy_r2d_button_set_textx(b, simhei_font, label, len, { 0, 0, 0, 255 });
+                joy_r2d_layout_grid_next_row(g);
                 return b;
         };
 
@@ -55,16 +55,16 @@ void MenuLayer::load_menu_buttons()
         btn_online   = make_btn("联机游戏", (int)strlen("联机游戏"));
         btn_settings = make_btn("设置",     (int)strlen("设置"));
         btn_exit     = make_btn("退出",     (int)strlen("退出"));
-        jlayout_grid_destroy(g);
+        joy_r2d_layout_grid_destroy(g);
 }
 
 void MenuLayer::HandleEvent(const void* ev)
 {
-        jevent_callbacks_t cbs = {};
+        joy_event_callbacks_t cbs = {};
         cbs.on_mousepressed = [](float x, float y, int btn, void* arg) {
                 (void)btn;
                 auto* self = (MenuLayer*)arg;
-                auto hit = [&](button_p b) { return ui_button_hit(b, x, y); };
+                auto hit = [&](joy_button_p b) { return ui_button_hit(b, x, y); };
                 // 必须互斥：若一次触摸同时命中多个按钮，连发会造成"点哪个都退出"
                 //（MENU_EVENT_EXIT 是最后一条，一旦也命中就退出程序）。
                 if      (self->btn_start    && hit(self->btn_start))    MenuLayer::sendMenuEvent(MENU_EVENT_START);
@@ -75,36 +75,36 @@ void MenuLayer::HandleEvent(const void* ev)
         cbs.on_mousereleased = [](float x, float y, int btn, void* arg) {
                 (void)x; (void)y; (void)btn;
                 auto* self = (MenuLayer*)arg;
-                if (self->btn_start)   button_set_pressed(self->btn_start, false);
-                if (self->btn_online)  button_set_pressed(self->btn_online, false);
-                if (self->btn_settings) button_set_pressed(self->btn_settings, false);
-                if (self->btn_exit)    button_set_pressed(self->btn_exit, false);
+                if (self->btn_start)   joy_r2d_button_set_pressed(self->btn_start, false);
+                if (self->btn_online)  joy_r2d_button_set_pressed(self->btn_online, false);
+                if (self->btn_settings) joy_r2d_button_set_pressed(self->btn_settings, false);
+                if (self->btn_exit)    joy_r2d_button_set_pressed(self->btn_exit, false);
         };
         cbs.on_mousemoved = [](float x, float y, float dx, float dy, void* arg) {
                 (void)dx; (void)dy;
                 auto* self = (MenuLayer*)arg;
-                if (self->btn_start)   button_is_hovered(self->btn_start, x, y);
-                if (self->btn_online)  button_is_hovered(self->btn_online, x, y);
-                if (self->btn_settings) button_is_hovered(self->btn_settings, x, y);
-                if (self->btn_exit)    button_is_hovered(self->btn_exit, x, y);
+                if (self->btn_start)   joy_r2d_button_is_hovered(self->btn_start, x, y);
+                if (self->btn_online)  joy_r2d_button_is_hovered(self->btn_online, x, y);
+                if (self->btn_settings) joy_r2d_button_is_hovered(self->btn_settings, x, y);
+                if (self->btn_exit)    joy_r2d_button_is_hovered(self->btn_exit, x, y);
         };
-        dispatch_event(cbs, ev, this);
+        joy_core_dispatch_event(cbs, ev, this);
 }
 
 void MenuLayer::Destroy()
 {
-        if (btn_start)   { button_destroy(btn_start);   btn_start = NULL; }
-        if (btn_online)  { button_destroy(btn_online);  btn_online = NULL; }
-        if (btn_settings){ button_destroy(btn_settings);btn_settings = NULL; }
-        if (btn_exit)    { button_destroy(btn_exit);    btn_exit = NULL; }
+        if (btn_start)   { joy_r2d_button_destroy(btn_start);   btn_start = NULL; }
+        if (btn_online)  { joy_r2d_button_destroy(btn_online);  btn_online = NULL; }
+        if (btn_settings){ joy_r2d_button_destroy(btn_settings);btn_settings = NULL; }
+        if (btn_exit)    { joy_r2d_button_destroy(btn_exit);    btn_exit = NULL; }
 }
 
 void MenuLayer::Render()
 {
         if (!ctx_) return;
-        jr2d_p r2d = ctx_->r2d;
-        if (btn_start)   button_draw(btn_start);
-        if (btn_online)  button_draw(btn_online);
-        if (btn_settings) button_draw(btn_settings);
-        if (btn_exit)    button_draw(btn_exit);
+        joy_r2d_p r2d = ctx_->r2d;
+        if (btn_start)   joy_r2d_button_draw(btn_start);
+        if (btn_online)  joy_r2d_button_draw(btn_online);
+        if (btn_settings) joy_r2d_button_draw(btn_settings);
+        if (btn_exit)    joy_r2d_button_draw(btn_exit);
 }

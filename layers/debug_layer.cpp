@@ -19,10 +19,10 @@ void DebugLayer::Destroy() {}
 void DebugLayer::drawDebug()
 {
         if (!ctx_) return;
-        jr2d_p r2d = ctx_->r2d;
+        joy_r2d_p r2d = ctx_->r2d;
         float x = 0.0f, y = 0.0f;
-        jcolor_t c = { 255, 80, 80, 255 };
-        jrect_t r = { x - 30, y - 30, 60, 60 };
-        r2d_set_color(r2d, c.r, c.g, c.b, c.a);
-        shape_draw_rectangle(r2d, "fill", r);
+        joy_color_t c = { 255, 80, 80, 255 };
+        joy_rect_t r = { x - 30, y - 30, 60, 60 };
+        joy_r2d_set_color(r2d, c.r, c.g, c.b, c.a);
+        joy_r2d_shape_draw_rectangle(r2d, "fill", r);
 }

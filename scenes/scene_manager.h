@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #pragma once
 #include <memory>
 #include <joy/joy.h>
@@ -24,7 +25,7 @@ public:
 
     void HandleEvent(const SDL_Event* e);
     void Update(float dt);
-    void Render(jr2d_p r2d);
+    void Render(joy_r2d_p r2d);
 
     void reset();
     const char* currentName() const;

@@ -52,9 +52,9 @@ struct PlayerSpawnDesc {
     int   entity_id = -1;                 // -1 = 从 GlobalState 自动分配
     int   conv = 0;
     int   char_id = 0;
-    fp_t  box_x = 0, box_y = 0;           // 碰撞盒左上角（LogicPosition）
-    fp_t  box_w = 0, box_h = 0;
-    fp_t  spawn_x = 0, spawn_y = 0;       // 重生锚点（SpawnPoint）
+    joy_fp_t  box_x = 0, box_y = 0;           // 碰撞盒左上角（LogicPosition）
+    joy_fp_t  box_w = 0, box_h = 0;
+    joy_fp_t  spawn_x = 0, spawn_y = 0;       // 重生锚点（SpawnPoint）
     float render_x = 0.0f, render_y = 0.0f;
     int   hp = PLAYER_MAX_HP;
     int   max_hp = PLAYER_MAX_HP;
@@ -88,7 +88,7 @@ static entt::entity spawn_player(entt::registry& reg, Context* ctx, const Player
 // 加入路径：以出生格中心创建，碰撞盒按默认玩家尺寸居中。
 static entt::entity spawn_player_on_join(entt::registry& reg, Context* ctx,
                                          int conv, int char_id,
-                                         fp_t center_x, fp_t center_y)
+                                         joy_fp_t center_x, joy_fp_t center_y)
 {
     PlayerSpawnDesc d;
     d.conv = conv;
@@ -107,8 +107,8 @@ static entt::entity spawn_player_on_join(entt::registry& reg, Context* ctx,
 // 快照恢复路径：位置/尺寸/血量取服务端快照，重生锚点取当前关卡出生格。
 static entt::entity spawn_player_from_snapshot(entt::registry& reg, Context* ctx,
                                                int entity_id, int conv, int char_id,
-                                               fp_t box_x, fp_t box_y,
-                                               fp_t box_w, fp_t box_h, int hp)
+                                               joy_fp_t box_x, joy_fp_t box_y,
+                                               joy_fp_t box_w, joy_fp_t box_h, int hp)
 {
     PlayerSpawnDesc d;
     d.entity_id = entity_id;
@@ -131,15 +131,15 @@ struct EnemySpawnDesc {
     int   entity_id = -1;                 // -1 = 从 GlobalState 自动分配
     int   spawn_idx = 0;
     const SpawnDef* def = nullptr;        // nullptr = 最小装配（无 Health/AI/SpawnPoint）
-    fp_t  box_x = 0, box_y = 0;           // 碰撞盒左上角（LogicPosition）
-    fp_t  box_w = 0, box_h = 0;
+    joy_fp_t  box_x = 0, box_y = 0;           // 碰撞盒左上角（LogicPosition）
+    joy_fp_t  box_w = 0, box_h = 0;
     float render_x = 0.0f, render_y = 0.0f;
     int   hp = ENEMY_MAX_HP;
     int   max_hp = ENEMY_MAX_HP;
     // AI 运行时状态（仅快照恢复时需要；否则从 SpawnDef 重新开始）
     bool  restore_ai = false;
     int   ai_timer = 0, ai_state = 0;
-    fp_t  ai_target_x = 0, ai_target_y = 0;
+    joy_fp_t  ai_target_x = 0, ai_target_y = 0;
 };
 
 static entt::entity spawn_enemy(entt::registry& reg, Context* ctx, const EnemySpawnDesc& d)
@@ -196,10 +196,10 @@ static entt::entity spawn_enemy_at(entt::registry& reg, Context* ctx,
 // 快照恢复（客户端）：位置/尺寸/血量取快照；AI 参数取 SpawnDef，运行时状态取快照。
 static entt::entity spawn_enemy_from_snapshot(entt::registry& reg, Context* ctx,
                                               int entity_id, const SpawnDef* def, int spawn_idx,
-                                              fp_t box_x, fp_t box_y,
-                                              fp_t box_w, fp_t box_h, int hp,
+                                              joy_fp_t box_x, joy_fp_t box_y,
+                                              joy_fp_t box_w, joy_fp_t box_h, int hp,
                                               int ai_timer, int ai_state,
-                                              fp_t ai_target_x, fp_t ai_target_y)
+                                              joy_fp_t ai_target_x, joy_fp_t ai_target_y)
 {
     EnemySpawnDesc d;
     d.entity_id = entity_id;

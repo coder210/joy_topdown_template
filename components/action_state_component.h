@@ -25,7 +25,7 @@ struct ActionStateComponent {
     static constexpr int ATTACK_DURATION = 18;
 
     // 击退/硬直计时（tick 数）：>0 视为硬直中。由伤害/击退系统在命中时置满，
-    // 由 input_consume_input_system 每 tick 递减。驱动 janim 的 knocked 动画（独立于攻击）。
+    // 由 input_consume_input_system 每 tick 递减。驱动渲染层 knocked 动画（独立于攻击）。
     int knockback_timer = 0;
     static constexpr int KNOCKED_DURATION = 18;   // 0.9s @ 20Hz（与 ATTACK_DURATION 一致）
 

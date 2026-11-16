@@ -5,7 +5,7 @@
 #include "scene.h"
 
 // 关卡选择场景：继承 Scene 基类，事件由 SceneManager 直接分发到 HandleUiEvent
-//（内部用 joy 的 dispatch_event 解析），不再依赖 joy 的 scene_node 桥接。
+//（内部用 joy 的 joy_core_dispatch_event 解析），不再依赖 joy 的 scene_node 桥接。
 class LevelSelectScene : public Scene {
 public:
     explicit LevelSelectScene(Context* ctx, GameModeKind mode);
@@ -17,8 +17,8 @@ private:
     // 关卡槽位上限：与 LEVEL_META 条数解耦，加关卡只改 LEVEL_META 即可（不必再扩数组）
     static const int LEVEL_SLOT_MAX = 12;
     GameModeKind target_mode = MODE_SINGLE;
-    button_p btn_levels[LEVEL_SLOT_MAX];
-    button_p btn_confirm = NULL, btn_back = NULL;
+    joy_button_p btn_levels[LEVEL_SLOT_MAX];
+    joy_button_p btn_confirm = NULL, btn_back = NULL;
     int selected = 0;
     int hovered_ = -1;                 // 鼠标悬停的卡片（自行跟踪，避免依赖按钮内部态）
     // 区分“点击行”与“滑动列表”：按下只记录，松手且仍在同一行才算点击
@@ -29,7 +29,7 @@ private:
     // "此关正在制作中" 提示（模态：显示期间消费所有事件，点击任意处关闭）
     bool tip_active = false;
     // 关卡列表纵向滚动（复用引擎 jui 的 scrollview）：关卡增多超出视口时可上下拖动
-    scrollview_p level_view = NULL;
+    joy_scrollview_p level_view = NULL;
     float level_base_y[LEVEL_SLOT_MAX] = { 0 };   // 各关在 scroll=0 时的顶边 y
     // 每关真实网格的缓存（Load 时读取），用于卡片左侧迷你地图（零美术资源）
     char  preview_grid_[LEVEL_SLOT_MAX][4096];

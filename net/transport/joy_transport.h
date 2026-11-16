@@ -29,9 +29,9 @@ public:
 private:
     void ReleasePending();
 
-    netclient_p   client_ = nullptr;
-    netserver_p   server_ = nullptr;
-    net_message_t msg_{};          // 最近一次 Poll 取到的消息（Release 时释放）
+    joy_netclient_p   client_ = nullptr;
+    joy_netserver_p   server_ = nullptr;
+    joy_net_message_t msg_{};          // 最近一次 Poll 取到的消息（Release 时释放）
     bool          msg_pending_ = false;
 };
 

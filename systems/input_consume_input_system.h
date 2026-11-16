@@ -53,7 +53,7 @@ static void input_consume_input_system(entt::registry& registry, Context* ctx, f
 		PlayerStateInput state_input;
 		state_input.move_bits = input.dir;
 
-		// log_info("Raw dir: %d\n", input.dir);
+		// joy_core_log_info("Raw dir: %d\n", input.dir);
 
 		// 鼠标瞄准角：来自随输入同步的量化值（两端同一整数，渲染层据此指向武器）。
 		// 存到 ActionStateComponent.aim_yaw（持久）；**不能存 PlayerStateInput**——

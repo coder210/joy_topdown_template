@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #include "scene_manager.h"
 #include "context.h"
 #include "scenes/scene.h"
@@ -26,7 +27,7 @@ void SceneManager::setPending(Scene* next) {
 void SceneManager::requestTransition(Scene* next, int code) {
     if (!next) return;
     pending_.reset(next);
-    push_user_event(TRANSITION_EVENT, code);
+    joy_core_push_user_event(TRANSITION_EVENT, code);
 }
 
 void SceneManager::processPending() {
@@ -39,7 +40,7 @@ void SceneManager::processPending() {
 
 void SceneManager::HandleEvent(const SDL_Event* e) {
     if (!current_ || !e) return;
-    // 模拟原 joy 的双回调：先场景级事件，再 UI 级事件（HandleUiEvent 内部用 dispatch_event 解析）
+    // 模拟原 joy 的双回调：先场景级事件，再 UI 级事件（HandleUiEvent 内部用 joy_core_dispatch_event 解析）
     current_->HandleEvent((const void*)e);
     current_->HandleUiEvent((const void*)e);
 }
@@ -48,7 +49,7 @@ void SceneManager::Update(float dt) {
     if (current_) current_->Update(dt);
 }
 
-void SceneManager::Render(jr2d_p r2d) {
+void SceneManager::Render(joy_r2d_p r2d) {
     if (current_) current_->Render();
 }
 

@@ -108,7 +108,7 @@ static void fog_pass_2d(Context* ctx)
     static std::vector<float> R_world, R_px;
     R_world.resize((size_t)SEG);
     R_px.resize((size_t)SEG);
-    joy_fov_compute_radii(walls.data(), (int)walls.size(),
+    joy_r3d_fov_compute_radii(walls.data(), (int)walls.size(),
         px, py, FOV2D_VIS_RADIUS, 0.0f, STEP, SEG, R_world.data());
 
     auto& gs = ctx->ecs.ctx().get<GlobalState>();
@@ -125,7 +125,7 @@ static void fog_pass_2d(Context* ctx)
             R_px[i] = near_px;
     }
 
-    joy_fov_draw_2d(ctx->r2d, cxp, cyp, R_px.data(), SEG,
+    joy_r2d_fov_draw_2d(ctx->r2d, cxp, cyp, R_px.data(), SEG,
         FOV2D_FEATHER_PX, meters_to_pixels(FOV2D_OUTER_RADIUS));
 }
 
@@ -153,7 +153,7 @@ static bool fog2d_entity_visible(Context* ctx, float ex, float ey)
     std::vector<joy_fov_rect> walls;
     if (!fog2d_ensure_walls(walls)) return true;
     float inv = 1.0f / d;
-    float hit = joy_fov_ray_dist(walls.data(), (int)walls.size(), px, py, dx * inv, dy * inv);
+    float hit = joy_r3d_fov_ray_dist(walls.data(), (int)walls.size(), px, py, dx * inv, dy * inv);
     if (hit < d - 1e-3f) return false;
     return true;
 }

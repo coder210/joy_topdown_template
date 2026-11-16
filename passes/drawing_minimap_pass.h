@@ -23,11 +23,11 @@ static void drawing_minimap_pass(Context* ctx)
     if (!ctx->r2d) return;
 
     // 小地图尺寸与边距按比例表达（128px / 8px 是相对 480x320 设计稿的值），
-    // 再由 r2d_fpx 换算成当前逻辑像素 —— 逻辑分辨率改变时自动等比缩放，无需改常量。
+    // 再由 joy_r2d_fpx 换算成当前逻辑像素 —— 逻辑分辨率改变时自动等比缩放，无需改常量。
     float mm_size = 0.0f, margin_x = 0.0f, margin_y = 0.0f, canvas_w = 0.0f;
-    r2d_fpx(ctx->r2d, 128.0f / 480.0f, 0.0f,          0.0f, 0.0f, &mm_size,  NULL,      NULL, NULL);
-    r2d_fpx(ctx->r2d, 8.0f / 480.0f,   8.0f / 320.0f, 0.0f, 0.0f, &margin_x, &margin_y, NULL, NULL);
-    r2d_fpx(ctx->r2d, 1.0f,            0.0f,          0.0f, 0.0f, &canvas_w, NULL,      NULL, NULL);
+    joy_r2d_fpx(ctx->r2d, 128.0f / 480.0f, 0.0f,          0.0f, 0.0f, &mm_size,  NULL,      NULL, NULL);
+    joy_r2d_fpx(ctx->r2d, 8.0f / 480.0f,   8.0f / 320.0f, 0.0f, 0.0f, &margin_x, &margin_y, NULL, NULL);
+    joy_r2d_fpx(ctx->r2d, 1.0f,            0.0f,          0.0f, 0.0f, &canvas_w, NULL,      NULL, NULL);
 
     // 视口按地图宽高比适配（MAP_W/MAP_H 已随 tilemap 动态更新），非方形地图不拉伸。
     float mm_w = mm_size, mm_h = mm_size;
@@ -55,13 +55,13 @@ static void drawing_minimap_pass(Context* ctx)
     };
 
     // 宣纸底 + 墨色边框
-    r2d_set_color(ctx->r2d, 248, 246, 240, 255);
-    jrect_t bg = { mm_x, mm_y, mm_w, mm_h };
-    shape_draw_rectangle(ctx->r2d, "fill", bg);
+    joy_r2d_set_color(ctx->r2d, 248, 246, 240, 255);
+    joy_rect_t bg = { mm_x, mm_y, mm_w, mm_h };
+    joy_r2d_shape_draw_rectangle(ctx->r2d, "fill", bg);
 
-    r2d_set_color(ctx->r2d, 40, 40, 45, 255);
-    jrect_t border = { mm_x - 1.0f, mm_y - 1.0f, mm_w + 2.0f, mm_h + 2.0f };
-    shape_draw_rectangle(ctx->r2d, "line", border);
+    joy_r2d_set_color(ctx->r2d, 40, 40, 45, 255);
+    joy_rect_t border = { mm_x - 1.0f, mm_y - 1.0f, mm_w + 2.0f, mm_h + 2.0f };
+    joy_r2d_shape_draw_rectangle(ctx->r2d, "line", border);
 
     auto to_map = [&](float wx, float wy, float& mx, float& my) {
         mx = mm_x + wx / (float)MAP_W * mm_w;
@@ -78,9 +78,9 @@ static void drawing_minimap_pass(Context* ctx)
             float cwx = (float)x + 0.5f, cwy = (float)y + 0.5f;
             float mx, my;
             to_map(cwx, cwy, mx, my);
-            r2d_set_color(ctx->r2d, 90, 90, 98, 255);
-            jrect_t bq = { mx - cell * 0.5f, my - cell * 0.5f, cell, cell };
-            shape_draw_rectangle(ctx->r2d, "fill", bq);
+            joy_r2d_set_color(ctx->r2d, 90, 90, 98, 255);
+            joy_rect_t bq = { mx - cell * 0.5f, my - cell * 0.5f, cell, cell };
+            joy_r2d_shape_draw_rectangle(ctx->r2d, "fill", bq);
         }
     }
 
@@ -94,9 +94,9 @@ static void drawing_minimap_pass(Context* ctx)
         if (!revealed(t.position.x, t.position.y, ppx, ppy)) continue;
         float mx, my;
         to_map(t.position.x, t.position.y, mx, my);
-        r2d_set_color(ctx->r2d, 200, 60, 50, 255);
-        jrect_t dq = { mx - cell * 0.4f, my - cell * 0.4f, cell * 0.8f, cell * 0.8f };
-        shape_draw_rectangle(ctx->r2d, "fill", dq);
+        joy_r2d_set_color(ctx->r2d, 200, 60, 50, 255);
+        joy_rect_t dq = { mx - cell * 0.4f, my - cell * 0.4f, cell * 0.8f, cell * 0.8f };
+        joy_r2d_shape_draw_rectangle(ctx->r2d, "fill", dq);
     }
 
     // 玩家（本地墨色大点始终揭示；其他玩家淡墨小点仅视野内揭示）——同样用世界中心
@@ -108,13 +108,13 @@ static void drawing_minimap_pass(Context* ctx)
         float mx, my;
         to_map(t.position.x, t.position.y, mx, my);
         if (local) {
-            r2d_set_color(ctx->r2d, 40, 40, 45, 255);
-            jrect_t lq = { mx - cell * 0.5f, my - cell * 0.5f, cell, cell };
-            shape_draw_rectangle(ctx->r2d, "fill", lq);
+            joy_r2d_set_color(ctx->r2d, 40, 40, 45, 255);
+            joy_rect_t lq = { mx - cell * 0.5f, my - cell * 0.5f, cell, cell };
+            joy_r2d_shape_draw_rectangle(ctx->r2d, "fill", lq);
         } else {
-            r2d_set_color(ctx->r2d, 120, 120, 128, 255);
-            jrect_t oq = { mx - cell * 0.4f, my - cell * 0.4f, cell * 0.8f, cell * 0.8f };
-            shape_draw_rectangle(ctx->r2d, "fill", oq);
+            joy_r2d_set_color(ctx->r2d, 120, 120, 128, 255);
+            joy_rect_t oq = { mx - cell * 0.4f, my - cell * 0.4f, cell * 0.8f, cell * 0.8f };
+            joy_r2d_shape_draw_rectangle(ctx->r2d, "fill", oq);
         }
     }
 }

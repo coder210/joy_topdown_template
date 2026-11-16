@@ -7,9 +7,9 @@
 // FPS 显示（纯视觉 HUD，不影响帧同步/ECS 逻辑）
 //   - 在逻辑屏幕坐标左上角绘制实时帧率
 //   - 内部用指数移动平均平滑帧率，每 0.5s 刷新一次文本
-//   - 需在 r2d_begin/r2d_end 之间调用
+//   - 需在 joy_r2d_begin/joy_r2d_end 之间调用
 // ============================================================
-static void draw_fps_pass(jr2d_p r2d, font_p font, float dt)
+static void draw_fps_pass(joy_r2d_p r2d, joy_font_p font, float dt)
 {
         static float ema      = 60.0f;
         static float accum    = 0.0f;
@@ -23,10 +23,10 @@ static void draw_fps_pass(jr2d_p r2d, font_p font, float dt)
                 accum = 0.0f;
         }
 
-        jcolor_t c = { 60, 60, 70, 235 };   // 深灰，适配白底背景
-        jcolor_t shadow = { 255, 255, 255, 170 };
-        jtext_printf(r2d, font, text, (int)strlen(text), shadow,
+        joy_color_t c = { 60, 60, 70, 235 };   // 深灰，适配白底背景
+        joy_color_t shadow = { 255, 255, 255, 170 };
+        joy_r2d_text_printf(r2d, font, text, (int)strlen(text), shadow,
                      9.0f / 480.0f, 5.0f / 320.0f);
-        jtext_printf(r2d, font, text, (int)strlen(text), c,
+        joy_r2d_text_printf(r2d, font, text, (int)strlen(text), c,
                      8.0f / 480.0f, 4.0f / 320.0f);
 }

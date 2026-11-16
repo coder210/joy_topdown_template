@@ -21,7 +21,7 @@ struct GlobalState {
     float fixed_timestep = 1.0f / 20.0f;
 
     // 摄像机
-    vec2_t camera_position = { 0.0f, 0.0f };
+    joy_vec2_t camera_position = { 0.0f, 0.0f };
     int camera_follow_conv = -1;  // 要跟随的玩家 conv，-1 表示不跟随
 
     // 横版清关：把世界 Y 锁到屏幕垂直中心（<0 = 不锁，随玩家上下跟随，保持原俯视行为）
@@ -35,7 +35,7 @@ struct GlobalState {
     // 两端以同一 seed 创建同一序列，保证 AI/巡逻等行为完全一致。
     // 用单状态 LCG（lcg_random_*）：状态仅 1 个 uint64，loading 同步量最小。
     int random_seed = 0;
-    lcg_num_p random = NULL;      // lcg_random_create(seed) 创建，帧同步期间共享推进
+    joy_lcg_num_p random = NULL;      // joy_core_lcg_random_create(seed) 创建，帧同步期间共享推进
 
     // 选关地图与通关判定（与 3D 的 game_scene 业务逻辑对齐）
     int level = 1;                // 当前选关索引（来自 ctx->selected_level）

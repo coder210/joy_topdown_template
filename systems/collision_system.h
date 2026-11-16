@@ -9,9 +9,9 @@
 struct Context;
 
 // 定点数向下取整转 int（算术右移即 floor，负向负无穷），纯整数、帧同步确定性。
-static inline int collision_fp_floor_to_int(fp_t x)
+static inline int collision_fp_floor_to_int(joy_fp_t x)
 {
-    return (int)(x >> FP_FRACTIONAL_PLACES);
+    return (int)(x >> JOY_FP_FRACTIONAL_PLACES);
 }
 
 // 玩家/敌人与地图碰撞处理 system。
@@ -40,13 +40,13 @@ static void collision_system(entt::registry& registry, Context* ctx, float dt) {
         auto& mover_pos = mover_view.get<LogicPositionComponent>(mover_entity);
 
         // 移动体 AABB 边界（纯定点数，帧同步确定性）
-        const fp_t x0 = mover_pos.x;
-        const fp_t y0 = mover_pos.y;
-        const fp_t w  = mover_rect.width;
-        const fp_t h  = mover_rect.height;
-        const fp_t x1 = fp_add(x0, w);
-        const fp_t y1 = fp_add(y0, h);
-        const fp_t EPS = fp_from_float(0.001f);
+        const joy_fp_t x0 = mover_pos.x;
+        const joy_fp_t y0 = mover_pos.y;
+        const joy_fp_t w  = mover_rect.width;
+        const joy_fp_t h  = mover_rect.height;
+        const joy_fp_t x1 = fp_add(x0, w);
+        const joy_fp_t y1 = fp_add(y0, h);
+        const joy_fp_t EPS = fp_from_float(0.001f);
 
         // 计算移动体覆盖的格子范围（含边缘），越界视为墙
         int gx0 = collision_fp_floor_to_int(x0);
@@ -66,15 +66,15 @@ static void collision_system(entt::registry& registry, Context* ctx, float dt) {
                 if (!blocked) continue;
 
                 // 墙格矩形 [gx, gy]~[gx+1, gy+1]，与移动体 AABB 求最小渗透方向并推出
-                rectanglef_t mover_box = { x0, y0, w, h };
-                rectanglef_t tile_box  = { fp_from_int(gx), fp_from_int(gy),
+                joy_rectanglef_t mover_box = { x0, y0, w, h };
+                joy_rectanglef_t tile_box  = { fp_from_int(gx), fp_from_int(gy),
                                            fp_one(), fp_one() };
-                contact2df_t contact;
-                if (collision2df_get_rectangles(mover_box, fp_zero(), tile_box, fp_zero(), &contact)) {
-                    fp_t depth = contact.depth;
+                joy_contact2df_t contact;
+                if (joy_collision_2df_get_rectangles(mover_box, fp_zero(), tile_box, fp_zero(), &contact)) {
+                    joy_fp_t depth = contact.depth;
                     if (depth < fp_zero()) depth = fp_sub(fp_zero(), depth);
-                    fp_t nx = fp_sub(fp_zero(), contact.normal.x);
-                    fp_t ny = fp_sub(fp_zero(), contact.normal.y);
+                    joy_fp_t nx = fp_sub(fp_zero(), contact.normal.x);
+                    joy_fp_t ny = fp_sub(fp_zero(), contact.normal.y);
                     mover_pos.x = fp_add(mover_pos.x, fp_mul(nx, depth));
                     mover_pos.y = fp_add(mover_pos.y, fp_mul(ny, depth));
                     // 推出后更新边界与格子范围，继续检查下一格

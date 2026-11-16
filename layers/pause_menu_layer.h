@@ -52,20 +52,20 @@ private:
     int  layout_lw_ = 0;
     int  layout_lh_ = 0;
 
-    button_p btn_pause_ = nullptr;
+    joy_button_p btn_pause_ = nullptr;
 
-    button_p btn_resume_ = nullptr;
-    button_p btn_settings_ = nullptr;
-    button_p btn_mainmenu_ = nullptr;
-    button_p btn_quit_ = nullptr;
+    joy_button_p btn_resume_ = nullptr;
+    joy_button_p btn_settings_ = nullptr;
+    joy_button_p btn_mainmenu_ = nullptr;
+    joy_button_p btn_quit_ = nullptr;
 
-    button_p btn_cancel_ = nullptr;
-    button_p btn_ok_ = nullptr;
+    joy_button_p btn_cancel_ = nullptr;
+    joy_button_p btn_ok_ = nullptr;
 
-    button_p btn_settings_back_ = nullptr;
-    button_p btn_debug_ = nullptr;      // 设置页：显示/隐藏调试 HUD（手机端没有 F1）
-    slider_p bgm_slider_ = nullptr;
-    slider_p sfx_slider_ = nullptr;
+    joy_button_p btn_settings_back_ = nullptr;
+    joy_button_p btn_debug_ = nullptr;      // 设置页：显示/隐藏调试 HUD（手机端没有 F1）
+    joy_slider_p bgm_slider_ = nullptr;
+    joy_slider_p sfx_slider_ = nullptr;
 
     void updateDebugButtonText();       // 同步“调试信息：开/关”文案
 };

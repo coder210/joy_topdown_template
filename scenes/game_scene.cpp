@@ -56,7 +56,7 @@
 void GameScene::Load()
 {
     Context* ctx = this->ctx();
-    log_info("[game scene] start... mode=%d", (int)ctx->mode);
+    joy_core_log_info("[game scene] start... mode=%d", (int)ctx->mode);
 
     // 游戏场景用自适应逻辑宽度：铺满窗口、左右无黑边（宽屏横向多看地图）。
     // 其它场景在 GameScene::Destroy 里恢复设计分辨率（3:2），避免 UI 比例被拉伸。
@@ -176,7 +176,7 @@ void GameScene::Update(float dt)
     // 降低每帧对连接数查询/时钟读取的调用频率，避免给主循环添负担。
     if (LanDiscovery::Get().beacon_active()) {
         static uint64_t s_last_lan_ms = 0;
-        uint64_t now_ms = get_ticks();
+        uint64_t now_ms = joy_core_get_ticks();
         if (now_ms - s_last_lan_ms >= 200) {
             s_last_lan_ms = now_ms;
             int n = ctx->transport ? ctx->transport->ConnectionCount() : 0;
@@ -193,14 +193,14 @@ void GameScene::Update(float dt)
     else            rt_->accumulator += dt;
     auto& gs = ctx->ecs.ctx().get<GlobalState>();
     // ---- 临时诊断：每秒打点 dt 累计 / 渲染帧数 / 实际逻辑 tick 数 ----
-    if (get_ticks() - s_diag_t0 >= 1000) {
+    if (joy_core_get_ticks() - s_diag_t0 >= 1000) {
         auto& nc = ctx->ecs.ctx().get<FrameCommandBuffer>();
-        log_info("[diag] framerate=%d dt_sum=%.4f ticks=%d logic=%d | mode=%d auth=%d local=%d conv=%u net_frame=%d joins=%d inputs=%d players=%d char_id=%d",
+        joy_core_log_info("[diag] framerate=%d dt_sum=%.4f ticks=%d logic=%d | mode=%d auth=%d local=%d conv=%u net_frame=%d joins=%d inputs=%d players=%d char_id=%d",
             s_diag_frames, s_diag_dtsum, s_diag_ticks, gs.logic_fps,
             (int)ctx->mode, (int)cfg_.authoritative, (int)cfg_.localPlayer,
             (unsigned)net_session(ctx).local_conv, nc.frame_id, nc.num_joins, nc.num_inputs,
             (int)ctx->ecs.view<PlayerComponent>().size(), (int)ctx->selected_char_id);
-        s_diag_frames = 0; s_diag_dtsum = 0; s_diag_ticks = 0; s_diag_t0 = get_ticks();
+        s_diag_frames = 0; s_diag_dtsum = 0; s_diag_ticks = 0; s_diag_t0 = joy_core_get_ticks();
     }
     s_diag_frames++; s_diag_dtsum += dt;
     while (rt_->accumulator >= rt_->FIXED_TIMESTEP) {
@@ -231,7 +231,7 @@ void GameScene::Update(float dt)
     // 逻辑帧率测量
     // 客户端（MODE_CLIENT）本端 gs.next_frame_id 不递增（由服务器权威帧号 FrameCommandBuffer.frame_id 驱动），
     // 直接用它度量会恒为 0；因此客户端改用 FrameCommandBuffer.frame_id，其余模式仍用本端 next_frame_id。
-    uint32_t now_ms = get_ticks();
+    uint32_t now_ms = joy_core_get_ticks();
     int cur_logic_frame = currentLogicFrame();
     if (rt_->fps_measure_time == 0) {
         rt_->fps_measure_time  = now_ms;
@@ -281,7 +281,7 @@ void GameScene::Update(float dt)
             if (rt_->victory_delay >= 1.2f) {
                 rt_->victory_started = true;
                 ctx->scene_mgr->setPending(new VictoryScene(ctx));
-                push_user_event(VICTORY_EVENT, VICTORY_EVENT_TRIGGERED);
+                joy_core_push_user_event(VICTORY_EVENT, VICTORY_EVENT_TRIGGERED);
             }
         }
     }
@@ -440,9 +440,9 @@ void GameScene::handleEvent(const void* ev)
         return;
     }
     // 独立服务端：只响应退出键 q
-    jevent_callbacks_t cbs = {};
+    joy_event_callbacks_t cbs = {};
     cbs.on_keypressed = GameScene::onServerKeyPressed;
-    dispatch_event(cbs, ev, NULL);
+    joy_core_dispatch_event(cbs, ev, NULL);
 }
 
 void GameScene::networkUpdate()
@@ -474,7 +474,7 @@ void GameScene::tick()
     static bool s_pack_diag = false;
     if (!s_pack_diag && !game_runtime(this->ctx()).command_queue.empty()) {
         s_pack_diag = true;
-        log_info("[diag] packed command len=%d frame=%d",
+        joy_core_log_info("[diag] packed command len=%d frame=%d",
             (int)game_runtime(this->ctx()).command_queue.back().size(), frame_id);
     }
 
@@ -532,7 +532,7 @@ void GameScene::onServerKeyPressed(const char* key, int scancode, bool repeat,
 {
     (void)scancode; (void)repeat; (void)ctrl; (void)shift; (void)alt; (void)arg;
     if (strcmp(key, "q") == 0 || strcmp(key, "Q") == 0) {
-        push_quit_event();
+        joy_core_push_quit_event();
     }
 }
 

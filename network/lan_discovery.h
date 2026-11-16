@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #ifndef LAN_DISCOVERY_H
 #define LAN_DISCOVERY_H
 
@@ -11,7 +12,7 @@
 //
 // 协议：房主每 kRoomBeaconIntervalMs 向 255.255.255.255:kRoomBeaconPort 广播一行文本：
 //   "JOYROOM|版本|游戏端口|人数|上限|地图|房间名"
-// 客户端绑定 kRoomBeaconPort 收包，用 sys_recvfrom 返回的源 IP 作为房间 IP，
+// 客户端绑定 kRoomBeaconPort 收包，用 joy_sys_recvfrom 返回的源 IP 作为房间 IP，
 // 以 ip:port 去重，kRoomExpireMs 内无心跳则移除。
 //
 // 全部走 joy 的 sys_* socket（Windows / Linux / Android 可用；macOS 引擎本身不支持 socket）。
@@ -38,12 +39,12 @@ public:
     bool start_beacon(const char* name, int game_port, int map_id, int max_players) {
         if (!lan_discovery_supported()) return false;   // 浏览器无原始 UDP
         stop_beacon();
-        beacon_fd_ = sys_udp();
+        beacon_fd_ = joy_sys_udp();
         if (beacon_fd_ < 0) return false;
         // 非阻塞：广播 sendto 在部分系统/防火墙/无广播路由时会阻塞若干秒，
         // 若放在游戏线程里会周期性地卡顿（每秒一次）。这里务必设为非阻塞。
-        sys_set_sock_accpettimeo(beacon_fd_, 1);
-        sys_set_sock_broadcast(beacon_fd_);
+        joy_sys_set_sock_accpettimeo(beacon_fd_, 1);
+        joy_sys_set_sock_broadcast(beacon_fd_);
         beacon_room_ = RoomInfo();
         beacon_room_.port = game_port;
         beacon_room_.players = 1;
@@ -55,7 +56,7 @@ public:
     }
     void set_beacon_players(int n) { beacon_room_.players = n; }
     void stop_beacon() {
-        if (beacon_fd_ >= 0) { sys_closesocket(beacon_fd_); beacon_fd_ = -1; }
+        if (beacon_fd_ >= 0) { joy_sys_closesocket(beacon_fd_); beacon_fd_ = -1; }
     }
     bool beacon_active() const { return beacon_fd_ >= 0; }
 
@@ -63,22 +64,22 @@ public:
     bool start_listen() {
         if (!lan_discovery_supported()) return false;   // 浏览器无原始 UDP
         if (listen_fd_ >= 0) return true;
-        listen_fd_ = sys_udp();
+        listen_fd_ = joy_sys_udp();
         if (listen_fd_ < 0) return false;
-        sys_set_sock_reuseaddr(listen_fd_);
-        if (!sys_bind(listen_fd_, "0.0.0.0", kRoomBeaconPort)) {
-            sys_closesocket(listen_fd_);
+        joy_sys_set_sock_reuseaddr(listen_fd_);
+        if (!joy_sys_bind(listen_fd_, "0.0.0.0", kRoomBeaconPort)) {
+            joy_sys_closesocket(listen_fd_);
             listen_fd_ = -1;
             return false;
         }
         // 双保险：非阻塞 + 1ms 收超时。某些平台 ioctlsocket(FIONBIO) 失败时
         // 仍会阻塞，导致大厅/主循环卡死；rcvtimeo 保证 recvfrom 一定会很快返回。
-        sys_set_sock_accpettimeo(listen_fd_, 1);
-        sys_set_sock_rcvtimeo(listen_fd_, 1);
+        joy_sys_set_sock_accpettimeo(listen_fd_, 1);
+        joy_sys_set_sock_rcvtimeo(listen_fd_, 1);
         return true;
     }
     void stop_listen() {
-        if (listen_fd_ >= 0) { sys_closesocket(listen_fd_); listen_fd_ = -1; }
+        if (listen_fd_ >= 0) { joy_sys_closesocket(listen_fd_); listen_fd_ = -1; }
     }
     bool listening() const { return listen_fd_ >= 0; }
 
@@ -92,9 +93,9 @@ private:
     LanDiscovery() {}
 
     void tick() {
-        // 用 SDL_GetTicks（单调、便宜）：sys_current_time() 在 Windows 走
+        // 用 SDL_GetTicks（单调、便宜）：joy_sys_current_time() 在 Windows 走
         // GetLocalTime + mktime，既非单调又有额外开销，曾在每帧调用时拖慢主循环。
-        const int64_t now = (int64_t)get_ticks();
+        const int64_t now = (int64_t)joy_core_get_ticks();
 
         // 房主：周期广播
         if (beacon_fd_ >= 0) {
@@ -104,7 +105,7 @@ private:
                                  kRoomBeaconMagic, beacon_room_.port,
                                  beacon_room_.players, beacon_room_.max_players,
                                  beacon_room_.map_id, beacon_room_.name.c_str());
-                if (n > 0) sys_sendto(beacon_fd_, msg, n, "255.255.255.255", kRoomBeaconPort);
+                if (n > 0) joy_sys_sendto(beacon_fd_, msg, n, "255.255.255.255", kRoomBeaconPort);
                 last_beacon_ms_ = now;
             }
         }
@@ -116,7 +117,7 @@ private:
                 char buf[JOY_MAX_BUFFER + 1];
                 char ip[JOY_MAX_IP];
                 int port = 0;
-                int n = sys_recvfrom(listen_fd_, buf, ip, &port);
+                int n = joy_sys_recvfrom(listen_fd_, buf, ip, &port);
                 if (n <= 0) break;
                 if (n > JOY_MAX_BUFFER) n = JOY_MAX_BUFFER;
                 buf[n] = 0;

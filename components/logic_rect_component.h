@@ -4,8 +4,8 @@
 
 struct LogicRectComponent
 {
-        fp_t width;
-        fp_t height;
+        joy_fp_t width;
+        joy_fp_t height;
 };
 
 #endif

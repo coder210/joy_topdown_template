@@ -32,9 +32,9 @@ public:
 
 	~AssetManager();
 
-	font_p GetSimheiFont24();
-	font_p GetSimheiFont12();
-	font_p GetSimheiFont28();   // 超采样字体：28px 栅格化，绘制时缩到 14px，文字更锐利
+	joy_font_p GetSimheiFont24();
+	joy_font_p GetSimheiFont12();
+	joy_font_p GetSimheiFont28();   // 超采样字体：28px 栅格化，绘制时缩到 14px，文字更锐利
 
 	// 按 (类别, ID) 查资源运行时相对路径；未收录返回 nullptr（调用方应回退内置默认路径）。
 	// 例：GetResourcePath(kCatFonts, "simhei") / GetResourcePath(kCatMaps, "level1")
@@ -43,10 +43,10 @@ public:
 	// 清空纹理缓存（释放所有纹理）
 	void ClearTexCache();
 
-	// 按路径取纹理（带缓存）。命中直接返回；否则 image_create 并缓存，
+	// 按路径取纹理（带缓存）。命中直接返回；否则 joy_r2d_image_create 并缓存，
 	// 失败也入表避免每帧重试。纹理生命周期由 ClearTexCache / 析构统一释放。
 	// 注意：调用方需已持有有效的 r2d（纹理依赖渲染设备上下文）。
-	image_p GetImage(jr2d_p r2d, const char* path);
+	joy_image_p GetImage(joy_r2d_p r2d, const char* path);
 
 private:
 	explicit AssetManager();
@@ -56,11 +56,11 @@ private:
 	void load_resources_json();
 
 	static AssetManager* instance_;
-	font_p simhei_font24_;
-	font_p simhei_font12_;
-	font_p simhei_font28_;
+	joy_font_p simhei_font24_;
+	joy_font_p simhei_font12_;
+	joy_font_p simhei_font28_;
 	std::map<std::string, std::string> resource_paths_;  // key: "category/id" → 运行时相对路径
-	std::unordered_map<std::string, image_p> tex_cache_;
+	std::unordered_map<std::string, joy_image_p> tex_cache_;
 };
 
 #endif // ASSET_MANAGER_H

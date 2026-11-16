@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #include "character_catalog.h"
 #include "../asset_manager.h"
 #include <joy/external/cJSON.h>
@@ -35,11 +36,11 @@ void CharacterCatalog::setBuiltinDefault()
 
 static bool read_file_text(const char* path, std::string& out)
 {
-    // 走 joy 的 utils_read_file（内部用 SDL_LoadFile）——
+    // 走 joy 的 joy_core_utils_read_file（内部用 SDL_LoadFile）——
     // 安卓资源打包在 APK 内，不是文件系统路径，std::fopen 读不到，
     // 结果就是 characters.json 读失败、只能回落到内置默认（1 个角色）。
     size_t sz = 0;
-    char* data = utils_read_file(path, &sz);
+    char* data = joy_core_utils_read_file(path, &sz);
     if (!data) return false;
     out.assign(data, sz);
     SDL_free(data);
@@ -54,19 +55,19 @@ void CharacterCatalog::load()
         ? AssetManager::GetInstance()->GetResourcePath(AssetManager::kCatConfig, "characters")
         : nullptr;
     if (!path) {
-        log_info("[character] no config.characters entry, using built-in defaults");
+        joy_core_log_info("[character] no config.characters entry, using built-in defaults");
         return;
     }
 
     std::string text;
     if (!read_file_text(path, text)) {
-        log_info("[character] %s not found, using built-in defaults", path);
+        joy_core_log_info("[character] %s not found, using built-in defaults", path);
         return;
     }
 
     cJSON* root = cJSON_Parse(text.c_str());
     if (!root) {
-        log_error("[character] parse %s failed, using built-in defaults", path);
+        joy_core_log_error("[character] parse %s failed, using built-in defaults", path);
         return;
     }
 
@@ -118,7 +119,7 @@ void CharacterCatalog::load()
     cJSON_Delete(root);
 
     if (parsed.empty()) {
-        log_error("[character] %s has no character entry, using built-in defaults", path);
+        joy_core_log_error("[character] %s has no character entry, using built-in defaults", path);
         return;
     }
 
@@ -126,7 +127,7 @@ void CharacterCatalog::load()
     for (size_t i = 0; i < parsed.size(); i++) {
         float sp = fp_to_float(parsed[i].move_speed);
         if (sp < kSpeedMin || sp > kSpeedMax) {
-            log_error("[character] '%s' speed=%.2f m/s out of range [%.1f,%.1f], clamped",
+            joy_core_log_error("[character] '%s' speed=%.2f m/s out of range [%.1f,%.1f], clamped",
                 parsed[i].key.c_str(), sp, kSpeedMin, kSpeedMax);
             parsed[i].move_speed = fp_from_float(sp < kSpeedMin ? kSpeedMin : kSpeedMax);
         }
@@ -135,7 +136,7 @@ void CharacterCatalog::load()
     defs_.swap(parsed);
     byKey_.clear();
     for (const auto& d : defs_) byKey_[d.key] = d.id;
-    log_info("[character] loaded %s: %d character(s)", path, (int)defs_.size());
+    joy_core_log_info("[character] loaded %s: %d character(s)", path, (int)defs_.size());
 }
 
 const CharacterDef& CharacterCatalog::get(int id)

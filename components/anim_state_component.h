@@ -1,10 +1,10 @@
 #pragma once
-#include <joy/janim.h>
+#include "../passes/sprite_anim.h"
 
 // 角色序列帧动画的运行时状态（每实体一份）。
 // 纯渲染表现，不参与帧同步、不进快照。
-// 作为 ECS 组件挂载到玩家实体上：实体销毁时由 ECS 自动回收，
-// 从而消除原先裸全局 unordered_map<id, anim_t> 在实体离开/死亡时不清理导致的泄漏。
+// 作为 ECS 组件挂载到玩家实体上：实体销毁时由 ECS 自动回收。
+// 动画定义（clip / 状态 / 过渡）按角色类型共享，见 passes/draw_player_pass.h。
 // 武器攻击动画运行时（纯渲染、不进快照、不影响帧同步）。
 // 由 draw_player_pass 在渲染端检测"逻辑态跳变"触发：近战(挥刀扫弧) / 射击(枪口闪光+后坐)。
 struct WeaponAnimState {
@@ -18,8 +18,7 @@ struct WeaponAnimState {
 };
 
 struct AnimStateComponent {
-    anim_t anim;
-    const anim_def_t* def = nullptr;   // 一次性缓存角色动画定义，避免每帧按 char_id 查 g_anim_defs
-    WeaponAnimState weapon;            // 武器攻击动画运行时（纯渲染）
-    AnimStateComponent() { anim_init(&anim); }
+    SpriteAnim anim;
+    const SpriteAnimDef* def = nullptr;   // 一次性缓存角色动画定义，避免每帧按 char_id 查表
+    WeaponAnimState weapon;               // 武器攻击动画运行时（纯渲染）
 };

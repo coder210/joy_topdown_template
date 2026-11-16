@@ -5,7 +5,7 @@
 // 击退效果：被命中时由 melee/bullet 系统写入，knockback_system 每 tick 施加一次
 // 位移并衰减。与 AI/寻路/输入的速度通道完全独立，不会被覆盖（否则敌人像纸片挨打不动）。
 struct KnockbackComponent {
-    fp_t vx, vy;   // 剩余击退速度（米/秒，定点）
+    joy_fp_t vx, vy;   // 剩余击退速度（米/秒，定点）
     int  ticks;    // 剩余持续 tick 数（每 tick 乘一次衰减）
 };
 

@@ -12,15 +12,15 @@
 static const int MAX_CHARACTERS = 16;
 
 // 逻辑动画槽（对应 characters.json 的 anims 键）。
-// 顺序不可随意调整：janim 内部按 current_state ∈ [2,5] 判定"攻击态"以防止重复触发，
-// 故 ANIM_ATTACK 必须落在下标 2。
+// 顺序不可随意调整：passes/draw_player_pass.h 按本枚举顺序向本地状态机
+// (passes/sprite_anim.h) 注册状态，且渲染层直接用 ANIM_DEATH 作为状态下标。
 enum CharacterAnimId {
     ANIM_IDLE   = 0,
     ANIM_WALK   = 1,
     ANIM_ATTACK = 2,
     ANIM_HIT    = 3,
     ANIM_DEATH  = 4,
-    ANIM_KNOCKED = 5,   // 击退/硬直反应动画；放末位以保持 ANIM_ATTACK=2（janim 防重复触发攻击的约束）
+    ANIM_KNOCKED = 5,   // 击退/硬直反应动画
     ANIM_COUNT  = 6,
 };
 
@@ -35,7 +35,7 @@ struct CharacterDef {
     std::string key;                 // "warrior"
     std::string name;                // 展示名
     int         max_hp = 100;        // stats.hp
-    fp_t        move_speed = 0;      // stats.speed（米/秒，已定点化）
+    joy_fp_t        move_speed = 0;      // stats.speed（米/秒，已定点化）
     std::string sprite_dir;          // 精灵目录（运行时相对路径）
     std::string weapon;              // 对应武器 key（如 "sword"），由角色类型固定持有，无武器切换
     uint32_t    color = 0xFF4394;   // 角色主色（0xRRGGBB），用于血条/描边等

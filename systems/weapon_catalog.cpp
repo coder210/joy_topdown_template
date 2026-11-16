@@ -1,3 +1,4 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #include "weapon_catalog.h"
 #include "../asset_manager.h"
 #include <joy/external/cJSON.h>
@@ -62,10 +63,10 @@ void WeaponCatalog::setBuiltinDefault()
 
 static bool weapon_read_file_text(const char* path, std::string& out)
 {
-    // 同 character_catalog：走 joy 的 utils_read_file（SDL_LoadFile），
+    // 同 character_catalog：走 joy 的 joy_core_utils_read_file（SDL_LoadFile），
     // 安卓下才能从 APK 里读到资源。
     size_t sz = 0;
-    char* data = utils_read_file(path, &sz);
+    char* data = joy_core_utils_read_file(path, &sz);
     if (!data) return false;
     out.assign(data, sz);
     SDL_free(data);
@@ -80,19 +81,19 @@ void WeaponCatalog::load()
         ? AssetManager::GetInstance()->GetResourcePath(AssetManager::kCatConfig, "weapons")
         : nullptr;
     if (!path) {
-        log_info("[weapon] no config.weapons entry, using built-in defaults");
+        joy_core_log_info("[weapon] no config.weapons entry, using built-in defaults");
         return;
     }
 
     std::string text;
     if (!weapon_read_file_text(path, text)) {
-        log_info("[weapon] %s not found, using built-in defaults", path);
+        joy_core_log_info("[weapon] %s not found, using built-in defaults", path);
         return;
     }
 
     cJSON* root = cJSON_Parse(text.c_str());
     if (!root) {
-        log_error("[weapon] parse %s failed, using built-in defaults", path);
+        joy_core_log_error("[weapon] parse %s failed, using built-in defaults", path);
         return;
     }
 
@@ -175,7 +176,7 @@ void WeaponCatalog::load()
     cJSON_Delete(root);
 
     if (parsed.empty()) {
-        log_error("[weapon] %s has no weapon entry, using built-in defaults", path);
+        joy_core_log_error("[weapon] %s has no weapon entry, using built-in defaults", path);
         return;
     }
 
@@ -184,7 +185,7 @@ void WeaponCatalog::load()
     cell_px_ = cell;
     byKey_.clear();
     for (const auto& d : defs_) byKey_[d.key] = d.id;
-    log_info("[weapon] loaded %s: %d weapon(s)", path, (int)defs_.size());
+    joy_core_log_info("[weapon] loaded %s: %d weapon(s)", path, (int)defs_.size());
 }
 
 const WeaponDef& WeaponCatalog::get(int id)
@@ -202,9 +203,9 @@ const WeaponDef* WeaponCatalog::findByName(const std::string& key)
     return &defs_[it->second];
 }
 
-jrect_t WeaponCatalog::cellRect(const WeaponDef& def) const
+joy_rect_t WeaponCatalog::cellRect(const WeaponDef& def) const
 {
-    jrect_t r;
+    joy_rect_t r;
     r.x = (float)def.col * cell_px_;
     r.y = (float)def.row * cell_px_;
     r.w = cell_px_;

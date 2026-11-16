@@ -11,7 +11,7 @@
 
 // 历史状态快照（用于预测回滚）。
 struct state_snapshot {
-    fp_t position_x, position_y;
+    joy_fp_t position_x, position_y;
 };
 
 // 网络会话态（通过 registry.ctx().get<NetSession>() 访问）。

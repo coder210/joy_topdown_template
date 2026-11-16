@@ -1,7 +1,8 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #ifndef DRAW_PLAYER_PASS_H
 #define DRAW_PLAYER_PASS_H
 #include <joy/joy.h>
-#include <joy/janim.h>          /* joy 原生帧动画状态机：支持精灵表裁剪 + 状态过渡 */
+#include "sprite_anim.h"        /* 本地帧动画状态机：精灵表裁剪 + 状态过渡（见该文件头注释） */
 #include <string>
 #include <unordered_map>
 #include <cstring>
@@ -25,9 +26,9 @@ struct Context;
 
 /* ============================================================
  * 玩家序列帧渲染（characters.json 驱动）
- *  - 动画定义/播放用 joy 的 janim（anim_def_t + anim_t + anim_update）
+ *  - 动画定义/播放用本地 sprite_anim.h（SpriteAnimDef + SpriteAnim + sprite_anim_update）
  *  - 素材为横向等帧精灵表，帧宽 = 图高，帧数 = 图宽 / 图高（自动探测）
- *  - 纯渲染层：只写 anim_t，绝不回写 LogicPosition/Health 等逻辑组件，
+ *  - 纯渲染层：只写 SpriteAnim，绝不回写 LogicPosition/Health 等逻辑组件，
  *    不参与帧同步、不进快照。
  * ============================================================ */
 
@@ -41,18 +42,18 @@ static const float kSpriteFPS = 12.0f;
 // 两帧原生箭尖朝上，与 weapons.png 的弓同为竖放（hold_angle=-90），旋转公式不变。
 static const char* kBowTilesheetPath = "tilesheet.png";
 static const float kBowCellPx = 64.0f;
-static jrect_t bow_cell_with_arrow() { jrect_t r = { 320.0f, 576.0f, kBowCellPx, kBowCellPx }; return r; }
-static jrect_t bow_cell_no_arrow()   { jrect_t r = { 384.0f, 576.0f, kBowCellPx, kBowCellPx }; return r; }
+static joy_rect_t bow_cell_with_arrow() { joy_rect_t r = { 320.0f, 576.0f, kBowCellPx, kBowCellPx }; return r; }
+static joy_rect_t bow_cell_no_arrow()   { joy_rect_t r = { 384.0f, 576.0f, kBowCellPx, kBowCellPx }; return r; }
 
 // 渲染层缓存（不属于帧同步状态）：
 //  - 纹理缓存统一收归 AssetManager::tex_cache_（见 sprite_get_image），本文件不再持有；
 //  - 每实体的动画播放状态改为 AnimStateComponent 挂在实体上（实体销毁由 ECS 自动回收，
 //    消除此前裸全局 map 的泄漏）；
 //  - 仅保留按角色类型共享的动画定义缓存（key=char_id），随场景销毁清理。
-static std::unordered_map<int, anim_def_t>      g_anim_defs;      // key: char_id
-// 按路径指针缓存已解析纹理：clip.path 是 anim_def_t 内稳定的 char[] 地址（整局不变），
+static std::unordered_map<int, SpriteAnimDef>   g_anim_defs;      // key: char_id
+// 按路径指针缓存已解析纹理：clip.path 是 SpriteAnimDef 内稳定的字符串地址（整局不变），
 // 用指针作 key 可省去每帧的字符串哈希查找（AssetManager 内部仍是 unordered_map<string>）。
-static std::unordered_map<const char*, image_p> g_img_cache;      // key: clip.path
+static std::unordered_map<const char*, joy_image_p> g_img_cache;      // key: clip.path
 
 // 清空玩家动画定义缓存（纹理归 AssetManager::ClearTexCache 管理）
 static void player_anim_cache_clear()
@@ -61,59 +62,58 @@ static void player_anim_cache_clear()
         g_img_cache.clear();
 }
 
-static image_p sprite_get_image(Context* ctx, const char* path)
+static joy_image_p sprite_get_image(Context* ctx, const char* path)
 {
         if (!path || !*path) return NULL;
         auto it = g_img_cache.find(path);          // 指针比较，O(1) 无字符串哈希
         if (it != g_img_cache.end()) return it->second;
         // 纹理缓存统一走 AssetManager（与字体/地图资源同一入口，生命周期由销毁时统一释放）
         auto* am = AssetManager::GetInstance();
-        image_p img = (am && ctx) ? am->GetImage(ctx->r2d, path) : NULL;
+        joy_image_p img = (am && ctx) ? am->GetImage(ctx->r2d, path) : NULL;
         return g_img_cache[path] = img;
 }
 
 // 把一整条横向精灵表展开为若干 clip（每帧一个 src_rect）
-static void sprite_add_clips(Context* ctx, anim_def_t* def, int state, const std::string& path)
+static void sprite_add_clips(Context* ctx, SpriteAnimDef* def, int state, const std::string& path)
 {
         if (path.empty()) return;
         // 构建期直接走 AssetManager（按 string 稳定缓存纹理），不进 g_img_cache：
         // 这里的 path 是 animPath() 返回的临时 std::string，其 c_str() 出作用域即失效，
         // 不能用作 g_img_cache 的指针 key（会存悬空指针）。渲染期 clip.path 来自 def 内
-        // 稳定 char[]，才由 sprite_get_image 走指针缓存。
+        // 稳定字符串，才由 sprite_get_image 走指针缓存。
         auto* am = AssetManager::GetInstance();
-        image_p img = (am && ctx) ? am->GetImage(ctx->r2d, path.c_str()) : NULL;
+        joy_image_p img = (am && ctx) ? am->GetImage(ctx->r2d, path.c_str()) : NULL;
         if (!img) return;
 
         float w = 0, h = 0;
-        if (!image_get_size(img, &w, &h) || h <= 0.0f) return;
+        if (!joy_r2d_image_get_size(img, &w, &h) || h <= 0.0f) return;
         int frames = (int)(w / h);
         if (frames <= 0) return;
-        if (frames > ANIM_MAX_CLIPS) frames = ANIM_MAX_CLIPS;
+        if (frames > SPRITE_ANIM_MAX_CLIPS) frames = SPRITE_ANIM_MAX_CLIPS;
 
         for (int i = 0; i < frames; i++) {
-                jrect_t r = { (float)i * h, 0.0f, h, h };
-                anim_add_clip(def, state, path.c_str(), 1.0f / kSpriteFPS, r);
+                joy_rect_t r = { (float)i * h, 0.0f, h, h };
+                def->add_clip(state, path.c_str(), 1.0f / kSpriteFPS, r);
         }
 }
 
 // 构建（并缓存）某角色的动画状态机
-static const anim_def_t& sprite_anim_def(Context* ctx, int char_id)
+static const SpriteAnimDef& sprite_anim_def(Context* ctx, int char_id)
 {
         auto it = g_anim_defs.find(char_id);
         if (it != g_anim_defs.end()) return it->second;
 
         const CharacterDef& cd = g_characterCatalog.get(char_id);
-        anim_def_t def;
-        memset(&def, 0, sizeof(def));
+        SpriteAnimDef def;
 
-        // 状态下标必须与 CharacterAnimId 对齐：
-        // janim 内部按 current_state ∈ [2,5] 判定"攻击态"以防止重复触发，故 attack 必须是 2。
-        int s_idle = anim_add_state(&def, "idle", true);
-        int s_walk = anim_add_state(&def, "walk", true);
-        int s_attack = anim_add_state(&def, "attack", false);
-        int s_hit = anim_add_state(&def, "hit", false);
-        int s_death = anim_add_state(&def, "death", false);
-        int s_knocked = anim_add_state(&def, "knocked", false);
+        // 状态下标必须与 CharacterAnimId 对齐（idle=0 … knocked=5），
+        // 死亡态由渲染层按 CharacterAnimId 直接切入，故顺序不能改。
+        int s_idle = def.add_state("idle", true);
+        int s_walk = def.add_state("walk", true);
+        int s_attack = def.add_state("attack", false);
+        int s_hit = def.add_state("hit", false);
+        int s_death = def.add_state("death", false);
+        int s_knocked = def.add_state("knocked", false);
         (void)s_hit;
         // hit / knocked 目前是"已定义但无触发源"的休眠状态：项目暂无伤害/击退结算点去置触发
         // （hit 无过渡；knocked 的 knockback_timer 未被置满），故两者现都不播放。
@@ -126,25 +126,25 @@ static const anim_def_t& sprite_anim_def(Context* ctx, int char_id)
         sprite_add_clips(ctx, &def, s_death, g_characterCatalog.animPath(cd, ANIM_DEATH));
         sprite_add_clips(ctx, &def, s_knocked, g_characterCatalog.animPath(cd, ANIM_KNOCKED));
 
-        anim_set_default_state(&def, s_idle);
+        def.set_default_state(s_idle);
 
         // 静止 ↔ 步行（按 speed 参数）
-        int t = anim_add_transition(&def, s_idle, s_walk);
-        anim_transition_add_cond(&def, t, "speed", ANIM_COND_GREATER, 0.0f);
-        t = anim_add_transition(&def, s_walk, s_idle);
-        anim_transition_add_cond(&def, t, "speed", ANIM_COND_EQUALS, 0.0f);
+        int t = def.add_transition(s_idle, s_walk);
+        def.add_cond(t, "speed", SPRITE_COND_GREATER, 0.0f);
+        t = def.add_transition(s_walk, s_idle);
+        def.add_cond(t, "speed", SPRITE_COND_EQUALS, 0.0f);
         // 任意态 → 攻击（trigger）；攻击播完 → 回到 idle
-        t = anim_add_transition(&def, -1, s_attack);
-        anim_transition_add_cond(&def, t, "attack", ANIM_COND_TRIGGER, 0.0f);
-        t = anim_add_transition(&def, s_attack, s_idle);
-        anim_transition_set_exit_time(&def, t,
+        t = def.add_transition(-1, s_attack);
+        def.add_cond(t, "attack", SPRITE_COND_TRIGGER, 0.0f);
+        t = def.add_transition(s_attack, s_idle);
+        def.set_exit_time(t,
                 (float)ActionStateComponent::ATTACK_DURATION / 20.0f);  // 20Hz 逻辑 tick
 
         // 任意态 → 击退（trigger）；击退播完 → 回到 idle
-        t = anim_add_transition(&def, -1, s_knocked);
-        anim_transition_add_cond(&def, t, "knocked", ANIM_COND_TRIGGER, 0.0f);
-        t = anim_add_transition(&def, s_knocked, s_idle);
-        anim_transition_set_exit_time(&def, t,
+        t = def.add_transition(-1, s_knocked);
+        def.add_cond(t, "knocked", SPRITE_COND_TRIGGER, 0.0f);
+        t = def.add_transition(s_knocked, s_idle);
+        def.set_exit_time(t,
                 (float)ActionStateComponent::KNOCKED_DURATION / 20.0f);  // 20Hz 逻辑 tick
 
         g_anim_defs[char_id] = def;
@@ -201,7 +201,7 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
 
         const std::string atlas = g_weaponCatalog.atlasPath();
         if (atlas.empty()) return;
-        image_p img = am->GetImage(ctx->r2d, atlas.c_str());
+        joy_image_p img = am->GetImage(ctx->r2d, atlas.c_str());
         if (!img) return;
 
         const WeaponDef& wd = g_weaponCatalog.get(weapon_id);
@@ -264,10 +264,10 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         //    useArrow(非攻击态) 用 col5"有箭的弓"(待机双手持有箭)；
         //    攻击中用 col6"无箭的弓"(箭已离弦)；攻击结束自动回到有箭帧。
         //    tilesheet 加载失败时回退 weapons.png。
-        jrect_t cell = g_weaponCatalog.cellRect(wd);
-        image_p wimg = img;
+        joy_rect_t cell = g_weaponCatalog.cellRect(wd);
+        joy_image_p wimg = img;
         if (wd.kind == 0) {
-                image_p tsimg = am->GetImage(ctx->r2d, kBowTilesheetPath);
+                joy_image_p tsimg = am->GetImage(ctx->r2d, kBowTilesheetPath);
                 if (tsimg) {
                         wimg = tsimg;
                         cell = useArrow ? bow_cell_with_arrow() : bow_cell_no_arrow();
@@ -282,7 +282,7 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         const float rad = aim * 3.1415926f / 180.0f;
         const float rr  = meters_to_pixels(wd.hold_dx) * reach;
         const float ry  = meters_to_pixels(wd.hold_dy);
-        vec2_t pos;
+        joy_vec2_t pos;
         if (!attacking && wd.kind == 1 && !has_mouse_aim) {
                 pos.x = cx + (flip_h ? -ry : ry) * 1.8f;
                 pos.y = cy - rr * 0.9f * kWeaponHoldDistScale;
@@ -298,22 +298,22 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                 pos.x = cx + cosf(rad) * rr * kWeaponHoldDistScale - sinf(rad) * perp;
                 pos.y = cy + sinf(rad) * rr * kWeaponHoldDistScale + cosf(rad) * perp;
         }
-        vec2_t scl    = { scale, scale };                  // 不随角色翻转，武器独立旋转
+        joy_vec2_t scl    = { scale, scale };                  // 不随角色翻转，武器独立旋转
         // 旋转轴 = 握点（素材上"手握的位置"，如弓上的蓝点标记）：武器绕握点旋转，
         // 握点落在 pos（角色手部）。未配置握点（<0）的素材退回格中心。
-        vec2_t origin = { (wd.grip_x >= 0.0f ? wd.grip_x : cell.w * 0.5f),
+        joy_vec2_t origin = { (wd.grip_x >= 0.0f ? wd.grip_x : cell.w * 0.5f),
                           (wd.grip_y >= 0.0f ? wd.grip_y : cell.h * 0.5f) };
 
         // 旋转角 = 瞄准角 - 图集姿态修正（竖放武器 hold_angle=-90 → +90 修正为刀尖指向 aim）
         const float ang = (aim - wd.hold_angle_deg) * 3.1415926f / 180.0f;
-        image_draw_ex(wimg, &cell, pos, ang, scl, origin);
+        joy_r2d_image_draw_ex(wimg, &cell, pos, ang, scl, origin);
 
         // 手：把角色的"手"贴图（sprite_dir/hand.png，绿色拳头）画在握点上，盖在武器上
         // → 手握住武器的握点（如弓上的蓝点）。手不随武器旋转（拳头是圆的），
         //   大小与角色同比例（role_scale）。
         // 手的位置可用 hand_dx/hand_dy（格内像素，随武器朝向一起旋转）单独微调——
         // 只动手、不动武器（武器位置由上面的 origin/grip 决定）。素材缺失时静默跳过。
-        vec2_t handPos = pos;
+        joy_vec2_t handPos = pos;
         if (wd.hand_dx != 0.0f || wd.hand_dy != 0.0f) {
                 const float hc = cosf(ang), hs = sinf(ang);
                 const float lx = wd.hand_dx * scale;
@@ -325,14 +325,14 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
         std::string handPath = cd.sprite_dir;
         if (!handPath.empty() && handPath[handPath.size() - 1] != '/') handPath += "/";
         handPath += "hand.png";
-        image_p handImg = am->GetImage(ctx->r2d, handPath.c_str());
+        joy_image_p handImg = am->GetImage(ctx->r2d, handPath.c_str());
         if (handImg) {
                 float hw = 0.0f, hh = 0.0f;
-                if (image_get_size(handImg, &hw, &hh) && hw > 0.0f && hh > 0.0f) {
-                        jrect_t handCell = { 0.0f, 0.0f, hw, hh };
-                        vec2_t hscl    = { role_scale, role_scale };
-                        vec2_t horigin = { hw * 0.5f, hh * 0.5f };
-                        image_draw_ex(handImg, &handCell, handPos, 0.0f, hscl, horigin);
+                if (joy_r2d_image_get_size(handImg, &hw, &hh) && hw > 0.0f && hh > 0.0f) {
+                        joy_rect_t handCell = { 0.0f, 0.0f, hw, hh };
+                        joy_vec2_t hscl    = { role_scale, role_scale };
+                        joy_vec2_t horigin = { hw * 0.5f, hh * 0.5f };
+                        joy_r2d_image_draw_ex(handImg, &handCell, handPos, 0.0f, hscl, horigin);
 
                         // 拉弦手：拉弓阶段(useArrow，弦上搭箭)在"箭与弦相交"处再画一只手。
                         // 该点取自素材实测：tilesheet col5(320,576) 格内弦的 V 形顶点/箭尾搭弦点
@@ -343,9 +343,9 @@ static void draw_held_weapon(Context* ctx, int weapon_id, float cx, float cy,
                                 const float ndx = (32.0f - origin.x) * scale;
                                 const float ndy = (50.0f - origin.y) * scale;
                                 const float hc2 = cosf(ang), hs2 = sinf(ang);
-                                vec2_t stringPos = { pos.x + ndx * hc2 - ndy * hs2,
+                                joy_vec2_t stringPos = { pos.x + ndx * hc2 - ndy * hs2,
                                                      pos.y + ndx * hs2 + ndy * hc2 };
-                                image_draw_ex(handImg, &handCell, stringPos, 0.0f, hscl, horigin);
+                                joy_r2d_image_draw_ex(handImg, &handCell, stringPos, 0.0f, hscl, horigin);
                         }
                 }
         }
@@ -358,8 +358,8 @@ static const int HPBAR_W   = (int)((float)PIXELS_PER_METER * 0.72f);   // 0.72 �
 static const int HPBAR_H   = (int)((float)PIXELS_PER_METER * 0.24f);   // 0.24 米
 static const int HPBAR_PAD = (int)((float)PIXELS_PER_METER * 0.02f);   // 0.02 米（外描边）
 
-static image_p s_hpbar_track = NULL;   // 轨道+描边（38×14）
-static image_p s_hpbar_fill  = NULL;   // 填充（36×12，流式，每帧更新）
+static joy_image_p s_hpbar_track = NULL;   // 轨道+描边（38×14）
+static joy_image_p s_hpbar_fill  = NULL;   // 填充（36×12，流式，每帧更新）
 
 static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
 {
@@ -375,21 +375,17 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                 // 首次创建时一次性缓存其角色动画定义，避免每帧按 char_id 查 g_anim_defs。
                 auto& asc = registry.get_or_emplace<AnimStateComponent>(e);
                 if (!asc.def) asc.def = &sprite_anim_def(ctx, pc.char_id);
-                const anim_def_t& def = *asc.def;
-                anim_t& a = asc.anim;
+                const SpriteAnimDef& def = *asc.def;
+                SpriteAnim& a = asc.anim;
 
-                // 死亡：janim 的 params 只有 speed/dir/attack，无 death 条件，
-                // 故由外部强制切到 death 状态（janim 会挡住从 death 误触发 attack）。
+                // 死亡：参数里没有 death 条件，由外部强制切入 death 状态（该态无出向过渡）。
                 bool dead = registry.all_of<HealthComponent>(e)
                         && registry.get<HealthComponent>(e).dead;
-                if (dead && a.current_state != ANIM_DEATH) {
-                        a.current_state = ANIM_DEATH;
-                        a.current_frame = 0;
-                        a.frame_elapsed = 0;
-                        a.state_elapsed = 0;
+                if (dead && a.state != ANIM_DEATH) {
+                        sprite_anim_enter(a, def, ANIM_DEATH);
                 }
 
-                anim_params_t p;
+                SpriteAnimParams p;
                 p.speed = (!dead && ac.state == ActionStateComponent::WALK) ? 1.0f : 0.0f;
                 p.dir = ac.dir;
                 // 攻击 trigger：attack_timer 刚被置满的那一帧才触发一次
@@ -398,7 +394,7 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                 // 击退 trigger：knockback_timer 刚被置满的那一帧才触发一次
                 p.knocked = (!dead && ac.knockback_timer == ActionStateComponent::KNOCKED_DURATION);
 
-                anim_update(&a, &def, &p, dt);
+                sprite_anim_update(a, def, p, dt);
 
                 // 朝向：图集只有朝左的一套，故向右走时需要水平翻转。
                 // 上/下沿用上一次的朝向，避免上下走时左右抖动。
@@ -408,10 +404,10 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                 // 上/下：保持 a.flip_h 不变
 
                 // ---- 绘制 ----
-                anim_clip_t clip;
-                if (!anim_get_current_clip(&a, &def, &clip)) continue;
+                const SpriteClip* clip = sprite_anim_current_clip(a, def);
+                if (!clip) continue;
 
-                image_p img = sprite_get_image(ctx, clip.path);
+                joy_image_p img = sprite_get_image(ctx, clip->path.c_str());
                 if (!img) continue;
 
                 // 逻辑坐标(米) → 屏幕像素
@@ -420,13 +416,13 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
 
                 // Scribble 素材为 64x64 单帧；统一按"绘制高度 = 1 米"缩放（武器同用此基准）。
                 // 原来是写死 50px（PPM=50 时的 1 米），改用 PPM 表达以随分辨率同步放大。
-                const float scale = (clip.src_rect.h > 0.0f)
-                        ? ((float)PIXELS_PER_METER / clip.src_rect.h) : 1.0f;
-                vec2_t pos = { sx, sy };
-                // image_draw_ex 会把负 scale 转为 SDL_FLIP_HORIZONTAL（见 jr2d.c），
+                const float scale = (clip->src.h > 0.0f)
+                        ? ((float)PIXELS_PER_METER / clip->src.h) : 1.0f;
+                joy_vec2_t pos = { sx, sy };
+                // joy_r2d_image_draw_ex 会把负 scale 转为 SDL_FLIP_HORIZONTAL（见 jr2d.c），
                 // 因此朝右时传负的 x 缩放即可实现镜像，无需引擎新增 flip 参数。
-                vec2_t scl = { a.flip_h ? -scale : scale, scale };
-                vec2_t origin = { clip.src_rect.w * 0.5f, clip.src_rect.h * 0.5f };
+                joy_vec2_t scl = { a.flip_h ? -scale : scale, scale };
+                joy_vec2_t origin = { clip->src.w * 0.5f, clip->src.h * 0.5f };
 
                 // 瞄准角取自 ActionStateComponent.aim_yaw：由本机鼠标量化后随 C2S 输入上传，
                 // 两端消费同一个整数，故所有客户端画出的"武器指向"一致（不直接用本机鼠标，
@@ -449,7 +445,7 @@ static void player_render_pass(entt::registry& registry, Context* ctx, float dt)
                         draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,
                                 has_mouse_aim, mouse_aim_deg, pc.char_id);
 
-                image_draw_ex(img, &clip.src_rect, pos, 0.0f, scl, origin);
+                joy_r2d_image_draw_ex(img, &clip->src, pos, 0.0f, scl, origin);
 
                 if (weapon_front)
                         draw_held_weapon(ctx, pc.weapon_id, sx, sy, scale, ac, a.flip_h,

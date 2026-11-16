@@ -35,7 +35,7 @@ struct WeaponDef {
     float hold_dx    = 0.5f;    // 横向偏移（米，右为正；翻转后自动向左）
     float hold_dy    = 0.25f;   // 纵向偏移（米，下为正）
 
-    // 持握旋转（度，顺时针为正，SDL 语义；渲染时转弧度传 image_draw_ex）。
+    // 持握旋转（度，顺时针为正，SDL 语义；渲染时转弧度传 joy_r2d_image_draw_ex）。
     // 武器在合图里一律横向、刀尖/枪口朝右；竖放（刀尖朝上）配 -90。
     // 角色朝向翻转时角度自动取反，保证翻转前后竖直方向一致。
     float hold_angle_deg = 0.0f;
@@ -81,7 +81,7 @@ public:
     float cellPx() const { return cell_px_; }
 
     // 取该武器在合图中的裁剪框（src_rect）。
-    jrect_t cellRect(const WeaponDef& def) const;
+    joy_rect_t cellRect(const WeaponDef& def) const;
 
 private:
     void setBuiltinDefault();                        // 兜底内置表（与 weapons.json 一致）

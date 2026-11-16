@@ -21,11 +21,11 @@ static void draw_bullet_pass(Context* ctx)
     auto& cam = ctx->ecs.ctx().get<GlobalState>().camera_position;
     auto* am = AssetManager::GetInstance();
     if (!am) return;
-    image_p img = am->GetImage(ctx->r2d, kBulletTilesheetPath);
+    joy_image_p img = am->GetImage(ctx->r2d, kBulletTilesheetPath);
     if (!img) return;
 
     // 箭贴图：row9 col7，64×64
-    jrect_t cell = { 448.0f, 576.0f, 64.0f, 64.0f };
+    joy_rect_t cell = { 448.0f, 576.0f, 64.0f, 64.0f };
 
     // 子弹渲染与玩家渲染分开：直接读逻辑位置(LogicPosition + LogicRect 中心)，
     // 不经过 interpolate_pass 的平滑/外推——既不会"滞后提前消失"，也不会"外推越过墙"。
@@ -38,7 +38,7 @@ static void draw_bullet_pass(Context* ctx)
 
         float cx = fp_to_float(lp.x) + fp_to_float(rect.width)  * 0.5f;
         float cy = fp_to_float(lp.y) + fp_to_float(rect.height) * 0.5f;
-        vec2_t pos;
+        joy_vec2_t pos;
         pos.x = meters_to_pixels(cx - cam.x);
         pos.y = meters_to_pixels(cy - cam.y);
 
@@ -51,9 +51,9 @@ static void draw_bullet_pass(Context* ctx)
 
         // 绘制高度 = 1 米（原写死 50px 即 PPM=50 时的 1 米），贴图 64px → scale = 1米像素/64
         float scale = (float)PIXELS_PER_METER / 64.0f;
-        vec2_t scl    = { scale, scale };
-        vec2_t origin = { cell.w * 0.5f, cell.h * 0.5f };
-        image_draw_ex(img, &cell, pos, ang, scl, origin);
+        joy_vec2_t scl    = { scale, scale };
+        joy_vec2_t origin = { cell.w * 0.5f, cell.h * 0.5f };
+        joy_r2d_image_draw_ex(img, &cell, pos, ang, scl, origin);
     }
 }
 

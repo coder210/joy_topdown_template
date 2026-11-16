@@ -1,10 +1,11 @@
+#include <SDL3/SDL.h>   // SDL_Event / 输入枚举 / SDL_LoadFile 等（joy 公开头不再引入 SDL）
 #ifndef JOY_PASSES_HPBAR_H
 #define JOY_PASSES_HPBAR_H
 // 血条（胶囊纹理）公共实现：玩家 / 敌人共用。
 // 与 render_math.h 同一模式：被多个 pass 头包含，靠 include guard 保证单次展开。
 //
-// 为何用纹理而非 shape_draw_polygon：后者走 SDL_RenderGeometry，在本项目
-// 逻辑呈现(LETTERBOX)下不输出；image_draw_ex 走 SDL_RenderTextureRotated
+// 为何用纹理而非 joy_r2d_shape_draw_polygon：后者走 SDL_RenderGeometry，在本项目
+// 逻辑呈现(LETTERBOX)下不输出；joy_r2d_image_draw_ex 走 SDL_RenderTextureRotated
 // （角色/武器/敌人都在用）可靠且支持旋转。
 // 结构：轨道纹理 = 外 pad 像素"深墨描边 + 半透明墨底"；填充纹理 = 透明底 + 彩色胶囊，
 //        每帧按血量比例重绘像素后上传。两者都 1:1 绘制、绕中心旋转。
@@ -70,30 +71,30 @@ static void hpbar_gen_track(uint8_t* buf, int W, int H, int pad)
 
 // 惰性创建两张纹理：track 尺寸 (w+2pad)×(h+2pad)（固定，只建一次）；
 // fill 尺寸 w×h（流式，每帧由 hpbar_draw 更新像素）。返回两张是否都可用。
-static bool hpbar_ensure(jr2d_p r2d, image_p* track, image_p* fill, int w, int h, int pad)
+static bool hpbar_ensure(joy_r2d_p r2d, joy_image_p* track, joy_image_p* fill, int w, int h, int pad)
 {
         if (!*track) {
                 const int W = w + pad * 2, H = h + pad * 2;
-                *track = image_create_empty(r2d, W, H);
+                *track = joy_r2d_image_create_empty(r2d, W, H);
                 if (!*track) return false;
                 uint8_t* buf = (uint8_t*)malloc((size_t)W * H * 4);
                 if (!buf) return false;
                 hpbar_gen_track(buf, W, H, pad);
-                jrect_t r = { 0.0f, 0.0f, (float)W, (float)H };
-                image_update(*track, &r, buf, W * 4);
+                joy_rect_t r = { 0.0f, 0.0f, (float)W, (float)H };
+                joy_r2d_image_update(*track, &r, buf, W * 4);
                 free(buf);
-                image_set_blend_mode(*track, JR2D_BLEND_BLEND);
+                joy_r2d_image_set_blend_mode(*track, JR2D_BLEND_BLEND);
         }
         if (!*fill) {
-                *fill = image_create_empty(r2d, w, h);
-                if (*fill) image_set_blend_mode(*fill, JR2D_BLEND_BLEND);
+                *fill = joy_r2d_image_create_empty(r2d, w, h);
+                if (*fill) joy_r2d_image_set_blend_mode(*fill, JR2D_BLEND_BLEND);
         }
         return (*track != NULL && *fill != NULL);
 }
 
 // 在 (cx,cy) 画一条血条：轨道在下、填充在上（自 -长轴 端起按 ratio 填充）。
 // rot 为旋转弧度（玩家传瞄准角，敌人传 0 即水平）；(fr,fg,fb) 为填充色。
-static void hpbar_draw(jr2d_p r2d, image_p track, image_p fill,
+static void hpbar_draw(joy_r2d_p r2d, joy_image_p track, joy_image_p fill,
                        int w, int h, int pad, float ratio,
                        float cx, float cy, float rot,
                        uint8_t fr, uint8_t fg, uint8_t fb)
@@ -106,19 +107,19 @@ static void hpbar_draw(jr2d_p r2d, image_p track, image_p fill,
         uint8_t* buf = (uint8_t*)malloc((size_t)w * h * 4);
         if (buf) {
                 hpbar_gen_capsule(buf, w, h, (float)w * ratio, fr, fg, fb, 235);
-                jrect_t r = { 0.0f, 0.0f, (float)w, (float)h };
-                image_update(fill, &r, buf, w * 4);
+                joy_rect_t r = { 0.0f, 0.0f, (float)w, (float)h };
+                joy_r2d_image_update(fill, &r, buf, w * 4);
                 free(buf);
         }
 
-        jrect_t src_t = { 0.0f, 0.0f, (float)(w + pad * 2), (float)(h + pad * 2) };
-        jrect_t src_f = { 0.0f, 0.0f, (float)w, (float)h };
-        vec2_t pos  = { cx, cy };
-        vec2_t scl  = { 1.0f, 1.0f };
-        vec2_t org_t = { (w + pad * 2) * 0.5f, (h + pad * 2) * 0.5f };
-        vec2_t org_f = { w * 0.5f, h * 0.5f };
-        image_draw_ex(track, &src_t, pos, rot, scl, org_t);
+        joy_rect_t src_t = { 0.0f, 0.0f, (float)(w + pad * 2), (float)(h + pad * 2) };
+        joy_rect_t src_f = { 0.0f, 0.0f, (float)w, (float)h };
+        joy_vec2_t pos  = { cx, cy };
+        joy_vec2_t scl  = { 1.0f, 1.0f };
+        joy_vec2_t org_t = { (w + pad * 2) * 0.5f, (h + pad * 2) * 0.5f };
+        joy_vec2_t org_f = { w * 0.5f, h * 0.5f };
+        joy_r2d_image_draw_ex(track, &src_t, pos, rot, scl, org_t);
         if (ratio > 0.0f)
-                image_draw_ex(fill, &src_f, pos, rot, scl, org_f);
+                joy_r2d_image_draw_ex(fill, &src_f, pos, rot, scl, org_f);
 }
 #endif

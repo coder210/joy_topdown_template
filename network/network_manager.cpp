@@ -27,7 +27,7 @@
 // ========== 加载数据处理 ==========
 void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEntity* entities, int ec)
 {
-        log_info("handle_loading");
+        joy_core_log_info("handle_loading");
         game_runtime(ctx_).ready = true;
         net_session(ctx_).local_conv = conv;
         ctx_->ecs.ctx().get<GlobalState>().camera_follow_conv = conv;
@@ -63,7 +63,7 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
                             entity.position_x, entity.position_y,
                             entity.width, entity.height, (int)entity.hp,
                             entity.ai_timer, entity.ai_state,
-                            (fp_t)entity.ai_target_x, (fp_t)entity.ai_target_y);
+                            (joy_fp_t)entity.ai_target_x, (joy_fp_t)entity.ai_target_y);
                 }
         }
 
@@ -78,7 +78,7 @@ void NetworkManager::HandleLoading(int conv, int frame_id, int eid, const S2CEnt
         net_session(ctx_).snapshots.insert({ game_runtime(ctx_).server_frameid, snapshots });
 
         // 告知服务器本地玩家加入（出生在当前关卡 'P' 格）
-        fp_t sx_j, sy_j;
+        joy_fp_t sx_j, sy_j;
         map_player_spawn(ctx_->ecs.ctx().get<GlobalState>().level, &sx_j, &sy_j);
         std::string data = pack_c2s(CMD_PLAYER_JOIN, sx_j, sy_j, 0, 0, ctx_->selected_char_id);
         if (ctx_->transport) ctx_->transport->Send(data.c_str(), (int)data.size());
@@ -145,23 +145,23 @@ void NetworkManager::ClientReceive()
                 ctx_->transport->Send(d.c_str(), (int)d.size());
             }
             else if (ev.type == NetTransportEvent::Disconnected) {
-                log_info("disconnected=%d", ev.conv);
+                joy_core_log_info("disconnected=%d", ev.conv);
             }
             else if (ev.type == NetTransportEvent::Message) {
-                jmsgpack_unpacked_t r;
-                jmsgpack_unpacked_init(&r);
+                joy_msgpack_unpacked_t r;
+                joy_codec_msgpack_unpacked_init(&r);
                 size_t off = 0;
                 int is_loading = 0;
-                if (jmsgpack_unpack_next(&r, ev.data, ev.len, &off) >= 0) {
-                    const jmsgpack_object_t* root = jmsgpack_unpacked_data(&r);
-                    if (root && jmsgpack_object_type(root) == JMSGPACK_OBJECT_ARRAY
-                            && jmsgpack_object_array_size(root) >= 2) {
-                        const jmsgpack_object_t* first = jmsgpack_object_array_at(root, 0);
-                        if (first && jmsgpack_object_type(first) == JMSGPACK_OBJECT_POSITIVE_INTEGER)
-                            is_loading = ((int)jmsgpack_object_u64(first) == S2C_CMD_LOADING);
+                if (joy_codec_msgpack_unpack_next(&r, ev.data, ev.len, &off) >= 0) {
+                    const joy_msgpack_object_t* root = joy_codec_msgpack_unpacked_data(&r);
+                    if (root && joy_codec_msgpack_object_type(root) == JMSGPACK_OBJECT_ARRAY
+                            && joy_codec_msgpack_object_array_size(root) >= 2) {
+                        const joy_msgpack_object_t* first = joy_codec_msgpack_object_array_at(root, 0);
+                        if (first && joy_codec_msgpack_object_type(first) == JMSGPACK_OBJECT_POSITIVE_INTEGER)
+                            is_loading = ((int)joy_codec_msgpack_object_u64(first) == S2C_CMD_LOADING);
                     }
                 }
-                jmsgpack_unpacked_destroy(&r);
+                joy_codec_msgpack_unpacked_destroy(&r);
 
                 if (is_loading) {
                     int conv, frame_id, eid, seed;
@@ -173,10 +173,10 @@ void NetworkManager::ClientReceive()
                         // 用服务端下发的 seed 创建确定性随机序列，再用服务端当前单状态恢复，
                         // 保证与 server 的 random 推进位置完全一致（否则已推进的随机序列会分叉）。
                         auto& gs = ctx_->ecs.ctx().get<GlobalState>();
-                        if (gs.random) lcg_random_destroy(gs.random);
+                        if (gs.random) joy_core_lcg_random_destroy(gs.random);
                         gs.random_seed = seed;
-                        gs.random = lcg_random_create((uint64_t)(uint32_t)seed);
-                        lcg_random_set_state(gs.random, (uint64_t)random_state);
+                        gs.random = joy_core_lcg_random_create((uint64_t)(uint32_t)seed);
+                        joy_core_lcg_random_set_state(gs.random, (uint64_t)random_state);
                         HandleLoading(conv, frame_id, eid, entities, ec);
                     }
                 }
@@ -196,7 +196,7 @@ void NetworkManager::ClientReceive()
 // ========== 网络命令处理（HandleCmd_*）==========
 void NetworkManager::HandleCmdLoading(int conv)
 {
-        log_info("C2S_CMD_LOADING");
+        joy_core_log_info("C2S_CMD_LOADING");
         auto view = ctx_->ecs.view<ConnectionComponent>();
         entt::entity conn = entt::null;
         for (auto e : view) {
@@ -234,9 +234,9 @@ void NetworkManager::HandleCmdPlayerInput(int conv, uint32_t seq, int dir, int a
 
 void NetworkManager::HandleCmdHeartbeat(int conv)
 {
-        log_info("%d: C2S_CMD_HEARTBEAT", conv);
+        joy_core_log_info("%d: C2S_CMD_HEARTBEAT", conv);
         uint64_t ms_ticks;
-        utils_get_current_time(&ms_ticks);
+        joy_core_utils_get_current_time(&ms_ticks);
         auto view = ctx_->ecs.view<ConnectionComponent>();
         entt::entity conn = entt::null;
         for (auto e : view) {
@@ -246,7 +246,7 @@ void NetworkManager::HandleCmdHeartbeat(int conv)
                 }
         }
         if (conn == entt::null) {
-                log_debug("Heartbeat from unknown conv: %d", conv);
+                joy_core_log_debug("Heartbeat from unknown conv: %d", conv);
                 return;
         }
         auto& comp = ctx_->ecs.get<ConnectionComponent>(conn);
@@ -261,10 +261,10 @@ void NetworkManager::ServerReceive()
         NetTransportEvent ev;
         while (ctx_->transport->Poll(ev)) {
                 if (ev.type == NetTransportEvent::Connected) {
-                        log_info("connected=%d", ev.conv);
+                        joy_core_log_info("connected=%d", ev.conv);
                 }
                 else if (ev.type == NetTransportEvent::Disconnected) {
-                        log_info("disconnected=%d", ev.conv);
+                        joy_core_log_info("disconnected=%d", ev.conv);
                         S2CPlayerLeave l = { ev.conv };
                         net_session(ctx_).player_leaves.push_back(l);
                 }
@@ -280,7 +280,7 @@ void NetworkManager::ServerReceive()
                                 }
                         }
                         else {
-                                log_info("Failed to parse message from conv=%d", ev.conv);
+                                joy_core_log_info("Failed to parse message from conv=%d", ev.conv);
                         }
                 }
                 ctx_->transport->Release(ev);
@@ -373,7 +373,7 @@ void NetworkManager::InputForwarding()
                                 ctx_->transport->SendTo(comp.conv, cmd->c_str(), (int)cmd->size());
                             }
                             else {
-                                log_error("Frame %d not found in commands, skip sending.", i);
+                                joy_core_log_error("Frame %d not found in commands, skip sending.", i);
                             }
                         }
                         comp.frameid = taget_frameid;
@@ -382,10 +382,10 @@ void NetworkManager::InputForwarding()
                         int snap_frame = 0;
                         const std::string* snap = net_session(ctx_).frames.FindSnapshotAtOrBefore(comp.frameid, &snap_frame);
                         if (!snap) {
-                                log_info("WARNING: no snapshot cache found for frame %d (client %d), sending empty loading", comp.frameid, comp.conv);
+                                joy_core_log_info("WARNING: no snapshot cache found for frame %d (client %d), sending empty loading", comp.frameid, comp.conv);
                                 auto& gs = ctx_->ecs.ctx().get<GlobalState>();
                                 uint64_t lcg_state = 0;
-                                lcg_random_get_state(gs.random, &lcg_state);
+                                joy_core_lcg_random_get_state(gs.random, &lcg_state);
                                 auto data = pack_s2c_loading(comp.conv, comp.frameid,
                                         gs.next_entity_id, nullptr, 0,
                                         (int32_t)gs.random_seed, (int64_t)lcg_state);
@@ -398,7 +398,7 @@ void NetworkManager::InputForwarding()
                         ec = unpack_world(snap->c_str(), (int)snap->size(), &eid, entities, 512);
                         auto& gs = ctx_->ecs.ctx().get<GlobalState>();
                         uint64_t lcg_state = 0;
-                        lcg_random_get_state(gs.random, &lcg_state);
+                        joy_core_lcg_random_get_state(gs.random, &lcg_state);
                         // 关键：loading 快照是帧 snap_frame 的，上报的 frame_id 必须也是 snap_frame，
                         // 客户端才能用它精确初始化 AI 状态并从 snap_frame+1 开始演算。
                         // 之前误用 comp.frameid 导致"快照帧 ≠ 上报帧"，AI 状态初始化错位。
@@ -419,7 +419,7 @@ void NetworkManager::InputForwarding()
 void NetworkManager::InjectLocalJoin()
 {
         net_session(ctx_).local_conv = 1;
-        fp_t sx_l, sy_l;
+        joy_fp_t sx_l, sy_l;
         map_player_spawn(ctx_->ecs.ctx().get<GlobalState>().level, &sx_l, &sy_l);
         S2CPlayerJoin j = { (int32_t)net_session(ctx_).local_conv, sx_l, sy_l, (int32_t)ctx_->selected_char_id };
         net_session(ctx_).player_joins.push_back(j);

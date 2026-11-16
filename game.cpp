@@ -1,9 +1,9 @@
-#define SDL_MAIN_USE_CALLBACKS 1
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_video.h>
-#include <SDL3/SDL_hints.h>   // SDL_HINT_ORIENTATIONS / SDL_SetHint（移动端横屏）
+// 游戏插件（cpp 脚本）实现：业务全在这里，宿主只有 host.cpp。
+// 宿主与游戏库共用同一份 SDL3 共享库，所以这里可以直接用 SDL 类型/函数。
+#include <SDL3/SDL.h>   // SDL_Event / SDL_SetHint / SDL_LoadFile / SDL_RenderGeometry ...
 #include <joy/joy.h>
 #include <cstring>
+#include "game_hooks.h"
 #include "context.h"
 #include "asset_manager.h"
 #include "scenes/scene.h"
@@ -72,10 +72,10 @@ static void handle_victory_event()
 }
 
 // 处理加载场景的模式按钮事件（服务端分支也复用，避免 ESC 返回加载场景后无法再切换模式）
-static void handle_mode_event(SDL_Event* e)
+static void handle_mode_event(const SDL_Event* e)
 {
-        if (!is_user_event(e, MODE_EVENT)) return;
-        switch (get_event_code(e)) {
+        if (!joy_core_is_user_event(e, MODE_EVENT)) return;
+        switch (joy_core_get_event_code(e)) {
         case MODE_EVENT_SINGLE:
                 enter_game_scene(MODE_SINGLE);
                 break;
@@ -91,27 +91,26 @@ static void handle_mode_event(SDL_Event* e)
         }
 }
 
-SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
+static bool game_init(void* /*game*/, int argc, char* argv[])
 {
-        sys_init_netenv();
+        joy_sys_init_netenv();
 
-        if (!init_env()) {
-                log_info("SDL init failed: %s", get_error());
-                return SDL_APP_FAILURE;
+        if (!joy_core_init_env()) {
+                joy_core_log_info("SDL init failed: %s", joy_core_get_error());
+                return false;
         }
 
         ctx = new Context();
-        *appstate = ctx;
         ctx->mode = parse_mode(argc, argv);
         settings_load(&ctx->settings);
         UiSfx::Get().setGain(ctx->settings.sfx_volume);   // UI 音效与游戏内音效同一档音量
-        log_info("settings loaded: ip=%s port=%d bgm=%f sfx=%f fullscreen=%d",
+        joy_core_log_info("settings loaded: ip=%s port=%d bgm=%f sfx=%f fullscreen=%d",
                 ctx->settings.server_ip, ctx->settings.server_port,
                 ctx->settings.bgm_volume, ctx->settings.sfx_volume,
                 ctx->settings.fullscreen ? 1 : 0);
 
-        game_timer_init(&ctx->game_timer);
-        game_timer_set_target_fps(&ctx->game_timer, 60);
+        joy_core_game_timer_init(&ctx->game_timer);
+        joy_core_game_timer_set_target_fps(&ctx->game_timer, 60);
 
         AssetManager::Init();
 
@@ -134,13 +133,13 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         // 窗口尺寸由 config/display_config.h 的 DISPLAY_WINDOW_* 决定；
         // 它与逻辑高度(DISPLAY_DESIGN_H)、PPM、字号统一由 CMake 的 DISPLAY_SCALE 推导。
         // 当前基准 480x320 + PPM=50 → 垂直可视 6.4 米、水平可视 9.6 米。
-        ctx->window = create_window("Joy Topdown", DISPLAY_WINDOW_W, DISPLAY_WINDOW_H);
-        ctx->r2d = r2d_create(ctx->window);
+        ctx->window = joy_core_create_window("Joy Topdown", DISPLAY_WINDOW_W, DISPLAY_WINDOW_H);
+        ctx->r2d = joy_r2d_create(ctx->window);
         // 2D 形状（矩形/线段）的 alpha 由“绘制混合模式”控制；引擎默认是 NONE，
         // 导致半透明 HUD 底色被画成不透明。这里全局开启 BLEND：
         // - 不透明颜色（alpha=255）结果不变；
         // - 半透明颜色（如剩余敌人纸片 alpha=150）才会真正透出背景。
-        r2d_set_blend_mode(ctx->r2d, JR2D_BLEND_BLEND);
+        joy_r2d_set_blend_mode(ctx->r2d, JR2D_BLEND_BLEND);
         // 全局自适应宽度：所有场景铺满窗口、无左右黑边（与游戏场景一致）
         presentation_set_adaptive(ctx->r2d);
 
@@ -151,12 +150,12 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         // 这一句会直接抛 ReferenceError 导致启动失败（GitHub Pages 无法自定义响应头，
         // 所以永远拿不到 SharedArrayBuffer）。网页图标改用 HTML 的 <link rel="icon">。
 #if !defined(__EMSCRIPTEN__)
-        window_set_icon(ctx->window, "branding/logo.png");
+        joy_core_window_set_icon(ctx->window, "branding/logo.png");
 #endif
 
         // 应用全屏设置
         if (ctx->settings.fullscreen) {
-                window_set_fullscreen(ctx->window, true);
+                joy_core_window_set_fullscreen(ctx->window, true);
         }
 
         ctx->running = true;
@@ -170,18 +169,19 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         if (ctx->mode == MODE_SERVER) {
                 // 独立服务端：直接进入游戏场景（无菜单）
                 g_mgr->push(new GameScene(ctx));
-                log_info("server start");
+                joy_core_log_info("server start");
         } else {
                 // 单机/Host/客户端：先进入闪屏画面，然后自动切换到主场景
                 g_mgr->push(new SplashScene(ctx));
         }
 
-        return SDL_APP_CONTINUE;
+        return true;
 }
 
-SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
+// 事件回调：0 继续，1 正常退出，-1 异常退出
+static int game_event(void*, const SDL_Event* e)
 {
-        if (should_close(e)) return SDL_APP_SUCCESS;
+        if (joy_core_should_close((void*)e)) return 1;
 
         // 窗口尺寸/像素尺寸/显示变化（桌面拖拽、全屏切换、安卓旋转）：重算逻辑分辨率，
         // 否则新宽高比与逻辑宽高比不一致时，letterbox 会重新出现左右黑边。
@@ -197,38 +197,38 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
         if (ctx->mode == MODE_SERVER) {
                 g_mgr->HandleEvent(e);
                 if (e->type == SDL_EVENT_KEY_DOWN && e->key.scancode == SDL_SCANCODE_ESCAPE) {
-                        log_info("[server] ESC pressed, back to main");
+                        joy_core_log_info("[server] ESC pressed, back to main");
                         g_mgr->change(new MainScene(ctx));
                 }
-                else if (is_user_event(e, TRANSITION_EVENT)) {
+                else if (joy_core_is_user_event(e, TRANSITION_EVENT)) {
                         g_mgr->processPending();
                 }
-                else if (is_user_event(e, MENU_EVENT)) {
-                        switch (get_event_code(e)) {
+                else if (joy_core_is_user_event(e, MENU_EVENT)) {
+                        switch (joy_core_get_event_code(e)) {
                         case MENU_EVENT_START:    enter_character_select(MODE_SINGLE); break;
                         case MENU_EVENT_ONLINE:   g_mgr->change(new OnlineScene(ctx)); break;
                         case MENU_EVENT_SETTINGS: g_mgr->change(new SettingsScene(ctx)); break;
-                        case MENU_EVENT_EXIT:     push_quit_event(); break;
+                        case MENU_EVENT_EXIT:     joy_core_push_quit_event(); break;
                         }
                 }
-                else if (is_user_event(e, ONLINE_EVENT)) {
-                        switch (get_event_code(e)) {
+                else if (joy_core_is_user_event(e, ONLINE_EVENT)) {
+                        switch (joy_core_get_event_code(e)) {
                         case ONLINE_EVENT_HOST:   enter_character_select(MODE_HOST); break;
                         case ONLINE_EVENT_CLIENT: enter_character_select(MODE_CLIENT); break;
                         case ONLINE_EVENT_SERVER: enter_game_scene(MODE_SERVER); break;
                         case ONLINE_EVENT_BACK:   g_mgr->change(new MainScene(ctx)); break;
                         }
                 }
-                else if (is_user_event(e, SETTINGS_EVENT)) {
-                        if (get_event_code(e) == SETTINGS_EVENT_BACK)
+                else if (joy_core_is_user_event(e, SETTINGS_EVENT)) {
+                        if (joy_core_get_event_code(e) == SETTINGS_EVENT_BACK)
                                 g_mgr->change(new MainScene(ctx));
                 }
-                else if (is_user_event(e, VICTORY_EVENT)) {
+                else if (joy_core_is_user_event(e, VICTORY_EVENT)) {
                         handle_victory_event();
                 }
                 handle_mode_event(e);
                 g_mgr->processPending();
-                return SDL_APP_CONTINUE;
+                return 0;
         }
 
         g_mgr->HandleEvent(e);
@@ -250,7 +250,7 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                             strcmp(g_mgr->currentName(), "LevelSelect") != 0) {
                                 if (e->key.scancode == SDL_SCANCODE_AC_BACK &&
                                     strcmp(g_mgr->currentName(), "Main") == 0) {
-                                        push_quit_event();
+                                        joy_core_push_quit_event();
                                 } else {
                                         g_mgr->change(new MainScene(ctx));
                                 }
@@ -268,8 +268,8 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                         break;
                 }
         }
-        else if (is_user_event(e, MENU_EVENT)) {
-                switch (get_event_code(e)) {
+        else if (joy_core_is_user_event(e, MENU_EVENT)) {
+                switch (joy_core_get_event_code(e)) {
                 case MENU_EVENT_START:
                         enter_character_select(MODE_SINGLE);
                         break;
@@ -280,17 +280,17 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                         g_mgr->change(new SettingsScene(ctx));
                         break;
                 case MENU_EVENT_EXIT:
-                        push_quit_event();
+                        joy_core_push_quit_event();
                         break;
                 }
         }
-        else if (is_user_event(e, SETTINGS_EVENT)) {
-                if (get_event_code(e) == SETTINGS_EVENT_BACK) {
+        else if (joy_core_is_user_event(e, SETTINGS_EVENT)) {
+                if (joy_core_get_event_code(e) == SETTINGS_EVENT_BACK) {
                         g_mgr->change(new MainScene(ctx));
                 }
         }
-        else if (is_user_event(e, ONLINE_EVENT)) {
-                switch (get_event_code(e)) {
+        else if (joy_core_is_user_event(e, ONLINE_EVENT)) {
+                switch (joy_core_get_event_code(e)) {
                 case ONLINE_EVENT_HOST:   enter_character_select(MODE_HOST); break;
                 case ONLINE_EVENT_CLIENT: enter_character_select(MODE_CLIENT); break;
                 case ONLINE_EVENT_SERVER: enter_game_scene(MODE_SERVER); break;
@@ -299,40 +299,58 @@ SDL_AppResult SDL_AppEvent(void*, SDL_Event* e)
                         break;
                 }
         }
-        else if (is_user_event(e, MODE_EVENT)) {
+        else if (joy_core_is_user_event(e, MODE_EVENT)) {
                 handle_mode_event(e);
         }
-        else if (is_user_event(e, TRANSITION_EVENT)) {
+        else if (joy_core_is_user_event(e, TRANSITION_EVENT)) {
                 g_mgr->processPending();
         }
-        else if (is_user_event(e, VICTORY_EVENT)) {
+        else if (joy_core_is_user_event(e, VICTORY_EVENT)) {
                 handle_victory_event();
         }
 
         g_mgr->processPending();
-        return SDL_APP_CONTINUE;
+        return 0;
 }
 
-SDL_AppResult SDL_AppIterate(void*)
+static void game_frame(void*)
 {
-        game_timer_update(&ctx->game_timer);
-        float dt = game_timer_get_delta_time(&ctx->game_timer);
+        if (!ctx || !g_mgr) return;
+        joy_core_game_timer_update(&ctx->game_timer);
+        float dt = joy_core_game_timer_get_delta_time(&ctx->game_timer);
         g_mgr->Update(dt);
-        r2d_set_color(ctx->r2d, 255, 255, 255, 255);
-        r2d_begin(ctx->r2d);
+        joy_r2d_set_color(ctx->r2d, 255, 255, 255, 255);
+        joy_r2d_begin(ctx->r2d);
         g_mgr->Render(ctx->r2d);
         if (ctx->show_debug_hud)
                 draw_fps_pass(ctx->r2d, AssetManager::GetInstance()->GetSimheiFont12(), dt);
-        r2d_end(ctx->r2d);
-        return SDL_APP_CONTINUE;
+        joy_r2d_end(ctx->r2d);
 }
 
-void SDL_AppQuit(void*, SDL_AppResult)
+static void game_shutdown(void*)
 {
+        if (!ctx) return;
         delete g_mgr;
+        g_mgr = nullptr;
         UiSfx::Get().shutdown();   // UI 音效自带的音频设备（与游戏场景的设备独立）
-        r2d_destroy(ctx->r2d);
-        destroy_window(ctx->window);
+        joy_r2d_destroy(ctx->r2d);
+        joy_core_destroy_window(ctx->window);
         delete ctx;
-        sys_release_netenv();
+        ctx = nullptr;
+        joy_sys_release_netenv();
+}
+
+/* ---------------- 插件导出入口（宿主唯一入口） ---------------- */
+extern "C" GAME_EXPORT const GameHooks* joy_game_get_hooks(void)
+{
+        static GameHooks hooks = {
+                GAME_ABI,
+                (uint32_t)sizeof(GameHooks),
+                NULL,
+                game_init,
+                game_event,
+                game_frame,
+                game_shutdown,
+        };
+        return &hooks;
 }

@@ -18,7 +18,7 @@ enum gameplay_control_event_k {
 };
 
 struct gc_button_meta {
-        button_p btn;
+        joy_button_p btn;
         Context* ctx;
         float w, h, x, y;
         const char* label;      // 圆心文字（攻）；同时用于选择按钮纹理
@@ -36,18 +36,18 @@ public:
     void Destroy() override;
 
 private:
-    button_p btn_attack = NULL;       // 右下攻击键（保持原样）
+    joy_button_p btn_attack = NULL;       // 右下攻击键（保持原样）
     gc_button_meta attack_meta = {};
-    joystick_p move_stick = NULL;     // 左下左摇杆：同时用于移动方向 + 瞄准方向
+    joy_joystick_p move_stick = NULL;     // 左下左摇杆：同时用于移动方向 + 瞄准方向
     int      stick_active = 0;        // 当前触点是否正在驱动摇杆
     int      last_set_ev = 0;         // 上次发送的 SET 方向事件（方向变化发 RELEASE 用）
     int      last_rel_ev = 0;
-    button_p pressed_btn = NULL;      // 当前按住中的按钮（仅攻击键）
+    joy_button_p pressed_btn = NULL;      // 当前按住中的按钮（仅攻击键）
     int      pressed_code = 0;
     int      layout_lw = 0;           // 上次同步布局时的逻辑分辨率（变化才重算）
     int      layout_lh = 0;
 
-    void add_button(button_p* slot, gc_button_meta* meta,
+    void add_button(joy_button_p* slot, gc_button_meta* meta,
                     float cx, float cy, float wf, float hf,
                     const char* label, int coolType);
     void load_controls();             // 创建左摇杆 + 攻击键

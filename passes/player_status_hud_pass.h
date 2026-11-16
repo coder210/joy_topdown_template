@@ -9,7 +9,7 @@
 #include "../asset_manager.h"
 
 static void player_status_hud_pass(entt::registry& ecs, uint32_t local_conv,
-        jr2d_p r2d, font_p font)
+        joy_r2d_p r2d, joy_font_p font)
 {
         const char* st = "--";
         const char* dirstr = "-";
@@ -64,13 +64,13 @@ static void player_status_hud_pass(entt::registry& ecs, uint32_t local_conv,
                 snprintf(buf, sizeof(buf), "HP: --  POS:(--, --)  ST: --");
         }
 
-        jcolor_t c = { 40, 40, 45, 235 };
+        joy_color_t c = { 40, 40, 45, 235 };
         // 透明调试 HUD：不铺底，用 1px 白色描边保证亮/暗背景都可读。
         // 位置收紧到 (8,20)，字号由调用方传 font12（小号），不再用 0.5 缩放。
-        jcolor_t shadow = { 255, 255, 255, 170 };
-        jtext_printf_scaled(r2d, font, buf, (int)strlen(buf), shadow,
+        joy_color_t shadow = { 255, 255, 255, 170 };
+        joy_r2d_text_printf_scaled(r2d, font, buf, (int)strlen(buf), shadow,
                             9.0f / 480.0f, 21.0f / 320.0f, 1.0f);
-        jtext_printf_scaled(r2d, font, buf, (int)strlen(buf), c,
+        joy_r2d_text_printf_scaled(r2d, font, buf, (int)strlen(buf), c,
                             8.0f / 480.0f, 20.0f / 320.0f, 1.0f);
 }
 

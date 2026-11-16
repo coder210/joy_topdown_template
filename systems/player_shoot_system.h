@@ -13,6 +13,7 @@
 #include "../systems/weapon_catalog.h"
 #include "../protocol.h"
 #include <joy/jmath.h>
+#include <cmath>
 
 struct Context;
 
@@ -44,18 +45,21 @@ static void remove_melee_events(std::vector<PlayerEventInput::Action>& v) {
 }
 
 // 鼠标瞄准角 -> 单位方向向量（定点）查表。
-// 表在首次调用时用定点三角函数（fp_cos/fp_sin）一次性生成，之后每次发射只做整数查表，
-// 逻辑路径不含浮点。角度 = q * 2π / 255（与 aim_yaw_degrees 同角度），全程定点，两端表逐位一致。
-struct AimDirFp { fp_t dx; fp_t dy; };
+// 表在首次调用时一次性生成，之后每次发射只做整数查表，逻辑路径不含浮点。
+// 角度 = q * 2π / 255（与 aim_yaw_degrees 同角度）。
+// 生成用 double 三角函数求值后立即量化成 Q32.32：double 精度远高于 32 位小数位，
+// 量化结果与平台无关（两端表逐位一致），而运行期仍只有整数查表 + 定点运算。
+struct AimDirFp { joy_fp_t dx; joy_fp_t dy; };
 
 static AimDirFp aim_yaw_dir(int q) {
     static AimDirFp table[kAimYawMax + 1];
     static bool built = false;
     if (!built) {
+        const double kTwoPi = 6.283185307179586476925286766559;
         for (int i = 0; i <= kAimYawMax; ++i) {
-            fp_t rad = fp_div(fp_mul(fp_from_int(i), FP_PI_TIMES_2), fp_from_int(255));
-            table[i].dx = fp_cos(rad);
-            table[i].dy = fp_sin(rad);
+            const double rad = kTwoPi * (double)i / (double)kAimYawMax;
+            table[i].dx = fp_from_float((float)std::cos(rad));
+            table[i].dy = fp_from_float((float)std::sin(rad));
         }
         built = true;
     }
@@ -71,15 +75,15 @@ static void spawn_player_bullet(entt::registry& registry, Context* ctx,
                                 const LogicRectComponent& lrec, int aim_yaw)
 {
     AimDirFp dir = aim_yaw_dir(aim_yaw);   // 定点查表，逻辑路径无浮点
-    fp_t dx = dir.dx;
-    fp_t dy = dir.dy;
+    joy_fp_t dx = dir.dx;
+    joy_fp_t dy = dir.dy;
 
     // 出生点：玩家中心沿瞄准方向偏移
-    fp_t cx = fp_add(lpos.x, fp_div(lrec.width,  fp_from_float(2.0f)));
-    fp_t cy = fp_add(lpos.y, fp_div(lrec.height, fp_from_float(2.0f)));
-    fp_t sx = fp_add(cx, fp_mul(dx, fp_from_float(BULLET_SPAWN_OFFSET)));
-    fp_t sy = fp_add(cy, fp_mul(dy, fp_from_float(BULLET_SPAWN_OFFSET)));
-    fp_t bw = fp_from_float(BULLET_HIT_WID), bh = fp_from_float(BULLET_HIT_LEN);
+    joy_fp_t cx = fp_add(lpos.x, fp_div(lrec.width,  fp_from_float(2.0f)));
+    joy_fp_t cy = fp_add(lpos.y, fp_div(lrec.height, fp_from_float(2.0f)));
+    joy_fp_t sx = fp_add(cx, fp_mul(dx, fp_from_float(BULLET_SPAWN_OFFSET)));
+    joy_fp_t sy = fp_add(cy, fp_mul(dy, fp_from_float(BULLET_SPAWN_OFFSET)));
+    joy_fp_t bw = fp_from_float(BULLET_HIT_WID), bh = fp_from_float(BULLET_HIT_LEN);
 
     entt::entity bullet = registry.create();
 
@@ -161,8 +165,8 @@ static void player_shoot_system(entt::registry& registry, Context* ctx, float /*
 
         // 音效与"真正发射"严格同步：只有通过冷却/瞄准检查、确实生成了箭才播放，
         // 快速连点被冷却吞掉的输入不会再响（这正是之前点攻击键音效的违和点）。
-        // 独立服务端无本机音频（bow_sound == NULL），audio_shot_play 对 NULL 安全。
-        if (ctx->bow_sound) audio_shot_play(ctx->bow_sound);
+        // 独立服务端无本机音频（bow_sound == NULL），joy_audio_shot_play 对 NULL 安全。
+        if (ctx->bow_sound) joy_audio_shot_play(ctx->bow_sound);
 
         remove_melee_events(events.pending_actions);
     }

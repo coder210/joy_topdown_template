@@ -17,7 +17,7 @@ struct Context;
 //   而 collision_system 只处理"玩家/敌人 vs 墙"，没有敌人之间的碰撞 → 直接重叠。
 //
 // 做法：对所有存活敌人两两做 AABB 相交检测，沿"最小渗透轴"把重叠量对半推开。
-//   - 纯定点数（fp_t）+ 对称推开，两端同状态同顺序 → 结果逐位一致（帧同步安全）。
+//   - 纯定点数（joy_fp_t）+ 对称推开，两端同状态同顺序 → 结果逐位一致（帧同步安全）。
 //   - 只改 LogicPositionComponent（逻辑位置），不引入任何跨端不一致的状态。
 //   - 放在 movement 之后、collision 之前：万一被推进墙里，随后的 collision_system
 //     会按最小渗透方向再把它推出来。
@@ -35,7 +35,7 @@ static void separation_system(entt::registry& registry, Context* ctx, float /*dt
     // 收集到固定数组（view 遍历顺序确定，两端一致），避免嵌套循环里反复查组件
     const int MAX_E = 256;
     entt::entity ents[MAX_E];
-    fp_t px[MAX_E], py[MAX_E], pw[MAX_E], ph[MAX_E];
+    joy_fp_t px[MAX_E], py[MAX_E], pw[MAX_E], ph[MAX_E];
     int n = 0;
 
     for (auto e : view) {
@@ -53,31 +53,31 @@ static void separation_system(entt::registry& registry, Context* ctx, float /*dt
         n++;
     }
 
-    const fp_t two = fp_from_int(2);
+    const joy_fp_t two = fp_from_int(2);
 
     for (int i = 0; i < n; i++) {
         for (int j = i + 1; j < n; j++) {
-            fp_t ax0 = px[i], ay0 = py[i];
-            fp_t ax1 = fp_add(ax0, pw[i]), ay1 = fp_add(ay0, ph[i]);
-            fp_t bx0 = px[j], by0 = py[j];
-            fp_t bx1 = fp_add(bx0, pw[j]), by1 = fp_add(by0, ph[j]);
+            joy_fp_t ax0 = px[i], ay0 = py[i];
+            joy_fp_t ax1 = fp_add(ax0, pw[i]), ay1 = fp_add(ay0, ph[i]);
+            joy_fp_t bx0 = px[j], by0 = py[j];
+            joy_fp_t bx1 = fp_add(bx0, pw[j]), by1 = fp_add(by0, ph[j]);
 
             // 两 AABB 的重叠量；任一轴 <= 0 表示不相交（仅贴边不算）
-            fp_t ox = fp_sub(fp_min(ax1, bx1), fp_max(ax0, bx0));
-            fp_t oy = fp_sub(fp_min(ay1, by1), fp_max(ay0, by0));
+            joy_fp_t ox = fp_sub(fp_min(ax1, bx1), fp_max(ax0, bx0));
+            joy_fp_t oy = fp_sub(fp_min(ay1, by1), fp_max(ay0, by0));
             if (ox <= fp_zero() || oy <= fp_zero()) continue;
 
             // 沿穿透更浅的轴推开，各推一半 → 双方对等分离
             if (ox < oy) {
-                fp_t half = fp_div(ox, two);
-                fp_t acx = fp_add(ax0, fp_div(pw[i], two));
-                fp_t bcx = fp_add(bx0, fp_div(pw[j], two));
+                joy_fp_t half = fp_div(ox, two);
+                joy_fp_t acx = fp_add(ax0, fp_div(pw[i], two));
+                joy_fp_t bcx = fp_add(bx0, fp_div(pw[j], two));
                 if (bcx >= acx) { px[i] = fp_sub(px[i], half); px[j] = fp_add(px[j], half); }
                 else            { px[i] = fp_add(px[i], half); px[j] = fp_sub(px[j], half); }
             } else {
-                fp_t half = fp_div(oy, two);
-                fp_t acy = fp_add(ay0, fp_div(ph[i], two));
-                fp_t bcy = fp_add(by0, fp_div(ph[j], two));
+                joy_fp_t half = fp_div(oy, two);
+                joy_fp_t acy = fp_add(ay0, fp_div(ph[i], two));
+                joy_fp_t bcy = fp_add(by0, fp_div(ph[j], two));
                 if (bcy >= acy) { py[i] = fp_sub(py[i], half); py[j] = fp_add(py[j], half); }
                 else            { py[i] = fp_add(py[i], half); py[j] = fp_sub(py[j], half); }
             }

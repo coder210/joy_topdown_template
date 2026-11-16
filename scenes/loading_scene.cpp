@@ -9,7 +9,7 @@ LoadingScene::LoadingScene(Context* ctx, GameModeKind mode) : Scene(ctx, "Loadin
 }
 
 void LoadingScene::Load() {
-    log_info("[loading scene] loading...");
+    joy_core_log_info("[loading scene] loading...");
 }
 
 void LoadingScene::Update(float dt) {
@@ -39,19 +39,19 @@ void LoadingScene::Update(float dt) {
 
 void LoadingScene::Render() {
     auto* self = this;
-    jr2d_p r2d = self->ctx()->r2d;
-    font_p font = AssetManager::GetInstance()->GetSimheiFont24();
+    joy_r2d_p r2d = self->ctx()->r2d;
+    joy_font_p font = AssetManager::GetInstance()->GetSimheiFont24();
 
     // 背景：白底（水墨/图纸风）
-    jcolor_t bg = { 255, 255, 255, 255 };
-    r2d_set_color(r2d, bg.r, bg.g, bg.b, bg.a);
+    joy_color_t bg = { 255, 255, 255, 255 };
+    joy_r2d_set_color(r2d, bg.r, bg.g, bg.b, bg.a);
     int w, h;
-    r2d_get_logical_presentation(r2d, &w, &h, NULL);
-    jrect_t full = { 0, 0, (float)w, (float)h };
-    shape_draw_rectangle(r2d, "fill", full);
+    joy_r2d_get_logical_presentation(r2d, &w, &h, NULL);
+    joy_rect_t full = { 0, 0, (float)w, (float)h };
+    joy_r2d_shape_draw_rectangle(r2d, "fill", full);
 
     // 加载文字（居中，墨色）
-    jcolor_t c = { 40, 40, 45, 255 };
+    joy_color_t c = { 40, 40, 45, 255 };
     char text[32];
     int dot_count = self->dot_count;
     if (dot_count == 0) snprintf(text, sizeof(text), "加载中");
@@ -61,8 +61,8 @@ void LoadingScene::Render() {
     // 水平按 120(设计稿宽度)居中、垂直居中后上移 12 —— 全部比例化
     // 按实际文字宽度居中（宽屏下固定 120/480 比例会偏左）
     int tw = 0, th = 0;
-    jtext_measurex(r2d, font, text, (int)strlen(text), c, &tw, &th);
-    jtext_printf(r2d, font, text, (int)strlen(text), c,
+    joy_r2d_text_measurex(r2d, font, text, (int)strlen(text), c, &tw, &th);
+    joy_r2d_text_printf(r2d, font, text, (int)strlen(text), c,
                  ((float)w - (float)tw) * 0.5f / (float)w, 0.5f - 12.0f / 320.0f);
 }
 

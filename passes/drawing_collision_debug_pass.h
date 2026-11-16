@@ -26,60 +26,60 @@ static void drawing_collision_debug_pass(Context* ctx)
 
     // 玩家碰撞盒：红色线框
     auto pview = ctx->ecs.view<PlayerComponent, LogicRectComponent, LogicPositionComponent>();
-    r2d_set_color(ctx->r2d, 220, 45, 45, 180);
+    joy_r2d_set_color(ctx->r2d, 220, 45, 45, 180);
     for (auto e : pview) {
         auto& pos  = pview.get<LogicPositionComponent>(e);
         auto& rect = pview.get<LogicRectComponent>(e);
         float w = fp_to_float(rect.width);
         float h = fp_to_float(rect.height);
         if (w <= 0.0f || h <= 0.0f) continue;
-        jrect_t r;
+        joy_rect_t r;
         r.x = meters_to_pixels(fp_to_float(pos.x) - cam.x);
         r.y = meters_to_pixels(fp_to_float(pos.y) - cam.y);
         r.w = meters_to_pixels(w);
         r.h = meters_to_pixels(h);
-        shape_draw_rectangle(ctx->r2d, "line", r);
+        joy_r2d_shape_draw_rectangle(ctx->r2d, "line", r);
     }
 
     // 墙碰撞盒：绿色线框（墙由 map_spawn_system 生成为 LocalOnly 实体，1×1 米）
     auto wview = ctx->ecs.view<LocalOnlyComponent, LogicRectComponent, LogicPositionComponent>();
-    r2d_set_color(ctx->r2d, 50, 200, 95, 150);
+    joy_r2d_set_color(ctx->r2d, 50, 200, 95, 150);
     for (auto e : wview) {
         auto& pos  = wview.get<LogicPositionComponent>(e);
         auto& rect = wview.get<LogicRectComponent>(e);
         float w = fp_to_float(rect.width);
         float h = fp_to_float(rect.height);
         if (w <= 0.0f || h <= 0.0f) continue;
-        jrect_t r;
+        joy_rect_t r;
         r.x = meters_to_pixels(fp_to_float(pos.x) - cam.x);
         r.y = meters_to_pixels(fp_to_float(pos.y) - cam.y);
         r.w = meters_to_pixels(w);
         r.h = meters_to_pixels(h);
-        shape_draw_rectangle(ctx->r2d, "line", r);
+        joy_r2d_shape_draw_rectangle(ctx->r2d, "line", r);
     }
 
     // 敌人碰撞盒：橙色线框（EnemyComponent + LogicRect + LogicPosition）
     // 原来 pass 只有"玩家 + 墙"两段，敌人/箭没有绘制代码，所以勾了也看不到。
     auto eview = ctx->ecs.view<EnemyComponent, LogicPositionComponent, LogicRectComponent>();
-    r2d_set_color(ctx->r2d, 240, 160, 40, 190);
+    joy_r2d_set_color(ctx->r2d, 240, 160, 40, 190);
     for (auto e : eview) {
         auto& pos  = eview.get<LogicPositionComponent>(e);
         auto& rect = eview.get<LogicRectComponent>(e);
         float w = fp_to_float(rect.width);
         float h = fp_to_float(rect.height);
         if (w <= 0.0f || h <= 0.0f) continue;
-        jrect_t r;
+        joy_rect_t r;
         r.x = meters_to_pixels(fp_to_float(pos.x) - cam.x);
         r.y = meters_to_pixels(fp_to_float(pos.y) - cam.y);
         r.w = meters_to_pixels(w);
         r.h = meters_to_pixels(h);
-        shape_draw_rectangle(ctx->r2d, "line", r);
+        joy_r2d_shape_draw_rectangle(ctx->r2d, "line", r);
     }
 
     /* 箭/子弹：画"贴图大小的旋转盒(OBB)"，必须与 bullet_system 的判定完全一致。
      * [TEST] 已去掉扫掠：只在当前位置画盒子，不覆盖整 tick 位移。 */
     auto bview = ctx->ecs.view<BulletComponent, LogicPositionComponent, LogicRectComponent>();
-    jcolor_t bc = { 60, 190, 255, 210 };
+    joy_color_t bc = { 60, 190, 255, 210 };
     for (auto e : bview) {
         auto& pos  = bview.get<LogicPositionComponent>(e);
         auto& rect = bview.get<LogicRectComponent>(e);
@@ -98,21 +98,21 @@ static void drawing_collision_debug_pass(Context* ctx)
         float dx = 1.0f, dy = 0.0f;
         if (vlen > 0.0f) { dx = vx / vlen; dy = vy / vlen; }
         // [TEST] 去掉扫掠：画"当前位置"的贴图大小旋转盒（与 bullet_system 判定一致）。
-        vec2f_t sc = { fp_from_float(ccx), fp_from_float(ccy) };
-        vec2f_t sa = { fp_from_float(dx),  fp_from_float(dy)  };
-        fp_t hlong  = fp_div(fp_from_float(BULLET_HIT_LEN), fp_from_float(2.0f));
-        fp_t hshort = fp_div(fp_from_float(BULLET_HIT_WID), fp_from_float(2.0f));
-        vec2f_t swept[8];
+        joy_vec2f_t sc = { fp_from_float(ccx), fp_from_float(ccy) };
+        joy_vec2f_t sa = { fp_from_float(dx),  fp_from_float(dy)  };
+        joy_fp_t hlong  = fp_div(fp_from_float(BULLET_HIT_LEN), fp_from_float(2.0f));
+        joy_fp_t hshort = fp_div(fp_from_float(BULLET_HIT_WID), fp_from_float(2.0f));
+        joy_vec2f_t swept[8];
         int swept_n = 0;
-        collision2df_swept_obb(sc, sa, hlong, hshort,
+        joy_collision_2df_swept_obb(sc, sa, hlong, hshort,
                                fp_zero(), fp_zero(), swept, &swept_n);
 
-        vec2_t pts[8];
+        joy_vec2_t pts[8];
         for (int i = 0; i < swept_n; i++) {
             pts[i].x = meters_to_pixels(fp_to_float(swept[i].x) - cam.x);
             pts[i].y = meters_to_pixels(fp_to_float(swept[i].y) - cam.y);
         }
-        if (swept_n >= 3) shape_draw_polygon(ctx->r2d, "line", pts, swept_n, bc);
+        if (swept_n >= 3) joy_r2d_shape_draw_polygon(ctx->r2d, "line", pts, swept_n, bc);
     }
 }
 

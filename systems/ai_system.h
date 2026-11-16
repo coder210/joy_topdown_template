@@ -20,15 +20,15 @@
 struct Context;
 
 // 定点数向零截断转 int（等价于 (int)(x / 2^32) 的 C 语义），纯整数运算，帧同步确定性。
-static inline int fp_trunc_to_int(fp_t x)
+static inline int fp_trunc_to_int(joy_fp_t x)
 {
-    int64_t q = x >> FP_FRACTIONAL_PLACES;   // 负数时偏小（floor 方向）
-    if (x < 0 && (x & (FP_ONE - 1)) != 0) q += 1;  // 向零修正
+    int64_t q = x >> JOY_FP_FRACTIONAL_PLACES;   // 负数时偏小（floor 方向）
+    if (x < 0 && (x & (JOY_FP_ONE - 1)) != 0) q += 1;  // 向零修正
     return (int)q;
 }
 
 static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
-    fp_t step = fp_mul(fp_from_float(2.5f), fp_from_float(game_runtime(ctx).FIXED_TIMESTEP));
+    joy_fp_t step = fp_mul(fp_from_float(2.5f), fp_from_float(game_runtime(ctx).FIXED_TIMESTEP));
 
     auto view = registry.view<IdComponent, EnemyComponent, AIComponent, LogicPositionComponent, ActionStateComponent>();
     auto player_view = registry.view<PlayerComponent, LogicPositionComponent, HealthComponent>();
@@ -52,16 +52,16 @@ static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
 
         // 寻找最近玩家
         bool found_player = false;
-        fp_t nearest_dist_sq = fp_mul(ai.detect_radius, ai.detect_radius);
-        fp_t nearest_px = fp_zero(), nearest_py = fp_zero();
+        joy_fp_t nearest_dist_sq = fp_mul(ai.detect_radius, ai.detect_radius);
+        joy_fp_t nearest_px = fp_zero(), nearest_py = fp_zero();
 
         for (auto p : player_view) {
             // 死亡玩家不作为敌人攻击/追击目标（不鞭尸）
             if (player_view.get<HealthComponent>(p).dead) continue;
             auto& ppos = player_view.get<LogicPositionComponent>(p);
-            fp_t dx = fp_sub(ppos.x, pos.x);
-            fp_t dy = fp_sub(ppos.y, pos.y);
-            fp_t dist_sq = fp_add(fp_mul(dx, dx), fp_mul(dy, dy));
+            joy_fp_t dx = fp_sub(ppos.x, pos.x);
+            joy_fp_t dy = fp_sub(ppos.y, pos.y);
+            joy_fp_t dist_sq = fp_add(fp_mul(dx, dx), fp_mul(dy, dy));
             if (dist_sq < nearest_dist_sq) {
                 nearest_dist_sq = dist_sq;
                 found_player = true;
@@ -71,7 +71,7 @@ static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
         }
 
         // 攻击半径判断
-        fp_t attack_dist_sq = fp_mul(ai.attack_radius, ai.attack_radius);
+        joy_fp_t attack_dist_sq = fp_mul(ai.attack_radius, ai.attack_radius);
         bool in_attack_range = found_player && (nearest_dist_sq < attack_dist_sq);
 
         if (in_attack_range) {
@@ -89,8 +89,8 @@ static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
             auto& events = registry.get<PlayerEventInput>(e);
             events.pending_actions.push_back({ 0, 0 });
 
-            fp_t dx = fp_sub(nearest_px, pos.x);
-            fp_t dy = fp_sub(nearest_py, pos.y);
+            joy_fp_t dx = fp_sub(nearest_px, pos.x);
+            joy_fp_t dy = fp_sub(nearest_py, pos.y);
             act.dir = (fp_abs(dx) > fp_abs(dy))
                 ? (dx > fp_zero() ? 2 : 1)
                 : (dy > fp_zero() ? 0 : 3);
@@ -111,8 +111,8 @@ static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
             pc.target_gy = fp_trunc_to_int(nearest_py);
             pc.dirty = true;
 
-            fp_t dx = fp_sub(nearest_px, pos.x);
-            fp_t dy = fp_sub(nearest_py, pos.y);
+            joy_fp_t dx = fp_sub(nearest_px, pos.x);
+            joy_fp_t dy = fp_sub(nearest_py, pos.y);
             act.dir = (fp_abs(dx) > fp_abs(dy))
                 ? (dx > fp_zero() ? 2 : 1)
                 : (dy > fp_zero() ? 0 : 3);
@@ -130,22 +130,22 @@ static void ai_system(entt::registry& registry, Context* ctx, float /*dt*/) {
             ai.timer--;
             if (ai.timer <= 0) {
                 // 纯定点数生成巡逻偏移（帧同步确定性，两端同 seed → 同序列 → 行为一致）。
-                // lcg_random_next 返回普通 uint32_t（[0,2^32)），经 fp_from_fraction 映射为 [0,1.0) 定点数。
+                // joy_core_lcg_random_next 返回普通 uint32_t（[0,2^32)），经 fp_from_fraction 映射为 [0,1.0) 定点数。
                 // 再 *2-1 得 [-1,1)，乘巡逻半径即得偏移（与原 float 版本偏移范围一致）。
                 auto& gs = ctx->ecs.ctx().get<GlobalState>();
-                uint32_t r1 = lcg_random_next(gs.random);
-                uint32_t r2 = lcg_random_next(gs.random);
-                fp_t fx = fp_sub(fp_mul(fp_from_fraction(r1), fp_from_float(2.0f)), fp_one());
-                fp_t fy = fp_sub(fp_mul(fp_from_fraction(r2), fp_from_float(2.0f)), fp_one());
-                fp_t rx = fp_mul(ai.patrol_radius, fx);
-                fp_t ry = fp_mul(ai.patrol_radius, fy);
+                uint32_t r1 = joy_core_lcg_random_next(gs.random);
+                uint32_t r2 = joy_core_lcg_random_next(gs.random);
+                joy_fp_t fx = fp_sub(fp_mul(fp_from_fraction(r1), fp_from_float(2.0f)), fp_one());
+                joy_fp_t fy = fp_sub(fp_mul(fp_from_fraction(r2), fp_from_float(2.0f)), fp_one());
+                joy_fp_t rx = fp_mul(ai.patrol_radius, fx);
+                joy_fp_t ry = fp_mul(ai.patrol_radius, fy);
                 ai.target_x = fp_add(ai.patrol_center_x, rx);
                 ai.target_y = fp_add(ai.patrol_center_y, ry);
                 ai.timer = 120;
             }
 
-            fp_t dx = fp_sub(ai.target_x, pos.x);
-            fp_t dy = fp_sub(ai.target_y, pos.y);
+            joy_fp_t dx = fp_sub(ai.target_x, pos.x);
+            joy_fp_t dy = fp_sub(ai.target_y, pos.y);
             // 距离阈值：小于0.2个单位则认为到达
             if (fp_abs(dx) > fp_from_float(0.2f) || fp_abs(dy) > fp_from_float(0.2f)) {
                     // 确保有 PathComponent
