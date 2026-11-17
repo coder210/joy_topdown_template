@@ -246,16 +246,20 @@ else()
     add_executable(${EXECUTABLE_NAME} ${HOST_FILES})
 endif()
 
-# 宿主只依赖 SDL（主回调 / 事件 / 加载器）
-target_link_libraries(${EXECUTABLE_NAME} PRIVATE SDL3::SDL3)
 target_include_directories(${EXECUTABLE_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(JOY_GAME_STATIC)
+    # 静态形态：游戏逻辑在 exe 里，宿主本身就是游戏 → 需要完整引擎
     target_sources(${EXECUTABLE_NAME} PRIVATE ${GAME_FILES})
     target_compile_definitions(${EXECUTABLE_NAME} PRIVATE GAME_STATIC=1 ${DISPLAY_DEFS})
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE joy::all)
     set(GAME_DEP_TARGET ${EXECUTABLE_NAME})
 else()
+    # 动态形态：宿主只调 joy 的 core 域 API（joy_core_lib_* 加载插件），
+    # 因此链 joy::core（单域静态库，只含 src/jcore.c），而不是 joy::all ——
+    # 后者是源码注入，会把整套引擎也编进 exe。引擎本体只在 game.dll 里一份。
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE joy::core)
+
     add_library(${GAME_TARGET} SHARED ${GAME_FILES})
     set_target_properties(${GAME_TARGET} PROPERTIES OUTPUT_NAME "game")
     target_link_libraries(${GAME_TARGET} PRIVATE joy::all)

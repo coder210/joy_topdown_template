@@ -12,10 +12,21 @@
  *
  * 后台验证（CI / 冒烟）：`--frames N` 跑 N 帧后自动退出，配合
  * SDL_VIDEODRIVER=dummy 可在无显示器环境验证启动是否正常。
+ *
+ * SDL 使用范围：只保留 SDL 主回调入口（平台硬约束，无法搬走）与
+ * SDL_GetBasePath（定位 exe 目录）。插件加载走 joy 的 core 域
+ * （joy_core_lib_load / joy_core_lib_symbol / joy_core_lib_unload），
+ * 宿主不再直接调用 SDL_LoadObject 系列。
+ *
+ * 代价（有意接受）：调用 joy 的 JOY_API 就必须链接 joy::all，因此 exe 里
+ * 也编译了一份引擎。它只用于加载插件——不要在宿主里用这份引擎去创建/操作
+ * 游戏对象，joy 的句柄表（joy_obj）是按实例分开的，跨副本传句柄无效。
  * ============================================================ */
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
+
+#include <joy/joy.h>   /* joy_core_lib_*：动态库加载（内部包 SDL_LoadObject） */
 
 #include "game_hooks.h"
 
@@ -48,7 +59,7 @@ typedef const GameHooks* (*joy_game_get_hooks_fn)(void);
 extern "C" const GameHooks* joy_game_get_hooks(void);
 #endif
 
-static SDL_SharedObject* g_lib   = NULL;
+static joy_lib_p    g_lib   = NULL;
 static const GameHooks*  g_hooks = NULL;
 static int               g_frames_limit = 0;   /* >0 时跑满即退出（冒烟） */
 static int               g_frame_count  = 0;
@@ -99,20 +110,20 @@ static bool load_game(const char* name)
         snprintf(path, sizeof(path), "%s", name);
     }
 
-    g_lib = SDL_LoadObject(path);
+    g_lib = joy_core_lib_load(path);
     if (!g_lib) {
         /* 回退：按裸名字交给系统搜索（CWD 已对齐 exe 目录） */
-        g_lib = SDL_LoadObject(name);
+        g_lib = joy_core_lib_load(name);
     }
     if (!g_lib) {
-        fprintf(stderr, "[host] 加载游戏插件失败: %s (%s)\n", path, SDL_GetError());
+        fprintf(stderr, "[host] 加载游戏插件失败: %s (%s)\n", path, joy_core_get_error());
         return false;
     }
 
-    joy_game_get_hooks_fn get_hooks =
-        reinterpret_cast<joy_game_get_hooks_fn>(SDL_LoadFunction(g_lib, "joy_game_get_hooks"));
+    joy_game_get_hooks_fn get_hooks = reinterpret_cast<joy_game_get_hooks_fn>(
+        joy_core_lib_symbol(g_lib, "joy_game_get_hooks"));
     if (!get_hooks) {
-        fprintf(stderr, "[host] 插件缺少 joy_game_get_hooks: %s\n", SDL_GetError());
+        fprintf(stderr, "[host] 插件缺少 joy_game_get_hooks: %s\n", joy_core_get_error());
         return false;
     }
 
@@ -182,9 +193,7 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
     if (g_hooks && g_hooks->shutdown) g_hooks->shutdown(g_hooks->game);
     g_hooks = NULL;
 #ifndef GAME_STATIC
-    if (g_lib) {
-        SDL_UnloadObject(g_lib);
-        g_lib = NULL;
-    }
+    joy_core_lib_unload(g_lib);
+    g_lib = NULL;
 #endif
 }

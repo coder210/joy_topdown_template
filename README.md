@@ -6,7 +6,7 @@ joy 引擎的顶视角（topdown）游戏模板。**游戏逻辑做成「cpp 脚
 ## 结构
 
 ```text
-host.cpp           宿主：SDL 主回调 + 加载插件 + 转发事件/每帧驱动（无游戏逻辑，只链 SDL3）
+host.cpp           宿主：SDL 主回调 + 加载插件（joy_core_lib_*）+ 转发事件/每帧驱动（无游戏逻辑）
 game_hooks.h       宿主 ↔ 插件唯一契约（GAME_ABI / GameHooks）：插件只导出 joy_game_get_hooks()
 game.cpp           游戏插件入口：init / on_event / on_frame / shutdown
 scenes/ layers/ systems/ passes/ world/ components/ network/ net/
@@ -15,8 +15,13 @@ assets/            运行时资源（POST_BUILD 拷到 exe 同目录）
 third_party/joy    引擎 submodule（含 SDL / msgpack / spine）
 ```
 
-- 宿主只链接 `SDL3::SDL3`，产出 `joy_topdown_template.exe`；
-- 插件链接 `joy::all`（引擎源码注入，全进程只有这一份引擎状态），产出 `game.dll`；
+- 宿主链接 `joy::core`（joy 的单域静态库，只含 `src/jcore.c`），产出
+  `joy_topdown_template.exe`；插件加载走 core 域的 `joy_core_lib_load /
+  joy_core_lib_symbol / joy_core_lib_unload`（内部包 SDL_LoadObject 系列），
+  宿主不再直接调 SDL 的加载函数，也**不会**把整套引擎编进 exe；
+- 边界：引擎句柄表（`joy_obj`）按实例分开，跨副本传句柄无效 —— exe 只用 core 里的
+  加载函数，游戏对象一律在插件那份引擎里创建与使用；
+- 插件链接 `joy::all`（引擎源码注入），产出 `game.dll`，整套引擎在进程里只有这一份；
 - 静态形态（iOS / wasm / Android 默认开启，`-DJOY_GAME_STATIC=ON`）把插件编进宿主，
   链接期解析 `joy_game_get_hooks()`，避开代码签名 / 动态链接配置。
 
